@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#17121f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Orbit — see when your friends are free</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --canvas:#17121f; --panel:#1e1826; --panel2:#241d2e;
+  --line:rgba(255,255,255,.075); --line-strong:rgba(255,255,255,.12);
+  --ink:#f4eef7; --muted:#9a8fa8; --faint:#6f6480;
+  --major:#b06bff; --ge:#2dd4bf; --pe:#34d399; --nstp:#f5b544; --now:#ff5d8f;
+  --hour:52px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(1000px 500px at 15% -10%, rgba(176,107,255,.10), transparent 60%),
+    radial-gradient(800px 460px at 110% 8%, rgba(45,212,191,.06), transparent 55%),
+    var(--canvas);
+  color:var(--ink); min-height:100vh; line-height:1.45; overflow-x:hidden;
+}
+button{font-family:inherit;color:inherit}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+*{scrollbar-width:none}
+
+#waves{position:fixed;inset:0;z-index:0;pointer-events:none}
+#glow{position:fixed;left:0;top:0;width:560px;height:560px;z-index:0;pointer-events:none;opacity:0;
+  background:radial-gradient(circle, rgba(176,107,255,.16), rgba(45,212,191,.05) 46%, transparent 70%);
+  mix-blend-mode:screen;transition:opacity .5s ease;will-change:transform}
+
+.appcol{position:relative;z-index:1;max-width:440px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.authcol{position:relative;z-index:1;max-width:480px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.boot{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--faint);font-size:13px;letter-spacing:.1em}
+
+/* top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:calc(14px + env(safe-area-inset-top)) 18px 10px}
+.brand-eyebrow{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--major);font-weight:600}
+.brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.02em;color:#fff;line-height:1;
+  text-shadow:0 0 18px rgba(176,107,255,.4), 0 0 44px rgba(45,212,191,.2)}
+.iconbtn{position:relative;width:42px;height:42px;border-radius:12px;background:var(--panel);border:1px solid var(--line);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s ease}
+.iconbtn:hover{border-color:var(--line-strong)}
+.nbadge{position:absolute;top:5px;right:5px;min-width:16px;height:16px;border-radius:999px;background:var(--now);color:#fff;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+.content{flex:1;overflow-y:auto;padding:6px 18px calc(96px + env(safe-area-inset-bottom));animation:rise .35s ease}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--pc)}50%{box-shadow:0 0 0 5px transparent}}
+@keyframes toastin{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+
+.eyebrow{font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--major);font-weight:600}
+.hint{font-size:12.5px;color:var(--muted);margin-top:8px}
+.small{font-size:11px;color:var(--faint)}
+
+/* story bar */
+.stories{display:flex;gap:14px;overflow-x:auto;padding:12px 2px 6px}
+.story{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;width:62px;flex:none;padding:0}
+.story-label{font-size:11px;color:var(--muted);max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.ring{padding:2.5px;border-radius:50%}
+.ring>div{padding:2px;border-radius:50%;background:var(--canvas)}
+.ring.live{animation:spin 7s linear infinite}
+.avwrap{position:relative;flex:none}
+.avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
+  font-weight:700;color:#0f0a16;letter-spacing:-.02em;flex:none;user-select:none}
+.statusdot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;border:2.5px solid var(--canvas);animation:pulse 1.8s ease-in-out infinite}
+.pinbadge{position:absolute;right:-2px;bottom:-2px;width:15px;height:15px;border-radius:50%;background:var(--panel2);
+  border:2px solid var(--canvas);display:flex;align-items:center;justify-content:center;color:var(--ge)}
+.addbubble{width:48px;height:48px;border-radius:50%;border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);background:rgba(255,255,255,.02)}
+
+/* cards & rows */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.cardrow{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:11px;
+  cursor:pointer;text-align:left;width:100%;transition:border-color .15s ease}
+.cardrow:hover{border-color:var(--line-strong)}
+.rowname{font-size:13px;font-weight:600;color:var(--ink)}
+.rowsub{font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:8px}
+
+/* buttons */
+.btn{border-radius:11px;padding:11px 14px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:border-color .15s ease, background .15s ease}
+.btn:hover{border-color:var(--line-strong)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-grad{background:linear-gradient(135deg,var(--major),var(--ge));border:none;color:#0f0a16;font-weight:700;font-family:'Space Grotesk',sans-serif}
+.btn-soft-green{background:rgba(52,211,153,.13);border:1px solid rgba(52,211,153,.4);color:var(--pe)}
+.btn-soft-red{background:rgba(255,93,143,.1);border:1px solid rgba(255,93,143,.35);color:#ffb1c8}
+.btn-block{width:100%}
+.pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--muted);
+  border-radius:999px;padding:7px 12px;font-size:12px;cursor:pointer;flex:none;transition:border-color .15s ease}
+.pill.on{background:rgba(176,107,255,.14);border-color:var(--major);color:var(--ink);font-weight:600}
+.pill.on-teal{background:rgba(45,212,191,.13);border-color:var(--ge);color:var(--ink);font-weight:600}
+.pillrow{display:flex;flex-wrap:wrap;gap:7px}
+.pillrow.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+
+/* forms */
+.flabel{font-size:10.5px;color:var(--faint);font-family:'Space Grotesk',sans-serif;letter-spacing:.1em;text-transform:uppercase;margin:14px 0 8px;font-weight:600}
+.input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink);
+  font-size:13.5px;outline:none;transition:border-color .15s ease;appearance:none}
+.input:focus{border-color:rgba(176,107,255,.55)}
+select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%, calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.formrow{display:flex;gap:10px}
+.formrow>*{flex:1;min-width:0}
+.errbox{margin-top:12px;background:rgba(255,93,143,.09);border:1px solid rgba(255,93,143,.3);border-radius:10px;padding:10px 12px;font-size:12px;color:#ffc6d8;line-height:1.5}
+.okbox{margin-top:12px;background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:10px 12px;font-size:12px;color:#b9f4dd;line-height:1.5}
+.warnbox{background:rgba(255,93,143,.09);border:1px solid rgba(255,93,143,.3);border-radius:12px;padding:12px 13px}
+
+/* password field with eye */
+.pwwrap{position:relative}
+.pwwrap .input{padding-right:44px}
+.pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:none;background:none;
+  color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.pweye:hover{color:var(--muted)}
+
+/* responsive form grids */
+.addgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+.addgrid .flabel{margin:0 0 8px}
+.f-wide{grid-column:1/-1}
+.classlist{display:grid;gap:8px}
+.profgrid{display:grid;grid-template-columns:1fr;gap:12px}
+.profgrid .flabel{margin:0 0 8px}
+
+/* schedule grid */
+.board{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:6px}
+.gridscroll{overflow:auto;border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;max-height:62vh;max-height:62dvh}
+.sgrid{display:grid;grid-template-columns:40px repeat(6,minmax(98px,1fr));min-width:620px}
+.hcell{padding:10px 4px 9px;text-align:center;border-bottom:1px solid var(--line-strong);border-left:1px solid var(--line);
+  position:sticky;top:0;z-index:10;background:var(--panel)}
+.hcell.today{background:#291b2b}
+.htime{border-bottom:1px solid var(--line-strong);position:sticky;top:0;left:0;z-index:12;background:var(--panel)}
+.dow{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12.5px}
+.cnt{display:block;font-size:10px;color:var(--faint);margin-top:2px}
+.taxis{position:sticky;left:0;z-index:9;background:var(--panel)}
+.hr{position:absolute;right:6px;transform:translateY(-6px);font-size:9.5px;color:var(--faint);font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
+.track{position:relative;border-left:1px solid var(--line);
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour) - 1px),var(--line) calc(var(--hour) - 1px),var(--line) var(--hour))}
+.track.wknd{background-color:rgba(255,255,255,.015)}
+.track.today{background-color:rgba(255,93,143,.028)}
+.cls{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
+  background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
+.cls::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);border-radius:8px 0 0 8px}
+.cname{font-weight:600;font-size:10.5px;line-height:1.15;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cmeta{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctime{font-size:9px;color:var(--c);font-weight:600;margin-top:auto;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evt{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
+  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14));border:1px dashed rgba(255,255,255,.4)}
+.evt .ctime{color:#e7d9f5}
+.nowline{position:absolute;left:0;right:0;height:2px;z-index:7;pointer-events:none;background:var(--now);box-shadow:0 0 8px rgba(255,93,143,.8)}
+.nowline::before{content:"";position:absolute;left:-2px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--now);box-shadow:0 0 10px rgba(255,93,143,.9)}
+
+/* map */
+.maparea{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;overflow:hidden;
+  background:radial-gradient(700px 400px at 30% -10%, rgba(176,107,255,.10), transparent 60%), var(--panel)}
+.mapgrid{position:absolute;inset:0;opacity:.6;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
+.zone{position:absolute;transform:translate(-50%,-50%);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;
+  padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:76px;transition:border-color .15s ease,background .15s ease}
+.zone.on{background:rgba(45,212,191,.14);border-color:var(--ge)}
+.zname{font-size:10px;color:var(--ink);font-weight:600;font-family:'Space Grotesk',sans-serif;white-space:nowrap}
+.zav{display:flex;margin-top:2px;min-height:22px;align-items:center}
+.zav .avatar{border:1.5px solid var(--panel)}
+.quiet{font-size:9.5px;color:var(--faint)}
+
+/* toggle */
+.tgl{width:46px;height:26px;border-radius:999px;border:none;cursor:pointer;background:rgba(255,255,255,.12);position:relative;transition:background .18s ease;flex:none}
+.tgl.on{background:var(--ge)}
+.tgl span{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s ease}
+.tgl.on span{left:23px}
+
+/* bottom sheet (mobile) / centered dialog (desktop) */
+.sheetback{position:fixed;inset:0;z-index:90;background:rgba(10,6,16,.72);display:flex;align-items:flex-end;justify-content:center;animation:rise .18s ease}
+.sheet{width:100%;max-width:440px;max-height:86vh;max-height:86dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--panel2);
+  border-radius:20px 20px 0 0;border-top:1px solid rgba(255,255,255,.14);padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 -20px 60px rgba(0,0,0,.6);position:relative;animation:pop .22s ease}
+.sheetbar{position:absolute;left:0;right:0;top:0;height:3px;border-radius:20px 20px 0 0}
+.sheettitle{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:#fff}
+.xbtn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex:none}
+.sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px}
+
+/* nav */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:50;max-width:440px;margin:0 auto}
+.navin{display:flex;background:rgba(24,18,32,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+.navbtn{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;position:relative;color:var(--faint)}
+.navbtn.on{color:var(--major)}
+.navbtn span{font-size:10.5px;color:var(--faint);font-weight:500}
+.navbtn.on span{color:var(--ink);font-weight:600}
+.navbadge{position:absolute;top:2px;right:50%;margin-right:-18px;min-width:15px;height:15px;border-radius:999px;background:var(--now);
+  color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
+
+/* toasts */
+.toasts{position:fixed;top:calc(12px + env(safe-area-inset-top));left:0;right:0;z-index:200;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{background:rgba(36,29,46,.97);border:1px solid rgba(176,107,255,.35);border-radius:999px;padding:10px 16px;color:var(--ink);
+  font-size:13px;font-weight:500;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:toastin .2s ease;display:flex;align-items:center;gap:8px;max-width:90vw}
+.toast .em{font-size:15px}
+
+/* auth */
+.authwrap{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 22px calc(40px + env(safe-area-inset-bottom))}
+.authcard{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px 20px;margin-top:22px}
+.authtabs{display:flex;gap:8px}
+.authtab{flex:1;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer}
+.authtab.on{background:rgba(176,107,255,.14);border-color:var(--major);color:var(--ink)}
+
+.detrow{display:flex;gap:12px;align-items:baseline;padding:8px 0}
+.detrow+.detrow{border-top:1px solid rgba(255,255,255,.08)}
+.detlab{color:var(--faint);min-width:58px;font-size:10.5px;font-family:'Space Grotesk',sans-serif;letter-spacing:.06em;text-transform:uppercase;font-weight:600;flex:none}
+.detval{color:var(--ink);font-size:13.5px;min-width:0;overflow-wrap:anywhere}
+
+a{color:var(--ge)}
+:focus-visible{outline:2px solid rgba(176,107,255,.7);outline-offset:2px}
+
+/* ============ desktop layout (≥900px) ============ */
+@media (min-width:900px){
+  .appcol{max-width:1180px;display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:auto 1fr;
+    column-gap:40px;padding:0 32px;align-items:start}
+  .topbar{grid-column:1/-1;padding:28px 4px 20px}
+  .brand{font-size:30px}
+  .content{grid-row:2;grid-column:2;overflow:visible;padding:0 2px 80px}
+  .nav{position:sticky;top:28px;bottom:auto;left:auto;right:auto;grid-row:2;grid-column:1;margin:0;max-width:none;align-self:start;z-index:5}
+  .navin{flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px;gap:2px;
+    backdrop-filter:none;-webkit-backdrop-filter:none;border-top:1px solid var(--line)}
+  .navbtn{flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 14px;border-radius:11px}
+  .navbtn.on{background:rgba(176,107,255,.12)}
+  .navbtn span{font-size:13.5px}
+  .navbadge{position:static;margin-left:auto;margin-right:0}
+  .stories{padding-top:6px}
+  .sheetback{align-items:center;padding:32px}
+  .sheet{max-width:540px;max-height:84vh;border-radius:20px;border:1px solid var(--line-strong);
+    padding-bottom:20px;box-shadow:0 30px 90px rgba(0,0,0,.65)}
+  .homegrid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;align-items:start}
+  .addgrid{grid-template-columns:2.2fr 1.4fr .95fr .95fr .95fr .95fr}
+  .addgrid .f-wide{grid-column:auto}
+  .classlist{grid-template-columns:1fr 1fr}
+  .profgrid{grid-template-columns:1fr 1fr}
+  .gridscroll{max-height:max(520px, calc(100dvh - 320px))}
+  .maparea{aspect-ratio:16/10}
+  .toasts{left:auto;right:28px;align-items:flex-end}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "preact": "https://esm.sh/preact@10.23.2",
+    "preact/hooks": "https://esm.sh/preact@10.23.2/hooks",
+    "htm": "https://esm.sh/htm@3.1.1",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="waves" aria-hidden="true"></canvas>
+<div id="glow" aria-hidden="true"></div>
+<div id="app"><div class="authcol"><div class="boot">loading orbit…</div></div></div>
+
+<script type="module">
+import { h, render, Fragment } from 'preact';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
+import htm from 'htm';
+import { createClient } from '@supabase/supabase-js';
+const html = htm.bind(h);
+
+/* ============================================================
+   CONFIG — your Supabase project. (Publishable key is safe to
+   ship publicly; never put a service_role key here.)
+   ============================================================ */
+const SUPABASE_URL = 'https://zdlevrezefagfqhflusj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_OB4qTnJFKnjO59R5BvkFTQ_AtKbtx2N';
+
+/* EDIT ME — campus zones for the map. id stays short, name is shown. */
+const ZONES = [
+  { id:'main',      name:'Main Building', x:.24, y:.28, icon:'🏛️' },
+  { id:'ccs',       name:'Academic Hall', x:.72, y:.24, icon:'🏫' },
+  { id:'library',   name:'Library',       x:.50, y:.50, icon:'📚' },
+  { id:'cafeteria', name:'Cafeteria',     x:.22, y:.70, icon:'🍜' },
+  { id:'gym',       name:'Gymnasium',     x:.76, y:.66, icon:'🏀' },
+  { id:'quad',      name:'The Quad',      x:.50, y:.84, icon:'🌳' },
+];
+
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ---------- constants ---------- */
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+const HOUR = 52, START = 7*60, END = 19*60;
+const CAT = { major:'var(--major)', ge:'var(--ge)', pe:'var(--pe)', nstp:'var(--nstp)' };
+const CATHEX = { major:'#b06bff', ge:'#2dd4bf', pe:'#34d399', nstp:'#f5b544' };
+const CATNAME = { major:'Major', ge:'Gen Ed', pe:'PE', nstp:'NSTP' };
+const KINDS = {
+  coffee:{ label:'Coffee', emoji:'☕', accent:'#f5b544' },
+  study:{ label:'Study group', emoji:'📚', accent:'#2dd4bf' },
+  lunch:{ label:'Lunch', emoji:'🍜', accent:'#34d399' },
+  hangout:{ label:'Hangout', emoji:'✨', accent:'#b06bff' },
+};
+const PING_PRESETS = [
+  { t:'Study?', e:'📖' }, { t:'Coffee?', e:'☕' }, { t:'Lunch?', e:'🍜' },
+  { t:'Where u at?', e:'📍' }, { t:'Free rn?', e:'👋' }, { t:'Walk to class?', e:'🚶' },
+];
+const ACCENTS = [
+  ['#b06bff','#2dd4bf'], ['#f5b544','#ff5d8f'], ['#2dd4bf','#34d399'],
+  ['#ff5d8f','#b06bff'], ['#34d399','#2dd4bf'], ['#b06bff','#f5b544'],
+];
+
+/* ---------- utils ---------- */
+const toMin = s => { const [h,m]=s.split(':').map(Number); return h*60+m; };
+const pxFor = m => (Math.max(START, Math.min(END, m)) - START) * (HOUR/60);
+const fmt = min => { let h=Math.floor(min/60), m=min%60, ap=h>=12?'PM':'AM', hh=h%12||12; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; };
+const nowInfo = () => { const d=new Date(); return { day:(d.getDay()+6)%7, min:d.getHours()*60+d.getMinutes() }; };
+const zoneName = id => ZONES.find(z=>z.id===id)?.name || null;
+const initialsOf = n => (n||'??').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+const firstName = n => (n||'').trim().split(/\s+/)[0] || '—';
+const ago = ts => {
+  if(!ts) return '';
+  const s = Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
+  if(s<90) return 'just now';
+  if(s<3600) return Math.round(s/60)+'m ago';
+  if(s<86400) return Math.round(s/3600)+'h ago';
+  return Math.round(s/86400)+'d ago';
+};
+const cleanHandle = s => (s||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,20);
+const uidTail = () => Math.random().toString(36).slice(2,8);
+
+/* ---------- inline icons (stroke, currentColor) ---------- */
+const I = paths => ({size=18, style=''}) => html`<svg width=${size} height=${size} viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style=${style}
+  dangerouslySetInnerHTML=${{__html:paths}} />`;
+const IcBell = I('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>');
+const IcHome = I('<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>');
+const IcPin = I('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>');
+const IcCal = I('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>');
+const IcUser = I('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>');
+const IcUsers = I('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>');
+const IcPlus = I('<path d="M5 12h14M12 5v14"/>');
+const IcX = I('<path d="M18 6 6 18M6 6l12 12"/>');
+const IcCheck = I('<path d="M20 6 9 17l-5-5"/>');
+const IcBack = I('<path d="m15 18-6-6 6-6"/>');
+const IcSend = I('<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>');
+const IcSearch = I('<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>');
+const IcTrash = I('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>');
+const IcOut = I('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>');
+const IcWarn = I('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/>');
+const IcClock = I('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>');
+const IcRadio = I('<circle cx="12" cy="12" r="2"/><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/>');
+const IcUpload = I('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>');
+const IcEye = I('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>');
+const IcEyeOff = I('<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/>');
+
+/* ---------- shared bits ---------- */
+function Avatar({ p, size=44, badge=null, ring=null }) {
+  const a1 = p?.accent1 || '#b06bff', a2 = p?.accent2 || '#2dd4bf';
+  const core = html`<div class="avatar" style=${`width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;background:linear-gradient(140deg,${a1},${a2})`}>${initialsOf(p?.display_name)}</div>`;
+  if (ring) return html`<div class="avwrap">
+    <div class=${'ring'+(ring==='live'?' live':'')} style=${ring==='live' ? `background:conic-gradient(from 0deg, ${a1}, ${a2}, ${a1})` : 'background:rgba(255,255,255,.12)'}><div>${core}</div></div>
+    ${badge}</div>`;
+  return html`<div class="avwrap">${core}${badge}</div>`;
+}
+const StatusDot = ({color}) => html`<span class="statusdot" style=${`background:${color};--pc:${color}`}></span>`;
+const PinBadge = () => html`<span class="pinbadge"><${IcPin} size=${8}/></span>`;
+const Eyebrow = ({color='var(--major)', children}) => html`<div class="eyebrow" style=${`color:${color}`}>${children}</div>`;
+
+function Sheet({ open, onClose, accent='var(--major)', children }) {
+  if (!open) return null;
+  return html`<div class="sheetback" onClick=${onClose}>
+    <div class="sheet" onClick=${e=>e.stopPropagation()}>
+      <div class="sheetbar" style=${`background:linear-gradient(90deg,${accent},transparent 72%)`}></div>
+      ${children}
+    </div></div>`;
+}
+
+/* ============================================================
+   schedule grid
+   ============================================================ */
+function Grid({ ownerId, classesByOwner, events, onPick, compact=false }) {
+  const scRef = useRef(null);
+  const nd = nowInfo();
+  const rows = (END-START)/60;
+  const myClasses = classesByOwner[ownerId] || [];
+  const myEvents = events.filter(e => {
+    const going = e.host===ownerId || (e.event_invitees||[]).some(i=>i.invitee===ownerId && i.status==='accepted');
+    return going;
+  });
+  const counts = [0,0,0,0,0,0];
+  myClasses.forEach(c=>counts[c.day]++);
+  myEvents.forEach(e=>{ if(e.day>=0 && e.day<=5) counts[e.day]++; });
+
+  // jump the viewport to "today, around now" on mount
+  useEffect(() => {
+    const el = scRef.current; if (!el) return;
+    const t = nowInfo();
+    el.scrollTop = Math.max(0, pxFor(t.min) - Math.min(el.clientHeight||420, 420)*0.35);
+    const hd = el.querySelector('.hcell.today');
+    if (hd) el.scrollLeft = Math.max(0, hd.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - 48);
+  }, [ownerId]);
+
+  return html`<div class="board"><div class="gridscroll" ref=${scRef}><div class="sgrid">
+    <div class="htime"></div>
+    ${DAYS.map((d,i)=>html`<div key=${d} class=${'hcell'+(i===nd.day?' today':'')}>
+      <div class="dow" style=${i===nd.day?'color:var(--now)':''}>${d}</div>
+      <div class="cnt">${counts[i]||'—'}</div></div>`)}
+    <div class="taxis" style=${`height:${rows*HOUR}px`}>
+      ${Array.from({length:rows+1}).map((_,hh)=>html`<div key=${hh} class="hr" style=${`top:${hh*HOUR}px`}>${fmt((7+hh)*60)}</div>`)}
+    </div>
+    ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${rows*HOUR}px`}>
+      ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
+          onClick=${()=>onPick && onPick({type:'class', row:c})}>
+        <span class="cname">${c.name}</span>
+        ${!compact && html`<span class="cmeta">${c.meta}</span>`}
+        <span class="ctime">${fmt(c.start_min)}–${fmt(c.end_min)}</span>
+      </div>`)}
+      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
+          onClick=${()=>onPick && onPick({type:'event', row:e})}>
+        <span class="cname">${KINDS[e.kind]?.emoji||'✨'} ${e.title}</span>
+        <span class="ctime">${fmt(e.start_min)}–${fmt(e.end_min)}</span>
+      </div>`)}
+      ${di===nd.day && nd.min>=START && nd.min<=END && html`<div class="nowline" style=${`top:${pxFor(nd.min)}px`}></div>`}
+    </div>`)}
+  </div></div></div>`;
+}
+
+/* ============================================================
+   status + conflicts
+   ============================================================ */
+function statusOf(pid, classesByOwner, events) {
+  const nd = nowInfo();
+  const cls = classesByOwner[pid] || [];
+  for (const c of cls) if (c.day===nd.day && c.start_min<=nd.min && c.end_min>nd.min)
+    return { kind:'class', text:`In ${c.name} · until ${fmt(c.end_min)}`, color:CATHEX[c.cat]||CATHEX.major };
+  for (const e of events) {
+    const going = e.host===pid || (e.event_invitees||[]).some(i=>i.invitee===pid && i.status==='accepted');
+    if (going && e.day===nd.day && e.start_min<=nd.min && e.end_min>nd.min)
+      return { kind:'event', text:`${KINDS[e.kind]?.label||'Plan'} · until ${fmt(e.end_min)}`, color:KINDS[e.kind]?.accent||'#b06bff' };
+  }
+  const rest = cls.filter(c=>c.day===nd.day && c.start_min>nd.min).sort((a,b)=>a.start_min-b.start_min);
+  if (rest.length) return { kind:'free', text:`Free · next class ${fmt(rest[0].start_min)}`, color:'#9a8fa8' };
+  return { kind:'free', text:'Free · no more classes today', color:'#9a8fa8' };
+}
+function conflictsFor(pid, day, s, e, classesByOwner, events) {
+  const out = [];
+  for (const c of (classesByOwner[pid]||[]))
+    if (c.day===day && c.start_min<e && c.end_min>s) out.push(`${c.name} (${fmt(c.start_min)}–${fmt(c.end_min)})`);
+  for (const ev of events) {
+    const going = ev.host===pid || (ev.event_invitees||[]).some(i=>i.invitee===pid && i.status==='accepted');
+    if (going && ev.day===day && ev.start_min<e && ev.end_min>s) out.push(`${ev.title} (${fmt(ev.start_min)}–${fmt(ev.end_min)})`);
+  }
+  return out;
+}
+
+/* ============================================================
+   AUTH SCREEN
+   ============================================================ */
+function PwInput({ value, onInput, placeholder, autocomplete, show, setShow, onEnter }) {
+  return html`<div class="pwwrap">
+    <input class="input" type=${show?'text':'password'} value=${value} onInput=${onInput}
+      placeholder=${placeholder} autocomplete=${autocomplete}
+      onKeyDown=${e=>{ if(e.key==='Enter'&&onEnter) onEnter(); }}/>
+    <button type="button" class="pweye" aria-label=${show?'Hide password':'Show password'} onClick=${()=>setShow(!show)}>
+      ${show ? html`<${IcEyeOff} size=${16}/>` : html`<${IcEye} size=${16}/>`}
+    </button>
+  </div>`;
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState('in');
+  const [f, setF] = useState({ name:'', handle:'', course:'', school:'', email:'', password:'', confirm:'' });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState('');
+  const [show, setShow] = useState(false);
+  const set = k => e => setF(v=>({ ...v, [k]: k==='handle' ? cleanHandle(e.target.value) : e.target.value }));
+
+  const friendly = m => {
+    if (!m) return 'Something went wrong. Try again.';
+    if (/already registered/i.test(m)) return 'That email already has an account — switch to Sign in.';
+    if (/invalid login/i.test(m)) return 'Wrong email or password.';
+    if (/at least 6/i.test(m)) return 'Password needs at least 6 characters.';
+    if (/relation .* does not exist|42P01/i.test(m)) return 'The database tables are missing — run orbit_database_setup.sql in Supabase → SQL Editor, then try again.';
+    if (/rate limit/i.test(m)) return 'Too many tries — wait a minute and try again.';
+    return m;
+  };
+
+  async function go() {
+    setErr(''); setOk(''); setBusy(true);
+    try {
+      if (mode==='up') {
+        if (!f.name.trim()) throw new Error('Add your name.');
+        if (f.handle.length<3) throw new Error('Handle needs 3–20 letters/numbers/underscores.');
+        if (f.password.length<6) throw new Error('Password needs at least 6 characters.');
+        if (f.password!==f.confirm) throw new Error("Passwords don't match — check the confirm field.");
+        const { data, error } = await sb.auth.signUp({
+          email:f.email.trim(), password:f.password,
+          options:{ data:{ display_name:f.name.trim(), handle:f.handle, course:f.course.trim(), school:f.school.trim() } }
+        });
+        if (error) throw error;
+        if (data.session && f.school.trim()) {
+          // best effort — needs the school column; ignored if it's not there yet
+          await sb.from('profiles').update({ school:f.school.trim() }).eq('id', data.session.user.id);
+        }
+        if (!data.session) setOk('Account created — but email confirmation is still ON in Supabase, so check your inbox for a confirm link. (To make sign-ups instant: Supabase → Authentication → Providers → Email → turn off "Confirm email".)');
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email:f.email.trim(), password:f.password });
+        if (error) throw error;
+      }
+    } catch(e) { setErr(friendly(e.message||String(e))); }
+    setBusy(false);
+  }
+
+  return html`<div class="authcol"><div class="authwrap">
+    <div class="brand-eyebrow">for students · by students</div>
+    <div class="brand" style="font-size:38px;margin-top:6px">Orbit</div>
+    <div class="hint">See when your friends are free. Plan coffee, study groups, and lunch around real class schedules — any school, any course.</div>
+    <div class="authcard">
+      <div class="authtabs">
+        <button class=${'authtab'+(mode==='in'?' on':'')} onClick=${()=>{setMode('in');setErr('');setOk('')}}>Sign in</button>
+        <button class=${'authtab'+(mode==='up'?' on':'')} onClick=${()=>{setMode('up');setErr('');setOk('')}}>Create account</button>
+      </div>
+      ${mode==='up' && html`<${Fragment}>
+        <div class="flabel">Your name</div>
+        <input class="input" value=${f.name} onInput=${set('name')} placeholder="Your full name" autocomplete="name"/>
+        <div class="flabel">Handle · how friends find you</div>
+        <input class="input" value=${f.handle} onInput=${set('handle')} placeholder="yourhandle" autocapitalize="none" autocomplete="username"/>
+        <div class="formrow">
+          <div>
+            <div class="flabel">Course · optional</div>
+            <input class="input" value=${f.course} onInput=${set('course')} placeholder="BSIT · 1st Yr"/>
+          </div>
+          <div>
+            <div class="flabel">School · optional</div>
+            <input class="input" value=${f.school} onInput=${set('school')} placeholder="Your school"/>
+          </div>
+        </div>
+      <//>`}
+      <div class="flabel">Email</div>
+      <input class="input" type="email" value=${f.email} onInput=${set('email')} placeholder="you@email.com" autocomplete="email" inputmode="email"/>
+      <div class="flabel">Password</div>
+      <${PwInput} value=${f.password} onInput=${set('password')} placeholder="at least 6 characters"
+        autocomplete=${mode==='up'?'new-password':'current-password'} show=${show} setShow=${setShow} onEnter=${mode==='in'?go:null}/>
+      ${mode==='up' && html`<${Fragment}>
+        <div class="flabel">Confirm password</div>
+        <${PwInput} value=${f.confirm} onInput=${set('confirm')} placeholder="type it again"
+          autocomplete="new-password" show=${show} setShow=${setShow} onEnter=${go}/>
+      <//>`}
+      ${err && html`<div class="errbox">${err}</div>`}
+      ${ok && html`<div class="okbox">${ok}</div>`}
+      <button class="btn btn-grad btn-block" style="margin-top:16px;padding:13px" disabled=${busy} onClick=${go}>
+        ${busy ? 'One sec…' : (mode==='up' ? 'Create my account' : 'Sign in')}
+      </button>
+    </div>
+    <div class="small" style="margin-top:14px;text-align:center">Free while we test · your schedule is visible to friends only</div>
+  </div></div>`;
+}
+
+/* ============================================================
+   MAIN SHELL — data layer + realtime + screens
+   ============================================================ */
+function Shell({ session }) {
+  const uid = session.user.id;
+  const [fatal, setFatal] = useState('');
+  const [ready, setReady] = useState(false);
+  const [me, setMe] = useState(null);
+  const [myPres, setMyPres] = useState(null);
+  const [graph, setGraph] = useState({ friends:[], incoming:[], outgoing:[] });
+  const [profiles, setProfiles] = useState({});
+  const [classesBy, setClassesBy] = useState({});
+  const [events, setEvents] = useState([]);
+  const [pings, setPings] = useState([]);
+  const [presence, setPresence] = useState({});
+  const [tab, setTab] = useState('home');
+  const [openFriend, setOpenFriend] = useState(null);
+  const [sheet, setSheet] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const [, setTick] = useState(0);
+  const profRef = useRef(profiles); profRef.current = profiles;
+  const graphRef = useRef(graph); graphRef.current = graph;
+  const evRef = useRef(events); evRef.current = events;
+
+  const toast = (text, em='') => {
+    const id = uidTail();
+    setToasts(t=>[...t,{id,text,em}]);
+    setTimeout(()=>setToasts(t=>t.filter(x=>x.id!==id)), 3600);
+  };
+  const nameOf = id => id===uid ? 'You' : (profRef.current[id]?.display_name ? firstName(profRef.current[id].display_name) : 'Someone');
+  const ensureProfiles = async ids => {
+    const need = [...new Set(ids)].filter(i=>i && i!==uid && !profRef.current[i]);
+    if (!need.length) return;
+    const { data } = await sb.from('profiles').select('*').in('id', need);
+    if (data?.length) setProfiles(m=>({ ...m, ...Object.fromEntries(data.map(p=>[p.id,p])) }));
+  };
+
+  /* ---------- loaders ---------- */
+  const friendIdsOf = g => g.friends.map(r=>r.requester===uid?r.addressee:r.requester);
+
+  async function loadMe() {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+    if (error) { if ((error.code==='42P01')||/does not exist/i.test(error.message)) setFatal('db'); return null; }
+    if (data) { setMe(data); return data; }
+    const fallback = { id:uid, handle:'user_'+uidTail()+uidTail().slice(0,4), display_name:'New Student' };
+    const { data:ins } = await sb.from('profiles').insert(fallback).select().maybeSingle();
+    setMe(ins||fallback); return ins||fallback;
+  }
+  async function loadMyPresence() {
+    const { data } = await sb.from('presence').select('*').eq('user_id', uid).maybeSingle();
+    if (data) { setMyPres(data); return; }
+    const { data:ins } = await sb.from('presence').insert({ user_id:uid }).select().maybeSingle();
+    setMyPres(ins || { user_id:uid, sharing:false, ghost:false, zone:null });
+  }
+  async function loadGraph() {
+    const { data, error } = await sb.from('friendships').select('*').or(`requester.eq.${uid},addressee.eq.${uid}`);
+    if (error) return [];
+    const g = {
+      friends: data.filter(r=>r.status==='accepted'),
+      incoming: data.filter(r=>r.status==='pending' && r.addressee===uid),
+      outgoing: data.filter(r=>r.status==='pending' && r.requester===uid),
+    };
+    setGraph(g);
+    await ensureProfiles(data.flatMap(r=>[r.requester,r.addressee]));
+    return friendIdsOf(g);
+  }
+  async function loadClasses(fids) {
+    const owners = [uid, ...fids];
+    const { data } = await sb.from('classes').select('*').in('owner', owners).order('start_min');
+    const by = {}; (data||[]).forEach(c=>{ (by[c.owner]=by[c.owner]||[]).push(c); });
+    setClassesBy(by);
+  }
+  async function loadEvents() {
+    const { data } = await sb.from('events').select('*, event_invitees(*)').order('day').order('start_min');
+    setEvents(data||[]);
+    await ensureProfiles((data||[]).flatMap(e=>[e.host, ...(e.event_invitees||[]).map(i=>i.invitee)]));
+  }
+  async function loadPings() {
+    const { data } = await sb.from('pings').select('*').or(`sender.eq.${uid},recipient.eq.${uid}`)
+      .order('created_at',{ascending:false}).limit(60);
+    setPings(data||[]);
+  }
+  async function loadPresence(fids) {
+    if (!fids.length) { setPresence({}); return; }
+    const { data } = await sb.from('presence').select('*').in('user_id', fids);
+    setPresence(Object.fromEntries((data||[]).map(r=>[r.user_id,r])));
+  }
+  async function loadAll() {
+    const meRow = await loadMe();
+    if (!meRow) { setReady(true); return; }
+    await loadMyPresence();
+    const fids = await loadGraph();
+    await Promise.all([loadClasses(fids), loadEvents(), loadPings(), loadPresence(fids)]);
+    setReady(true);
+  }
+
+  /* ---------- boot + realtime ---------- */
+  useEffect(() => {
+    loadAll();
+    const timers = {};
+    const later = (k, fn, ms=350) => { clearTimeout(timers[k]); timers[k]=setTimeout(fn, ms); };
+    const reloadGraphChain = async () => { const f = await loadGraph(); loadClasses(f); loadPresence(f); };
+
+    const ch = sb.channel('orbit-live')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'pings' }, ({ new:p }) => {
+        setPings(x => x.some(q=>q.id===p.id) ? x : [p, ...x]);
+        if (p.recipient===uid) {
+          ensureProfiles([p.sender]).then(()=> toast(p.kind==='poke' ? `${nameOf(p.sender)} waved at you` : `${nameOf(p.sender)}: ${p.text}`, p.emoji||'👋'));
+        }
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, payload => {
+        const n = payload.new || {};
+        if (payload.eventType==='INSERT' && n.addressee===uid)
+          ensureProfiles([n.requester]).then(()=>toast(`Friend request from ${nameOf(n.requester)}`, '👥'));
+        if (payload.eventType==='UPDATE' && n.status==='accepted' && n.requester===uid)
+          toast(`${nameOf(n.addressee)} accepted your request`, '🎉');
+        later('graph', reloadGraphChain);
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'events' }, () => later('events', loadEvents))
+      .on('postgres_changes', { event:'*', schema:'public', table:'event_invitees' }, payload => {
+        const n = payload.new || {};
+        if (payload.eventType==='INSERT' && n.invitee===uid) toast('New plan invite', '📨');
+        if (payload.eventType==='UPDATE' && n.status==='accepted' && n.invitee!==uid) {
+          const ev = evRef.current.find(e=>e.id===n.event_id);
+          if (ev && ev.host===uid) toast(`${nameOf(n.invitee)} is in`, '🎉');
+        }
+        later('events', loadEvents);
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'presence' }, ({ new:n }) => {
+        if (n && n.user_id && n.user_id!==uid) setPresence(m=>({ ...m, [n.user_id]:n }));
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'classes' }, () =>
+        later('classes', ()=>loadClasses(friendIdsOf(graphRef.current))))
+      .subscribe();
+
+    const tick = setInterval(() => {
+      setTick(t=>t+1);
+      // refresh friend presence periodically (covers friends turning sharing off)
+      loadPresence(friendIdsOf(graphRef.current));
+    }, 45000);
+    const vis = () => { if(!document.hidden){ setTick(t=>t+1); loadPresence(friendIdsOf(graphRef.current)); } };
+    document.addEventListener('visibilitychange', vis);
+    return () => { sb.removeChannel(ch); clearInterval(tick); document.removeEventListener('visibilitychange', vis); };
+  }, [uid]);
+
+  /* ---------- mutations ---------- */
+  async function sendRequest(otherId) {
+    const { error } = await sb.from('friendships').insert({ requester:uid, addressee:otherId });
+    if (error) { toast(/duplicate|unique/i.test(error.message) ? 'A request already exists between you two' : 'Could not send request'); }
+    else toast('Request sent', '📨');
+    const f = await loadGraph(); loadClasses(f); loadPresence(f);
+  }
+  async function acceptRequest(row) {
+    const { error } = await sb.from('friendships').update({ status:'accepted' }).eq('id', row.id);
+    if (!error) toast(`You and ${nameOf(row.requester)} are now friends`, '🎉');
+    const f = await loadGraph(); loadClasses(f); loadPresence(f);
+  }
+  async function removeFriendship(id) {
+    await sb.from('friendships').delete().eq('id', id);
+    const f = await loadGraph(); loadClasses(f); loadPresence(f);
+  }
+  async function sendPing(otherId, kind, text, emoji) {
+    const { error } = await sb.from('pings').insert({ sender:uid, recipient:otherId, kind, text, emoji });
+    if (error) toast('Could not send — are you two friends?');
+    else toast(kind==='poke' ? `Waved at ${nameOf(otherId)}` : `Sent "${text}"`, emoji);
+  }
+  async function markSeen() {
+    setPings(x=>x.map(p=>p.recipient===uid?{...p,seen:true}:p));
+    await sb.from('pings').update({ seen:true }).eq('recipient', uid).eq('seen', false);
+  }
+  async function setPres(patch) {
+    const row = { user_id:uid, sharing:!!myPres?.sharing, ghost:!!myPres?.ghost, zone:myPres?.zone||null, ...patch, updated_at:new Date().toISOString() };
+    setMyPres(row);
+    const { data } = await sb.from('presence').upsert(row).select().maybeSingle();
+    if (data) setMyPres(data);
+  }
+  async function createEvent({ kind, title, day, start_min, end_min, place, invitees }) {
+    const { data:ev, error } = await sb.from('events').insert({ host:uid, kind, title, day, start_min, end_min, place }).select().single();
+    if (error || !ev) { toast('Could not create the plan'); return false; }
+    if (invitees.length) {
+      const { error:e2 } = await sb.from('event_invitees').insert(invitees.map(i=>({ event_id:ev.id, invitee:i })));
+      if (e2) toast('Plan made, but some invites failed');
+    }
+    toast(`Invite sent to ${invitees.map(nameOf).join(' & ')}`, '📨');
+    loadEvents(); return true;
+  }
+  async function respondInvite(eventId, status) {
+    await sb.from('event_invitees').update({ status }).eq('event_id', eventId).eq('invitee', uid);
+    toast(status==='accepted' ? "It's on your schedule" : 'Declined', status==='accepted'?'✓':'');
+    loadEvents();
+  }
+  async function cancelEvent(id) {
+    await sb.from('events').delete().eq('id', id);
+    toast('Plan cancelled'); setSheet(null); loadEvents();
+  }
+  async function addClass(row) {
+    const { data, error } = await sb.from('classes').insert({ ...row, owner:uid }).select().single();
+    if (error) { toast('Could not add that class'); return false; }
+    setClassesBy(m=>({ ...m, [uid]:[...(m[uid]||[]), data].sort((a,b)=>a.start_min-b.start_min) }));
+    return true;
+  }
+  async function delClass(id) {
+    setClassesBy(m=>({ ...m, [uid]:(m[uid]||[]).filter(c=>c.id!==id) }));
+    await sb.from('classes').delete().eq('id', id);
+  }
+  async function saveProfile(patch, silent=false) {
+    let { data, error } = await sb.from('profiles').update(patch).eq('id', uid).select().maybeSingle();
+    if (error && ('school' in patch) && /school/i.test(error.message||'')) {
+      // school column not added yet — save the rest, tell them once
+      const { school, ...rest } = patch;
+      if (Object.keys(rest).length) {
+        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid).select().maybeSingle());
+      } else { data=null; error=null; }
+      if (!error) toast('Saved — run the school-column SQL in Supabase to store schools');
+    }
+    if (error) { toast(/duplicate|unique/i.test(error.message) ? 'That handle is taken' : 'Could not save'); return false; }
+    if (data) { setMe(data); if (!silent) toast('Saved', '✓'); }
+    return true;
+  }
+  async function importClasses(rows, { replace, profilePatch }) {
+    if (replace) {
+      const { error:de } = await sb.from('classes').delete().eq('owner', uid);
+      if (de) { toast('Could not clear your old schedule'); return false; }
+    }
+    const { error } = await sb.from('classes').insert(rows.map(r=>({ ...r, owner:uid })));
+    if (error) { toast('Import failed — the file has values the database rejected'); return false; }
+    if (profilePatch) await saveProfile(profilePatch, true);
+    await loadClasses(friendIdsOf(graphRef.current));
+    toast(`Imported ${rows.length} class${rows.length>1?'es':''}`, '📥');
+    return true;
+  }
+
+  /* ---------- derived ---------- */
+  const friendIds = friendIdsOf(graph);
+  const friends = friendIds.map(id=>profiles[id]).filter(Boolean);
+  const unseen = pings.filter(p=>p.recipient===uid && !p.seen).length;
+  const myInvites = events.filter(e=>(e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='pending'));
+  const reqBadge = graph.incoming.length;
+
+  if (fatal==='db') return html`<div class="authcol"><div class="authwrap">
+    <div class="brand">Orbit</div>
+    <div class="card" style="margin-top:18px">
+      <div style="font-weight:600;font-size:14px">Database not set up yet</div>
+      <div class="hint">The tables are missing. Open Supabase → SQL Editor, paste the whole <b>orbit_database_setup.sql</b> file, hit Run, then reload this page.</div>
+    </div></div></div>`;
+  if (!ready) return html`<div class="authcol"><div class="boot">loading your orbit…</div></div>`;
+
+  const friendOpen = openFriend ? profiles[openFriend] : null;
+
+  return html`<div class="appcol">
+    <div class="topbar">
+      <div><div class="brand-eyebrow">student network</div><div class="brand">Orbit</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="iconbtn" aria-label="Friends" onClick=${()=>setSheet({t:'friends'})}>
+          <${IcUsers} size=${18}/>${reqBadge>0 && html`<span class="nbadge">${reqBadge}</span>`}
+        </button>
+        <button class="iconbtn" aria-label="Signals" onClick=${()=>{setSheet({t:'inbox'});}}>
+          <${IcBell} size=${18}/>${unseen>0 && html`<span class="nbadge">${unseen}</span>`}
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      ${friendOpen ? html`<${FriendDash} f=${friendOpen} uid=${uid} classesBy=${classesBy} events=${events} presence=${presence}
+          onBack=${()=>setOpenFriend(null)}
+          onPoke=${()=>sendPing(friendOpen.id,'poke','waved at you','👋')}
+          onPing=${()=>setSheet({t:'ping', id:friendOpen.id})}
+          onPlan=${()=>setSheet({t:'creator', pre:friendOpen.id})}
+          onPick=${d=>setSheet({t:'detail', d})} />`
+      : tab==='home' ? html`<${Home} uid=${uid} me=${me} friends=${friends} classesBy=${classesBy} events=${events} presence=${presence}
+          onOpenFriend=${id=>setOpenFriend(id)} onYou=${()=>setTab('you')} onAdd=${()=>setSheet({t:'friends'})} />`
+      : tab==='map' ? html`<${MapScreen} uid=${uid} me=${me} friends=${friends} presence=${presence} myPres=${myPres} setPres=${setPres}
+          classesBy=${classesBy} events=${events} onOpenFriend=${id=>setOpenFriend(id)} />`
+      : tab==='plans' ? html`<${Plans} uid=${uid} events=${events} myInvites=${myInvites} classesBy=${classesBy}
+          nameOf=${nameOf} profiles=${profiles} me=${me}
+          onRespond=${respondInvite} onNew=${()=>setSheet({t:'creator'})} onOpen=${e=>setSheet({t:'detail', d:{type:'event',row:e}})} />`
+      : html`<${You} me=${me} uid=${uid} classesBy=${classesBy} events=${events} saveProfile=${saveProfile}
+          addClass=${addClass} delClass=${delClass} onPick=${d=>setSheet({t:'detail', d})} onImport=${()=>setSheet({t:'import'})} />`}
+    </div>
+
+    <div class="nav"><div class="navin">
+      ${[['home','Orbit',IcHome],['map','Map',IcPin],['plans','Plans',IcCal],['you','You',IcUser]].map(([id,lbl,Ic])=>{
+        const on = tab===id && !friendOpen;
+        return html`<button key=${id} class=${'navbtn'+(on?' on':'')} onClick=${()=>{setOpenFriend(null);setTab(id)}}>
+          <${Ic} size=${21}/><span>${lbl}</span>
+          ${id==='plans' && myInvites.length>0 && html`<span class="navbadge">${myInvites.length}</span>`}
+        </button>`;})}
+    </div></div>
+
+    <${Sheet} open=${sheet?.t==='friends'} onClose=${()=>setSheet(null)} accent="var(--ge)">
+      <${FriendsSheet} uid=${uid} graph=${graph} profiles=${profiles}
+        sendRequest=${sendRequest} acceptRequest=${acceptRequest} removeFriendship=${removeFriendship}
+        onOpen=${id=>{setSheet(null);setOpenFriend(id)}} onClose=${()=>setSheet(null)} />
+    <//>
+    <${Sheet} open=${sheet?.t==='inbox'} onClose=${()=>{setSheet(null);markSeen()}} accent="var(--now)">
+      <${Inbox} uid=${uid} pings=${pings} profiles=${profiles} nameOf=${nameOf} onClose=${()=>{setSheet(null);markSeen()}} markSeen=${markSeen}/>
+    <//>
+    <${Sheet} open=${sheet?.t==='ping'} onClose=${()=>setSheet(null)} accent="var(--ge)">
+      ${sheet?.t==='ping' && html`<${PingSheet} f=${profiles[sheet.id]} onSend=${(t,e)=>{sendPing(sheet.id,'ping',t,e);setSheet(null)}} />`}
+    <//>
+    <${Sheet} open=${sheet?.t==='creator'} onClose=${()=>setSheet(null)} accent="var(--major)">
+      ${sheet?.t==='creator' && html`<${Creator} uid=${uid} pre=${sheet.pre} friends=${friends} classesBy=${classesBy} events=${events}
+        onClose=${()=>setSheet(null)} onCreate=${async spec=>{ if(await createEvent(spec)){ setSheet(null); setOpenFriend(null); setTab('plans'); } }} />`}
+    <//>
+    <${Sheet} open=${sheet?.t==='detail'} onClose=${()=>setSheet(null)}
+      accent=${sheet?.d?.type==='event' ? 'var(--major)' : (sheet?.d ? (CAT[sheet.d.row.cat]||'var(--major)') : 'var(--major)')}>
+      ${sheet?.t==='detail' && html`<${Detail} d=${sheet.d} uid=${uid} profiles=${profiles} nameOf=${nameOf} onCancel=${cancelEvent} />`}
+    <//>
+    <${Sheet} open=${sheet?.t==='import'} onClose=${()=>setSheet(null)} accent="var(--ge)">
+      ${sheet?.t==='import' && html`<${ImportSheet} onClose=${()=>setSheet(null)}
+        onImport=${async(rows,opts)=>{ const ok=await importClasses(rows,opts); if(ok) setSheet(null); }} />`}
+    <//>
+
+    <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast">${t.em && html`<span class="em">${t.em}</span>`}${t.text}</div>`)}</div>
+  </div>`;
+}
+
+/* ============================================================
+   HOME
+   ============================================================ */
+function Home({ uid, me, friends, classesBy, events, presence, onOpenFriend, onYou, onAdd }) {
+  const nd = nowInfo();
+  const withStatus = friends.map(f=>({ f, st: statusOf(f.id, classesBy, events) }));
+  const inClass = withStatus.filter(x=>x.st.kind!=='free');
+  const free = withStatus.filter(x=>x.st.kind==='free');
+  const upcoming = events
+    .filter(e => e.host===uid || (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='accepted'))
+    .filter(e => e.day>nd.day || (e.day===nd.day && e.end_min>nd.min))
+    .sort((a,b)=>a.day-b.day||a.start_min-b.start_min).slice(0,3);
+  const noClasses = !(classesBy[uid]||[]).length;
+
+  return html`<div>
+    <${Eyebrow}>Your orbit<//>
+    <div class="stories">
+      <button class="story" onClick=${onYou}>
+        <div class="ring" style=${`background:linear-gradient(140deg,${me?.accent1||'#b06bff'},${me?.accent2||'#2dd4bf'})`}><div><${Avatar} p=${me} size=${48}/></div></div>
+        <div class="story-label">You</div>
+      </button>
+      <button class="story" onClick=${onAdd}>
+        <div class="addbubble"><${IcPlus} size=${20}/></div>
+        <div class="story-label">Add</div>
+      </button>
+      ${withStatus.map(({f,st})=>html`<button key=${f.id} class="story" onClick=${()=>onOpenFriend(f.id)}>
+        <${Avatar} p=${f} size=${48} ring=${st.kind!=='free'?'live':'seen'}
+          badge=${st.kind!=='free' ? html`<${StatusDot} color=${st.color}/>` : (presence[f.id]?.zone ? html`<${PinBadge}/>` : null)} />
+        <div class="story-label">${firstName(f.display_name)}</div>
+      </button>`)}
+    </div>
+
+    ${noClasses && html`<div class="card" style="margin-top:10px;border-color:rgba(176,107,255,.4)">
+      <div style="font-weight:600;font-size:13.5px">Add your class schedule</div>
+      <div class="hint" style="margin-top:4px">Friends can only see when you're free once your classes are in. Add them by hand — or import a schedule file in two taps.</div>
+      <button class="btn btn-grad" style="margin-top:12px" onClick=${onYou}>Open the You tab</button>
+    </div>`}
+
+    ${!friends.length && !noClasses && html`<div class="card" style="margin-top:10px">
+      <div style="font-weight:600;font-size:13.5px">It's quiet in here</div>
+      <div class="hint" style="margin-top:4px">Add friends by their handle and their schedules, pings, and plans light this screen up.</div>
+      <button class="btn btn-grad" style="margin-top:12px" onClick=${onAdd}>Find friends</button>
+    </div>`}
+
+    <div class="homegrid">
+      ${withStatus.length>0 && html`<div style="margin-top:20px">
+        <${Eyebrow} color="var(--ge)">Right now<//>
+        <div class="stack" style="margin-top:12px">
+          ${[...inClass, ...free.slice(0, inClass.length?2:4)].map(({f,st})=>html`
+            <button key=${f.id} class="cardrow" onClick=${()=>onOpenFriend(f.id)}>
+              <${Avatar} p=${f} size=${38}/>
+              <div style="min-width:0;flex:1">
+                <div class="rowname">${firstName(f.display_name)}</div>
+                <div class="rowsub" style=${`color:${st.color}`}>${st.text}</div>
+              </div>
+              ${presence[f.id]?.zone && html`<div class="small" style="display:flex;align-items:center;gap:4px;color:var(--faint)">
+                <span style="color:var(--ge);display:flex"><${IcPin} size=${11}/></span>${zoneName(presence[f.id].zone)}</div>`}
+            </button>`)}
+        </div>
+      </div>`}
+
+      ${upcoming.length>0 && html`<div style="margin-top:20px">
+        <${Eyebrow} color="var(--nstp)">Coming up<//>
+        <div class="stack" style="margin-top:12px">
+          ${upcoming.map(e=>{
+            const K = KINDS[e.kind]||KINDS.hangout;
+            return html`<div key=${e.id} class="cardrow" style="cursor:default">
+              <div style=${`width:34px;height:34px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:16px`}>${K.emoji}</div>
+              <div style="min-width:0;flex:1">
+                <div class="rowname" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title}</div>
+                <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+              </div>
+            </div>`;})}
+        </div>
+      </div>`}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   FRIEND DASHBOARD
+   ============================================================ */
+function FriendDash({ f, uid, classesBy, events, presence, onBack, onPoke, onPing, onPlan, onPick }) {
+  const st = statusOf(f.id, classesBy, events);
+  const pres = presence[f.id];
+  return html`<div style="animation:pop .2s ease">
+    <button class="btn" style="border:none;background:none;padding:0;color:var(--muted);margin-bottom:14px" onClick=${onBack}>
+      <${IcBack} size=${17}/> Orbit</button>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <${Avatar} p=${f} size=${58}/>
+      <div style="min-width:0">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:-.01em">${f.display_name}</div>
+        <div class="rowsub">@${f.handle}${f.course?` · ${f.course}`:''}${f.school?` · ${f.school}`:''}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <div class="card" style="flex:1;padding:11px 13px">
+        <div class="flabel" style="margin:0 0 4px">Status</div>
+        <div style=${`font-size:12.5px;font-weight:600;line-height:1.3;color:${st.color}`}>${st.text}</div>
+      </div>
+      <div class="card" style="flex:1;padding:11px 13px">
+        <div class="flabel" style="margin:0 0 4px">Location</div>
+        <div style=${`font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px;color:${pres?.zone?'var(--ge)':'var(--faint)'}`}>
+          ${pres?.zone ? html`<${IcPin} size=${13}/>${zoneName(pres.zone)}` : 'Not sharing'}
+        </div>
+        ${pres?.zone && html`<div class="small" style="margin-top:2px">${ago(pres.updated_at)}</div>`}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      ${[['👋','Poke',onPoke],['📡','Ping',onPing],['🗓️','Plan',onPlan]].map(([em,lbl,fn])=>html`
+        <button key=${lbl} class="btn" style="flex:1;flex-direction:column;gap:5px;padding:12px 8px" onClick=${fn}>
+          <span style="font-size:17px">${em}</span><span style="font-size:12px">${lbl}</span></button>`)}
+    </div>
+    <${Eyebrow}>${firstName(f.display_name)}'s week<//>
+    <div style="margin-top:12px">
+      ${(classesBy[f.id]||[]).length
+        ? html`<${Grid} ownerId=${f.id} classesByOwner=${classesBy} events=${events} onPick=${onPick} compact/>`
+        : html`<div class="card"><div class="hint" style="margin:0">${firstName(f.display_name)} hasn't added a schedule yet.</div></div>`}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   FRIENDS SHEET (search, requests, list)
+   ============================================================ */
+function FriendsSheet({ uid, graph, profiles, sendRequest, acceptRequest, removeFriendship, onOpen, onClose }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function search() {
+    const term = q.trim().replace(/[%,()]/g,'');
+    if (term.length<2) { setResults([]); return; }
+    setBusy(true);
+    const { data } = await sb.from('profiles').select('*')
+      .or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`).neq('id', uid).limit(8);
+    setResults(data||[]); setBusy(false);
+  }
+  const relOf = id => {
+    if (graph.friends.some(r=>r.requester===id||r.addressee===id)) return 'friend';
+    if (graph.outgoing.some(r=>r.addressee===id)) return 'sent';
+    if (graph.incoming.some(r=>r.requester===id)) return 'incoming';
+    return 'none';
+  };
+  const friendRows = graph.friends.map(r=>({ row:r, p:profiles[r.requester===uid?r.addressee:r.requester] })).filter(x=>x.p);
+
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">Friends</div>
+      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+
+    <div style="display:flex;gap:8px">
+      <input class="input" placeholder="Search by handle or name…" value=${q}
+        onInput=${e=>setQ(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')search()}} autocapitalize="none"/>
+      <button class="btn" style="flex:none;padding:11px 13px" onClick=${search}><${IcSearch} size=${16}/></button>
+    </div>
+    ${busy && html`<div class="small" style="margin-top:10px">searching…</div>`}
+    ${results && !busy && html`<div class="stack" style="margin-top:12px">
+      ${!results.length && html`<div class="small">No one found — check the exact handle with your friend.</div>`}
+      ${results.map(p=>{
+        const rel = relOf(p.id);
+        return html`<div key=${p.id} class="cardrow" style="cursor:default">
+          <${Avatar} p=${p} size=${38}/>
+          <div style="min-width:0;flex:1">
+            <div class="rowname">${p.display_name}</div>
+            <div class="rowsub">@${p.handle}${p.course?` · ${p.course}`:''}</div>
+          </div>
+          ${rel==='none' && html`<button class="btn btn-grad" style="padding:8px 13px;flex:none" onClick=${()=>sendRequest(p.id)}>Add</button>`}
+          ${rel==='sent' && html`<span class="small" style="flex:none">Requested</span>`}
+          ${rel==='incoming' && html`<span class="small" style="flex:none">Check requests ↓</span>`}
+          ${rel==='friend' && html`<span class="small" style="color:var(--pe);flex:none">Friends ✓</span>`}
+        </div>`;})}
+    </div>`}
+
+    ${graph.incoming.length>0 && html`<div>
+      <div class="flabel" style="color:var(--now)">Requests · ${graph.incoming.length}</div>
+      <div class="stack">
+        ${graph.incoming.map(r=>{
+          const p = profiles[r.requester];
+          return html`<div key=${r.id} class="cardrow" style="cursor:default">
+            <${Avatar} p=${p||{display_name:'??'}} size=${38}/>
+            <div style="min-width:0;flex:1">
+              <div class="rowname">${p?.display_name||'Someone'}</div>
+              <div class="rowsub">@${p?.handle||'…'}</div>
+            </div>
+            <button class="btn btn-soft-green" style="padding:8px 12px;flex:none" onClick=${()=>acceptRequest(r)}><${IcCheck} size=${14}/></button>
+            <button class="btn" style="padding:8px 12px;flex:none" onClick=${()=>removeFriendship(r.id)}><${IcX} size=${14}/></button>
+          </div>`;})}
+      </div>
+    </div>`}
+
+    ${graph.outgoing.length>0 && html`<div>
+      <div class="flabel">Sent · waiting</div>
+      <div class="stack">
+        ${graph.outgoing.map(r=>{
+          const p = profiles[r.addressee];
+          return html`<div key=${r.id} class="cardrow" style="cursor:default;opacity:.85">
+            <${Avatar} p=${p||{display_name:'??'}} size=${34}/>
+            <div style="min-width:0;flex:1"><div class="rowname" style="font-size:12.5px">${p?.display_name||'Someone'}</div></div>
+            <button class="btn" style="padding:7px 11px;font-size:11.5px;flex:none" onClick=${()=>removeFriendship(r.id)}>Cancel</button>
+          </div>`;})}
+      </div>
+    </div>`}
+
+    <div class="flabel">Your friends · ${friendRows.length}</div>
+    <div class="stack">
+      ${!friendRows.length && html`<div class="small">No friends yet — search a handle above. Tip: tell friends your handle so they can add you too.</div>`}
+      ${friendRows.map(({row,p})=>html`<div key=${row.id} class="cardrow" style="cursor:default">
+        <button style="display:flex;align-items:center;gap:11px;background:none;border:none;cursor:pointer;flex:1;min-width:0;padding:0;text-align:left" onClick=${()=>onOpen(p.id)}>
+          <${Avatar} p=${p} size=${38}/>
+          <div style="min-width:0">
+            <div class="rowname">${p.display_name}</div>
+            <div class="rowsub">@${p.handle}</div>
+          </div>
+        </button>
+        <button class="btn" style="padding:8px 11px;flex:none" title="Unfriend"
+          onClick=${()=>{ if(confirm(`Remove ${p.display_name} from your friends?`)) removeFriendship(row.id); }}><${IcTrash} size=${14}/></button>
+      </div>`)}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   MAP
+   ============================================================ */
+function MapScreen({ uid, me, friends, presence, myPres, setPres, classesBy, events, onOpenFriend }) {
+  const [sel, setSel] = useState(null);
+  const visible = friends.filter(f=>presence[f.id]?.zone);
+  const here = zid => visible.filter(f=>presence[f.id].zone===zid);
+  const sharingOn = !!myPres?.sharing && !myPres?.ghost;
+
+  return html`<div>
+    <${Eyebrow} color="var(--ge)">Campus<//>
+    <div class="hint" style="margin-bottom:14px">Zone check-ins, not GPS tracking. You choose what you share — nothing is on by default, and only friends can ever see it.</div>
+
+    <div class="maparea">
+      <div class="mapgrid"></div>
+      ${ZONES.map(z=>{
+        const ppl = here(z.id);
+        const meHere = sharingOn && myPres?.zone===z.id;
+        return html`<button key=${z.id} class=${'zone'+(sel===z.id?' on':'')}
+            style=${`left:${z.x*100}%;top:${z.y*100}%`} onClick=${()=>setSel(sel===z.id?null:z.id)}>
+          <div style="font-size:18px">${z.icon}</div>
+          <div class="zname">${z.name}</div>
+          <div class="zav">
+            ${meHere && html`<${Avatar} p=${me} size=${22}/>`}
+            ${ppl.slice(0,3).map((f,i)=>html`<div key=${f.id} style=${`margin-left:${(i===0&&!meHere)?0:-8}px`}><${Avatar} p=${f} size=${22}/></div>`)}
+            ${(ppl.length+(meHere?1:0))===0 && html`<span class="quiet">quiet</span>`}
+          </div>
+        </button>`;})}
+    </div>
+
+    ${sel && html`<div style="margin-top:14px">
+      <${Eyebrow}>${zoneName(sel)}<//>
+      <div class="stack" style="margin-top:10px">
+        ${!here(sel).length && html`<div class="small">No friends sharing here right now.</div>`}
+        ${here(sel).map(f=>{
+          const st = statusOf(f.id, classesBy, events);
+          return html`<button key=${f.id} class="cardrow" onClick=${()=>onOpenFriend(f.id)}>
+            <${Avatar} p=${f} size=${38}/>
+            <div style="min-width:0;flex:1">
+              <div class="rowname">${firstName(f.display_name)}</div>
+              <div class="rowsub" style=${`color:${st.color}`}>${st.text}</div>
+            </div>
+            <div class="small">${ago(presence[f.id].updated_at)}</div>
+          </button>`;})}
+      </div>
+    </div>`}
+
+    <div class="card" style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <span style=${`display:flex;color:${sharingOn?'var(--ge)':'var(--faint)'}`}><${IcRadio} size=${16}/></span>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600">Share my location</div>
+            <div class="rowsub">${sharingOn ? `Friends see you at ${zoneName(myPres?.zone)||'— pick a zone below'}` : 'Hidden from everyone'}</div>
+          </div>
+        </div>
+        <button class=${'tgl'+(sharingOn?' on':'')} aria-label="Toggle sharing"
+          onClick=${()=>setPres({ sharing:!sharingOn, ghost:false })}><span></span></button>
+      </div>
+      ${sharingOn && html`<div style="margin-top:14px">
+        <div class="flabel" style="margin-top:0">I'm at</div>
+        <div class="pillrow">
+          ${ZONES.map(z=>html`<button key=${z.id} class=${'pill'+(myPres?.zone===z.id?' on-teal':'')}
+            onClick=${()=>setPres({ zone:z.id })}>${z.icon} ${z.name}</button>`)}
+        </div>
+      </div>`}
+      <button class=${'btn btn-block'} style=${`margin-top:14px;${myPres?.ghost?'border-color:var(--major);background:rgba(176,107,255,.14)':''}`}
+        onClick=${()=>setPres({ ghost:!myPres?.ghost })}>
+        👻 ${myPres?.ghost ? "Ghost mode on — you're invisible" : 'Ghost mode'}
+      </button>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   PLANS
+   ============================================================ */
+function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen }) {
+  const nd = nowInfo();
+  const going = e => e.host===uid || (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='accepted');
+  const future = e => e.day>nd.day || (e.day===nd.day && e.end_min>nd.min);
+  const confirmed = events.filter(e=>going(e) && future(e)).sort((a,b)=>a.day-b.day||a.start_min-b.start_min);
+  const waiting = events.filter(e=>e.host===uid && (e.event_invitees||[]).some(i=>i.status==='pending'));
+
+  return html`<div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <${Eyebrow} color="var(--nstp)">Plans<//>
+      <button class="btn btn-grad" style="border-radius:999px;padding:8px 14px" onClick=${onNew}><${IcPlus} size=${15}/> New plan</button>
+    </div>
+
+    ${myInvites.length>0 && html`<div style="margin-top:18px">
+      <div class="flabel" style="color:var(--now);margin-top:0">Invites · ${myInvites.length}</div>
+      <div class="stack">
+        ${myInvites.map(e=>{
+          const K = KINDS[e.kind]||KINDS.hangout;
+          const conf = conflictsFor(uid, e.day, e.start_min, e.end_min, classesBy, events.filter(x=>x.id!==e.id));
+          return html`<div key=${e.id} class="card" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:11px">
+              <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${K.emoji}</div>
+              <div style="min-width:0;flex:1">
+                <div class="rowname" style="font-size:13.5px">${e.title}</div>
+                <div class="rowsub">from ${nameOf(e.host)} · ${DAYS[e.day]} ${fmt(e.start_min)}–${fmt(e.end_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+              </div>
+            </div>
+            ${conf.length>0 && html`<div class="warnbox" style="margin-top:10px;display:flex;gap:8px;align-items:flex-start">
+              <span style="color:var(--now);display:flex;flex:none;margin-top:1px"><${IcWarn} size=${14}/></span>
+              <div style="font-size:11.5px;color:#ffc6d8">Heads up — you have <b>${conf.join(', ')}</b> then.</div>
+            </div>`}
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-soft-green" style="flex:1" onClick=${()=>onRespond(e.id,'accepted')}><${IcCheck} size=${15}/> Accept</button>
+              <button class="btn" style="flex:1" onClick=${()=>onRespond(e.id,'declined')}>Decline</button>
+            </div>
+          </div>`;})}
+      </div>
+    </div>`}
+
+    ${waiting.length>0 && html`<div style="margin-top:20px">
+      <div class="flabel" style="margin-top:0">Waiting on replies</div>
+      <div class="stack">
+        ${waiting.map(e=>{
+          const pend = (e.event_invitees||[]).filter(i=>i.status==='pending').map(i=>nameOf(i.invitee)).join(', ');
+          return html`<button key=${e.id} class="cardrow" style="border-style:dashed;opacity:.9" onClick=${()=>onOpen(e)}>
+            <span style="font-size:16px;flex:none">${KINDS[e.kind]?.emoji||'✨'}</span>
+            <div style="min-width:0;flex:1">
+              <div class="rowname" style="font-size:12.5px">${e.title}</div>
+              <div class="rowsub">${DAYS[e.day]} ${fmt(e.start_min)} · waiting on ${pend}</div>
+            </div>
+            <span style="color:var(--faint);display:flex;flex:none"><${IcClock} size=${14}/></span>
+          </button>`;})}
+      </div>
+    </div>`}
+
+    <div style="margin-top:20px">
+      <div class="flabel" style="color:var(--ge);margin-top:0">Confirmed</div>
+      <div class="stack">
+        ${!confirmed.length && html`<div class="small">Nothing booked yet. Tap New plan to set something up.</div>`}
+        ${confirmed.map(e=>{
+          const K = KINDS[e.kind]||KINDS.hangout;
+          const ppl = [e.host, ...(e.event_invitees||[]).filter(i=>i.status==='accepted').map(i=>i.invitee)];
+          return html`<button key=${e.id} class="cardrow" style="background:linear-gradient(135deg,rgba(176,107,255,.10),rgba(45,212,191,.07));border-color:var(--line-strong);align-items:flex-start;flex-direction:column;gap:10px" onClick=${()=>onOpen(e)}>
+            <div style="display:flex;align-items:center;gap:11px;width:100%">
+              <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${K.emoji}</div>
+              <div style="min-width:0;flex:1">
+                <div class="rowname" style="font-size:13.5px">${e.title}</div>
+                <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center">
+              ${ppl.slice(0,5).map((id,i)=>html`<div key=${id} style=${`margin-left:${i?-8:0}px`}><${Avatar} p=${id===uid?me:profiles[id]} size=${24}/></div>`)}
+              <span class="small" style="margin-left:10px">${ppl.length} going</span>
+            </div>
+          </button>`;})}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   PLAN CREATOR
+   ============================================================ */
+function Creator({ uid, pre, friends, classesBy, events, onClose, onCreate }) {
+  const nd = nowInfo();
+  const [kind, setKind] = useState('coffee');
+  const [title, setTitle] = useState('');
+  const [day, setDay] = useState(Math.min(nd.day,5));
+  const [start, setStart] = useState(15*60);
+  const [dur, setDur] = useState(90);
+  const [place, setPlace] = useState('library');
+  const [inv, setInv] = useState(pre ? [pre] : []);
+  const [busy, setBusy] = useState(false);
+  const end = start + dur;
+  const toggle = id => setInv(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
+  const nmOf = id => firstName(friends.find(f=>f.id===id)?.display_name||'');
+
+  const finalTitle = title.trim() || `${KINDS[kind].label}${inv.length?` with ${inv.map(nmOf).join(' & ')}`:''}`;
+  const warnings = useMemo(()=>{
+    const w = [];
+    const mine = conflictsFor(uid, day, start, end, classesBy, events);
+    if (mine.length) w.push({ who:'You', items:mine });
+    inv.forEach(id=>{ const c = conflictsFor(id, day, start, end, classesBy, events); if (c.length) w.push({ who:nmOf(id), items:c }); });
+    return w;
+  }, [day, start, end, inv, classesBy, events]);
+
+  const times = []; for(let m=7*60; m<=18*60; m+=30) times.push(m);
+
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">New plan</div>
+      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+
+    <div style="display:flex;gap:8px">
+      ${Object.entries(KINDS).map(([k,K])=>html`<button key=${k}
+        class="btn" style=${`flex:1;flex-direction:column;gap:5px;padding:11px 6px;${kind===k?`background:${K.accent}20;border-color:${K.accent}`:''}`}
+        onClick=${()=>setKind(k)}>
+        <span style="font-size:17px">${K.emoji}</span>
+        <span style=${`font-size:10.5px;${kind===k?'color:var(--ink)':'color:var(--muted)'}`}>${K.label}</span>
+      </button>`)}
+    </div>
+
+    <div class="flabel">Title · optional</div>
+    <input class="input" value=${title} onInput=${e=>setTitle(e.target.value)} placeholder=${finalTitle}/>
+
+    <div class="flabel">Day</div>
+    <div class="pillrow scroll">
+      ${DAYS.map((d,i)=>html`<button key=${d} class=${'pill'+(day===i?' on':'')} onClick=${()=>setDay(i)} style="font-weight:600">${d}</button>`)}
+    </div>
+
+    <div class="formrow">
+      <div><div class="flabel">Start</div>
+        <select class="input" value=${start} onChange=${e=>setStart(+e.target.value)}>
+          ${times.map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
+        </select></div>
+      <div><div class="flabel">Length</div>
+        <select class="input" value=${dur} onChange=${e=>setDur(+e.target.value)}>
+          ${[30,60,90,120,180].map(d=>html`<option key=${d} value=${d}>${d<60?`${d} min`:`${d/60} hr${d>60?'s':''}`}</option>`)}
+        </select></div>
+    </div>
+
+    <div class="flabel">Where</div>
+    <div class="pillrow">
+      ${ZONES.map(z=>html`<button key=${z.id} class=${'pill'+(place===z.id?' on-teal':'')} onClick=${()=>setPlace(z.id)}>${z.icon} ${z.name}</button>`)}
+    </div>
+
+    <div class="flabel">Invite</div>
+    ${!friends.length && html`<div class="small">Add some friends first — plans need people.</div>`}
+    <div class="pillrow">
+      ${friends.map(f=>{
+        const on = inv.includes(f.id);
+        return html`<button key=${f.id} class=${'pill'+(on?' on':'')} style="padding:5px 11px 5px 5px" onClick=${()=>toggle(f.id)}>
+          <${Avatar} p=${f} size=${24}/> ${firstName(f.display_name)} ${on && html`<${IcCheck} size=${13}/>`}
+        </button>`;})}
+    </div>
+
+    ${warnings.length>0 && html`<div class="warnbox" style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+        <span style="color:var(--now);display:flex"><${IcWarn} size=${15}/></span>
+        <span style="font-size:12.5px;font-weight:600;color:#ffc6d8">Schedule clash</span>
+      </div>
+      ${warnings.map(w=>html`<div key=${w.who} style="font-size:11.5px;color:#ffd4e0;line-height:1.5"><b>${w.who}</b> has ${w.items.join(', ')} then.</div>`)}
+      <div class="small" style="margin-top:7px;color:var(--muted)">You can still send it — just a heads up.</div>
+    </div>`}
+
+    <button class=${'btn btn-block '+(inv.length?'btn-grad':'')} style="margin-top:16px;padding:13px"
+      disabled=${!inv.length||busy}
+      onClick=${async()=>{ setBusy(true); await onCreate({ kind, title:finalTitle, day, start_min:start, end_min:end, place, invitees:inv }); setBusy(false); }}>
+      <${IcSend} size=${16}/> ${busy?'Sending…':`Send invite${inv.length>1?'s':''}`}
+    </button>
+  </div>`;
+}
+
+/* ============================================================
+   PING SHEET / INBOX / DETAIL
+   ============================================================ */
+function PingSheet({ f, onSend }) {
+  return html`<div>
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:16px">
+      <${Avatar} p=${f} size=${40}/>
+      <div>
+        <div class="sheettitle" style="font-size:16px">Ping ${firstName(f?.display_name)}</div>
+        <div class="rowsub">Send a quick signal — lands on their phone instantly.</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${PING_PRESETS.map(p=>html`<button key=${p.t} class="btn" style="padding:14px 10px;justify-content:flex-start" onClick=${()=>onSend(p.t,p.e)}>
+        <span style="font-size:18px">${p.e}</span> ${p.t}</button>`)}
+    </div>
+  </div>`;
+}
+
+function Inbox({ uid, pings, profiles, nameOf, onClose, markSeen }) {
+  const mine = pings.filter(p=>p.recipient===uid);
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">Signals</div>
+      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+    ${!mine.length && html`<div class="small" style="text-align:center;padding:18px 0">No signals yet. Pokes and pings from friends land here.</div>`}
+    <div class="stack">
+      ${mine.map(p=>html`<div key=${p.id} class="cardrow" style=${'cursor:default;'+(p.seen?'':'background:rgba(176,107,255,.08);border-color:rgba(176,107,255,.3)')}>
+        <${Avatar} p=${profiles[p.sender]||{display_name:'??'}} size=${36}/>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13px"><b>${nameOf(p.sender)}</b> ${p.kind==='poke'?'waved at you':`pinged: ${p.text}`}</div>
+          <div class="small" style="margin-top:2px">${ago(p.created_at)}</div>
+        </div>
+        ${p.emoji && html`<span style="font-size:18px;flex:none">${p.emoji}</span>`}
+      </div>`)}
+    </div>
+    ${mine.some(p=>!p.seen) && html`<button class="btn btn-block" style="margin-top:14px" onClick=${markSeen}>Mark all read</button>`}
+  </div>`;
+}
+
+function Detail({ d, uid, profiles, nameOf, onCancel }) {
+  if (d.type==='event') {
+    const e = d.row, K = KINDS[e.kind]||KINDS.hangout;
+    const ppl = [e.host, ...(e.event_invitees||[]).filter(i=>i.status==='accepted').map(i=>i.invitee)];
+    const pend = (e.event_invitees||[]).filter(i=>i.status==='pending').map(i=>nameOf(i.invitee));
+    return html`<div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <span style="font-size:15px">${K.emoji}</span>
+        <span class="eyebrow" style=${`color:${K.accent};letter-spacing:.22em;font-size:10px`}>${K.label}</span>
+      </div>
+      <div class="sheettitle" style="font-size:20px">${e.title}</div>
+      <div style="margin-top:14px">
+        <div class="detrow"><span class="detlab">When</span><span class="detval">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}</span></div>
+        <div class="detrow"><span class="detlab">Where</span><span class="detval">${zoneName(e.place)||e.place||'—'}</span></div>
+        <div class="detrow"><span class="detlab">Going</span><span class="detval">${ppl.map(nameOf).join(', ')}</span></div>
+        ${pend.length>0 && html`<div class="detrow"><span class="detlab">Waiting</span><span class="detval" style="color:var(--muted)">${pend.join(', ')}</span></div>`}
+      </div>
+      ${e.host===uid && html`<button class="btn btn-soft-red btn-block" style="margin-top:16px"
+        onClick=${()=>{ if(confirm('Cancel this plan for everyone?')) onCancel(e.id); }}>Cancel plan</button>`}
+    </div>`;
+  }
+  const c = d.row, col = CATHEX[c.cat]||CATHEX.major;
+  return html`<div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+      <span style=${`width:8px;height:8px;border-radius:2.5px;background:${col};box-shadow:0 0 0 3px ${col}33`}></span>
+      <span class="eyebrow" style=${`color:${col};letter-spacing:.22em;font-size:10px`}>${CATNAME[c.cat]||'Class'}</span>
+    </div>
+    <div class="sheettitle" style="font-size:20px;line-height:1.15">${c.name}</div>
+    <div style="margin-top:14px">
+      <div class="detrow"><span class="detlab">When</span><span class="detval">${DAYS[c.day]} · ${fmt(c.start_min)}–${fmt(c.end_min)}</span></div>
+      <div class="detrow"><span class="detlab">Room</span><span class="detval">${c.meta||'—'}</span></div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   SCHEDULE FILE IMPORT
+   Orbit schedule file — JSON, made by Claude from any
+   registration form / COR / screenshot:
+   {
+     "orbit_schedule": 1,
+     "student": { "name": "…", "course": "…", "school": "…" },
+     "classes": [
+       { "name": "Subject name", "day": "Mon",
+         "start": "8:00 AM", "end": "9:30 AM",
+         "room": "CL3", "type": "major" }
+     ]
+   }
+   day: Mon–Sat (or 0–5) · type: major | ge | pe | nstp
+   The parser is forgiving: times accept "13:30", "1:30 PM",
+   bare hours, or minutes; "time": "8:00-9:30" also works;
+   unknown types fall back to "major"; bad rows are skipped.
+   ============================================================ */
+const DAY_IDX = { mon:0, monday:0, tue:1, tues:1, tuesday:1, wed:2, weds:2, wednesday:2,
+  thu:3, thur:3, thurs:3, thursday:3, fri:4, friday:4, sat:5, saturday:5 };
+function parseTimeVal(v) {
+  if (typeof v==='number' && isFinite(v)) return Math.round(v<24 ? v*60 : v);
+  const m = String(v??'').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i);
+  if (!m) throw new Error('bad time');
+  let h=+m[1], mm=+(m[2]||0); const ap=(m[3]||'').toLowerCase();
+  if (ap.startsWith('p') && h<12) h+=12;
+  if (ap.startsWith('a') && h===12) h=0;
+  if (!ap && h<6) h+=12;               // bare "1:30" on a class schedule means PM
+  return h*60+mm;
+}
+const catOf = s => { s=String(s||'').toLowerCase();
+  if (/nstp|rotc|cwts|lts/.test(s)) return 'nstp';
+  if (/^(pe\b|pe$|phys|sport|path?fit)/.test(s)) return 'pe';
+  if (/^(ge|gen|minor|elect)/.test(s)) return 'ge';
+  return 'major'; };
+function parseScheduleFile(text) {
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error("That doesn't look like an Orbit schedule file. Ask Claude to turn your registration form into one, then upload it unchanged."); }
+  if (Array.isArray(data)) data = { classes: data };
+  const src = data.classes || data.schedule || [];
+  if (!Array.isArray(src) || !src.length) throw new Error('No classes found in this file.');
+  const rows = [], skipped = [];
+  src.forEach((c, i) => {
+    try {
+      const name = String(c.name||c.subject||c.title||'').trim();
+      if (!name) throw 0;
+      let day = c.day;
+      if (typeof day === 'string' && !/^\d+$/.test(day.trim())) {
+        const k = day.trim().toLowerCase();
+        day = k in DAY_IDX ? DAY_IDX[k] : DAY_IDX[k.slice(0,3)];
+      } else day = Number(day);
+      if (!(day>=0 && day<=5)) throw 0;
+      let s, e;
+      if (c.time) { const p = String(c.time).split(/[-–—]/); s = parseTimeVal(p[0]); e = parseTimeVal(p[1]); }
+      else { s = parseTimeVal(c.start ?? c.start_min ?? c.from); e = parseTimeVal(c.end ?? c.end_min ?? c.to); }
+      if (!(e>s)) throw 0;
+      rows.push({ name:name.slice(0,80), meta:String(c.room||c.meta||c.note||'').trim().slice(0,60),
+        cat:catOf(c.type||c.cat||c.category), day, start_min:s, end_min:e });
+    } catch { skipped.push(i+1); }
+  });
+  if (!rows.length) throw new Error('Could not read any classes from this file.');
+  const st = data.student || data.profile || null;
+  let profilePatch = null;
+  if (st) {
+    profilePatch = {};
+    const nm = String(st.name||st.display_name||'').trim(); if (nm) profilePatch.display_name = nm.slice(0,60);
+    const co = String(st.course||'').trim(); if (co) profilePatch.course = co.slice(0,60);
+    const sc = String(st.school||'').trim(); if (sc) profilePatch.school = sc.slice(0,80);
+    if (!Object.keys(profilePatch).length) profilePatch = null;
+  }
+  return { rows, skipped, profilePatch };
+}
+
+function ImportSheet({ onClose, onImport }) {
+  const [parsed, setParsed] = useState(null);
+  const [err, setErr] = useState('');
+  const [replace, setReplace] = useState(true);
+  const [applyProfile, setApplyProfile] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  function handleText(t) {
+    try { setParsed(parseScheduleFile(t)); setErr(''); }
+    catch(e) { setParsed(null); setErr(e.message); }
+  }
+  async function pickFile(e) {
+    const fl = e.target.files && e.target.files[0]; if (!fl) return;
+    try { handleText(await fl.text()); } catch { setErr('Could not read that file.'); }
+    e.target.value = '';
+  }
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">Import schedule</div>
+      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+    <div class="hint" style="margin:0 0 14px">Send your registration form to Claude and ask for an <b>Orbit schedule file</b>. Upload the .json it gives you and your whole week fills itself in.</div>
+    <input ref=${fileRef} type="file" accept=".json,.txt,application/json,text/plain" style="display:none" onChange=${pickFile}/>
+    <button class="btn btn-grad btn-block" onClick=${()=>fileRef.current && fileRef.current.click()}>
+      <${IcUpload} size=${15}/> Choose schedule file</button>
+    <div class="flabel">…or paste the file contents</div>
+    <textarea class="input" style="min-height:96px;resize:vertical;font-size:12px" placeholder='{"classes":[ … ]}'
+      onInput=${e=>{ const t=e.target.value.trim(); if (t) handleText(t); else { setParsed(null); setErr(''); } }}></textarea>
+    ${err && html`<div class="errbox">${err}</div>`}
+    ${parsed && html`<div class="card" style="margin-top:14px;padding:14px">
+      <div style="font-size:13px;font-weight:600;color:var(--pe)">✓ ${parsed.rows.length} class${parsed.rows.length>1?'es':''} found</div>
+      <div class="stack" style="margin-top:10px">
+        ${parsed.rows.slice(0,4).map((r,i)=>html`<div key=${i} class="small" style="color:var(--muted)">
+          ${DAYS[r.day]} ${fmt(r.start_min)}–${fmt(r.end_min)} · ${r.name}</div>`)}
+        ${parsed.rows.length>4 && html`<div class="small">+ ${parsed.rows.length-4} more</div>`}
+        ${parsed.skipped.length>0 && html`<div class="small" style="color:var(--nstp)">Skipped ${parsed.skipped.length} unreadable line${parsed.skipped.length>1?'s':''}</div>`}
+      </div>
+      ${parsed.profilePatch && html`<div class="small" style="margin-top:10px;color:var(--muted)">
+        Profile in file: ${[parsed.profilePatch.display_name, parsed.profilePatch.course, parsed.profilePatch.school].filter(Boolean).join(' · ')}</div>`}
+      <label style="display:flex;align-items:center;gap:9px;margin-top:12px;font-size:12.5px;cursor:pointer">
+        <input type="checkbox" checked=${replace} onChange=${e=>setReplace(e.target.checked)} style="accent-color:#b06bff;width:16px;height:16px"/>
+        Replace my current schedule</label>
+      ${parsed.profilePatch && html`<label style="display:flex;align-items:center;gap:9px;margin-top:8px;font-size:12.5px;cursor:pointer">
+        <input type="checkbox" checked=${applyProfile} onChange=${e=>setApplyProfile(e.target.checked)} style="accent-color:#b06bff;width:16px;height:16px"/>
+        Also update my name / course / school</label>`}
+      <button class="btn btn-grad btn-block" style="margin-top:14px" disabled=${busy}
+        onClick=${async()=>{ setBusy(true); await onImport(parsed.rows, { replace, profilePatch: applyProfile ? parsed.profilePatch : null }); setBusy(false); }}>
+        ${busy ? 'Importing…' : 'Import to my schedule'}</button>
+    </div>`}
+  </div>`;
+}
+
+/* ============================================================
+   YOU — profile + schedule editor
+   ============================================================ */
+function You({ me, uid, classesBy, events, saveProfile, addClass, delClass, onPick, onImport }) {
+  const [name, setName] = useState(me?.display_name||'');
+  const [handle, setHandle] = useState(me?.handle||'');
+  const [course, setCourse] = useState(me?.course||'');
+  const [school, setSchool] = useState(me?.school||'');
+  const [acc, setAcc] = useState([me?.accent1||'#b06bff', me?.accent2||'#2dd4bf']);
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [nc, setNc] = useState({ name:'', meta:'', cat:'major', day:0, start:7*60, end:8*60+30 });
+  const mine = classesBy[uid]||[];
+  const times = []; for(let m=7*60; m<=19*60; m+=30) times.push(m);
+
+  async function submitClass() {
+    if (!nc.name.trim()) return;
+    if (nc.end<=nc.start) { alert('End time must be after start time.'); return; }
+    const ok = await addClass({ name:nc.name.trim(), meta:nc.meta.trim(), cat:nc.cat, day:nc.day, start_min:nc.start, end_min:nc.end });
+    if (ok) setNc(v=>({ ...v, name:'', meta:'' }));
+  }
+
+  return html`<div>
+    <div style="display:flex;align-items:center;gap:13px;margin-bottom:16px">
+      <${Avatar} p=${{...me, accent1:acc[0], accent2:acc[1]}} size=${54}/>
+      <div style="min-width:0;flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:#fff;letter-spacing:-.01em">${me?.display_name}</div>
+        <div class="rowsub">@${me?.handle}${me?.course?` · ${me.course}`:''}${me?.school?` · ${me.school}`:''}</div>
+      </div>
+      <button class="btn" style="padding:9px 12px;flex:none" onClick=${()=>setEditing(!editing)}>${editing?'Close':'Edit'}</button>
+    </div>
+
+    ${editing && html`<div class="card" style="margin-bottom:18px">
+      <div class="profgrid">
+        <div><div class="flabel">Name</div>
+          <input class="input" value=${name} onInput=${e=>setName(e.target.value)}/></div>
+        <div><div class="flabel">Handle</div>
+          <input class="input" value=${handle} onInput=${e=>setHandle(cleanHandle(e.target.value))} autocapitalize="none"/></div>
+        <div><div class="flabel">Course</div>
+          <input class="input" value=${course} onInput=${e=>setCourse(e.target.value)} placeholder="BSIT · 1st Yr"/></div>
+        <div><div class="flabel">School</div>
+          <input class="input" value=${school} onInput=${e=>setSchool(e.target.value)} placeholder="Your school / university"/></div>
+      </div>
+      <div class="flabel">Bubble colors</div>
+      <div class="pillrow">
+        ${ACCENTS.map((a,i)=>html`<button key=${i} class="pill" style=${`padding:4px;${acc[0]===a[0]&&acc[1]===a[1]?'border-color:var(--major)':''}`}
+          onClick=${()=>setAcc(a)} aria-label="Color option">
+          <span style=${`width:26px;height:26px;border-radius:50%;background:linear-gradient(140deg,${a[0]},${a[1]});display:block`}></span>
+        </button>`)}
+      </div>
+      <button class="btn btn-grad btn-block" style="margin-top:16px"
+        onClick=${async()=>{ if(handle.length<3){alert('Handle needs at least 3 characters.');return;}
+          if (await saveProfile({ display_name:name.trim()||me.display_name, handle, course:course.trim(), school:school.trim(), accent1:acc[0], accent2:acc[1] })) setEditing(false); }}>
+        Save profile</button>
+    </div>`}
+
+    <${Eyebrow}>Your week<//>
+    <div style="margin-top:12px">
+      <${Grid} ownerId=${uid} classesByOwner=${classesBy} events=${events} onPick=${onPick}/>
+    </div>
+    <div class="small" style="margin-top:10px">Solid blocks are classes · dashed blocks are plans</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;gap:8px;flex-wrap:wrap">
+      <${Eyebrow} color="var(--ge)">Classes · ${mine.length}<//>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${onImport}>
+          <${IcUpload} size=${14}/> Import file</button>
+        <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${()=>setAdding(!adding)}>
+          ${adding ? 'Close' : html`<${Fragment}><${IcPlus} size=${14}/> Add class<//>`}</button>
+      </div>
+    </div>
+
+    ${adding && html`<div class="card" style="margin-top:12px">
+      <div class="addgrid">
+        <div class="f-wide"><div class="flabel">Class name</div>
+          <input class="input" value=${nc.name} onInput=${e=>setNc(v=>({...v,name:e.target.value}))} placeholder="Fundamentals of Programming"/></div>
+        <div class="f-wide"><div class="flabel">Room / note · optional</div>
+          <input class="input" value=${nc.meta} onInput=${e=>setNc(v=>({...v,meta:e.target.value}))} placeholder="Lab · Rm 201"/></div>
+        <div><div class="flabel">Type</div>
+          <select class="input" value=${nc.cat} onChange=${e=>setNc(v=>({...v,cat:e.target.value}))}>
+            ${Object.entries(CATNAME).map(([k,n])=>html`<option key=${k} value=${k}>${n}</option>`)}
+          </select></div>
+        <div><div class="flabel">Day</div>
+          <select class="input" value=${nc.day} onChange=${e=>setNc(v=>({...v,day:+e.target.value}))}>
+            ${DAYS.map((d,i)=>html`<option key=${d} value=${i}>${d}</option>`)}
+          </select></div>
+        <div><div class="flabel">Starts</div>
+          <select class="input" value=${nc.start} onChange=${e=>setNc(v=>({...v,start:+e.target.value}))}>
+            ${times.slice(0,-1).map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
+          </select></div>
+        <div><div class="flabel">Ends</div>
+          <select class="input" value=${nc.end} onChange=${e=>setNc(v=>({...v,end:+e.target.value}))}>
+            ${times.slice(1).map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
+          </select></div>
+      </div>
+      <button class="btn btn-grad btn-block" style="margin-top:14px" onClick=${submitClass} disabled=${!nc.name.trim()}>Add to schedule</button>
+      <div class="small" style="margin-top:10px">Repeats weekly. If a class meets twice a week, add it once per day — or just import a schedule file.</div>
+    </div>`}
+
+    <div class="classlist" style="margin-top:12px">
+      ${!mine.length && html`<div class="small">No classes yet — add them by hand or import a schedule file so friends can see when you're free.</div>`}
+      ${[...mine].sort((a,b)=>a.day-b.day||a.start_min-b.start_min).map(c=>html`
+        <div key=${c.id} class="cardrow" style="cursor:default">
+          <span style=${`width:9px;height:9px;border-radius:3px;background:${CATHEX[c.cat]};box-shadow:0 0 0 3px ${CATHEX[c.cat]}33;flex:none`}></span>
+          <div style="min-width:0;flex:1">
+            <div class="rowname" style="font-size:12.5px">${c.name}</div>
+            <div class="rowsub">${DAYS[c.day]} · ${fmt(c.start_min)}–${fmt(c.end_min)}${c.meta?` · ${c.meta}`:''}</div>
+          </div>
+          <button class="btn" style="padding:8px 11px;flex:none" onClick=${()=>delClass(c.id)} aria-label="Delete class"><${IcTrash} size=${14}/></button>
+        </div>`)}
+    </div>
+
+    <button class="btn btn-block" style="margin-top:26px;color:var(--muted)" onClick=${()=>sb.auth.signOut()}>
+      <${IcOut} size=${15}/> Sign out</button>
+    <div class="small" style="text-align:center;margin-top:14px;opacity:.7">Orbit · built by Uno · running on Supabase</div>
+  </div>`;
+}
+
+/* ============================================================
+   APP ROOT
+   ============================================================ */
+function App() {
+  const [session, setSession] = useState(undefined);
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data:sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+  if (session === undefined) return html`<div class="authcol"><div class="boot">loading orbit…</div></div>`;
+  if (!session) return html`<${AuthScreen}/>`;
+  return html`<${Shell} key=${session.user.id} session=${session}/>`;
+}
+
+try {
+  render(html`<${App}/>`, document.getElementById('app'));
+} catch (e) {
+  document.getElementById('app').innerHTML =
+    '<div class="authcol"><div class="boot">Orbit could not start — check your internet connection and reload.</div></div>';
+}
+
+/* ============================================================
+   ambient seismic-wave background + cursor glow
+   ============================================================ */
+(function(){
+  const cv = document.getElementById('waves');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const glow = document.getElementById('glow');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W=0,H=0,rows=[],time=0,last=0,glowHalf=280;
+  let mx=-9999,my=-9999,tx=-9999,ty=-9999,pActive=false;
+  const rnd = i => { const x=Math.sin(i*127.1+311.7)*43758.5453; return x-Math.floor(x); };
+  function resize(){
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    W=innerWidth; H=innerHeight;
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    cv.style.width=W+'px'; cv.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const g=Math.round(Math.min(560,Math.max(340,W*0.95)));
+    glow.style.width=g+'px'; glow.style.height=g+'px'; glowHalf=g/2;
+    const n=Math.max(10,Math.min(18,Math.round(H/54)));
+    rows=[];
+    for(let i=0;i<n;i++){
+      const p=n>1?i/(n-1):0;
+      rows.push({y:H*(0.04+0.92*p),p,ph:rnd(i)*Math.PI*2,sp:0.5+rnd(i+50)*0.9,amp:4+rnd(i+100)*7});
+    }
+  }
+  const mix = p => [Math.round(176+(45-176)*p),Math.round(107+(212-107)*p),Math.round(255+(191-255)*p)];
+  function draw(now){
+    requestAnimationFrame(draw);
+    const dt=Math.min(33,(now-last)||16); last=now;
+    if(!reduced) time+=dt*0.001;
+    mx+=(tx-mx)*0.09; my+=(ty-my)*0.09;
+    if(pActive){glow.style.opacity=1;glow.style.transform='translate('+(mx-glowHalf)+'px,'+(my-glowHalf)+'px)';}
+    ctx.clearRect(0,0,W,H);
+    const step=W>760?9:12, span=W+360;
+    for(const r of rows){
+      const c=mix(r.p);
+      const dRow=Math.abs(r.y-my);
+      const boost=pActive?Math.exp(-(dRow*dRow)/(2*140*140))*0.20:0;
+      const alpha=0.075+0.055*Math.sin(r.ph+time*0.6)+boost;
+      ctx.strokeStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+Math.max(0.02,alpha).toFixed(3)+')';
+      ctx.lineWidth=1; ctx.beginPath();
+      const pX=(((time*70*r.sp+r.ph*140)%span)+span)%span-180;
+      for(let x=0;x<=W;x+=step){
+        let y=r.y+Math.sin(x*0.008+time*r.sp+r.ph)*r.amp+Math.sin(x*0.021-time*0.7+r.ph*2)*(r.amp*0.4);
+        const dp=(x-pX)/70;
+        y+=Math.exp(-dp*dp)*Math.sin(dp*2.5+time)*24;
+        if(pActive){const dx=x-mx,dy=r.y-my,dd=(dx*dx+dy*dy)/(2*120*120);if(dd<9)y+=Math.exp(-dd)*18*Math.sin(x*0.045+time*3);}
+        if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  }
+  addEventListener('resize',resize,{passive:true});
+  addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;pActive=true;},{passive:true});
+  addEventListener('touchmove',e=>{const c=e.touches[0];if(c){tx=c.clientX;ty=c.clientY;pActive=true;}},{passive:true});
+  addEventListener('touchstart',e=>{const c=e.touches[0];if(c){tx=c.clientX;ty=c.clientY;mx=c.clientX;my=c.clientY;pActive=true;}},{passive:true});
+  resize();
+  requestAnimationFrame(n=>{last=n;requestAnimationFrame(draw);});
+})();
+</script>
+</body>
+</html>
