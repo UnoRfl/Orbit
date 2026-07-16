@@ -8,12 +8,9 @@
 
 <br/>
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_Orbit-b06bff?style=for-the-badge)](https://unorfl.github.io/Orbit/)
-&nbsp;
 [![Preact](https://img.shields.io/badge/Preact-673AB8?style=for-the-badge&logo=preact&logoColor=white)](https://preactjs.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
-[![GitHub Pages](https://img.shields.io/badge/Hosted_on-GitHub_Pages-222?style=for-the-badge&logo=githubpages&logoColor=white)](https://pages.github.com/)
 
 </div>
 
@@ -25,15 +22,15 @@
 
 ## ✨ What is Orbit?
 
-Orbit turns your class schedule into a **live social map**. Add your friends, import your timetable once, and Orbit quietly keeps everyone's status up to date—*in class*, *free right now*, or *done for the day*—so you always know who's around to study, grab food, or just hang out.
+Orbit turns a class schedule into a **live social map**. By importing your timetable once and adding your friends, Orbit quietly keeps everyone's status up to date—*in class*, *free right now*, or *done for the day*—so you always know who's around to study, grab food, or just hang out.
 
-No app store, no clutter. Sign up with an email and you're in, on your phone or your laptop.
+No app store, no clutter. Sign up with an email and you're in, on a phone or laptop.
 
 I designed and built Orbit entirely solo, handling everything from the schedule parser to the final pixel of the interface.
 
 ---
 
-## 🌌 What you can do
+## 🌌 Core Features
 
 **Keep up with your circle**
 * Friends live as glowing bubbles, styled like an active story ring.
@@ -57,7 +54,7 @@ I designed and built Orbit entirely solo, handling everything from the schedule 
 
 ---
 
-## 🎨 The look & feel
+## 🎨 The Look & Feel
 
 I designed Orbit with a **cyberpunk, deep-space** aesthetic featuring near-black purples, neon accents, and intentional, fluid motion:
 
@@ -66,41 +63,29 @@ I designed Orbit with a **cyberpunk, deep-space** aesthetic featuring near-black
 * 🪐 **A space-themed map:** Campus zones are laid out as planets on their own orbits around a glowing "campus" star.
 * 📱 **Fully responsive:** A clean bottom-nav on mobile that seamlessly transitions into a side rail on desktop.
 
-I drew and animated every piece of the interface by hand in code—no templates, no UI kits.
+I drew and animated every piece of the interface by hand in code—no UI kits or templates were used.
 
 ---
 
-## 🛠 Built with
+## 🛠 Built With
 
 | Component | Technology |
 |---|---|
 | **Frontend** | Preact + htm — a tiny, fast React-style setup with **no build step**. |
-| **Backend** | Supabase — handles accounts, the database, and realtime updates. |
-| **Visuals** | Vanilla HTML Canvas — powers the background, loader, and map. |
-| **Hosting** | GitHub Pages |
-
-I engineered the entire app to ship as a **single `index.html`** file. Open it in a browser, and it just runs.
+| **Backend** | Supabase — handles authentication, the database layer, and real-time socket connections. |
+| **Visuals** | Vanilla HTML Canvas — powers the background, loader, and map rendering. |
 
 ---
 
-## ⚙️ How it fits together
+## ⚙️ Architecture Overview
 
-I kept Orbit's architecture deliberately simple. There's no bundler and no framework scaffolding to wade through; one file holds the interface, the animations, and the data layer. Supabase handles authentication and stores the schedules, friendships, plans, and check-ins. It pushes changes back out in real time, so a friend's status flips the instant their class ends. User preferences and display settings save directly to the device, ensuring the app feels fast and personal without requiring an unnecessary round trip to the server.
+I kept Orbit's architecture deliberately simple and lightweight. There is no heavy bundler and no complex framework scaffolding to wade through; a unified codebase handles the interface, the animations, and the data layer. 
 
----
-
-## 🚀 Run it yourself
-
-1. Create a free project at [supabase.com](https://supabase.com/).
-2. Run the included setup file (`orbit_database_setup_v2.sql`) in the Supabase SQL editor to create the necessary tables.
-3. Paste your project **URL** and **anon key** into the top of `index.html`.
-4. Open the file in a browser—or push the repository to **GitHub Pages** to host it live.
-
-That's it. No installation required, and no dependencies to download.
+The backend handles secure authentication and stores encrypted schedules, friendships, plans, and check-ins. It utilizes real-time subscriptions to push changes instantly, so a friend's status flips the exact second their class ends. User preferences and display settings are cached directly to the local device, ensuring the app feels native, fast, and personal without requiring unnecessary round trips to the server.
 
 ---
 
-## 🔒 Privacy first
+## 🔒 Privacy First
 
 I prioritized privacy from day one. Location and status sharing are **off until you actively turn them on**. Only your accepted friends can see your activity, Ghost Mode lets you disappear on demand, and blocking removes someone from your feed entirely. Orbit is built for staying in the loop with people you actually know, not broadcasting to strangers.
 
@@ -108,12 +93,10 @@ I prioritized privacy from day one. Location and status sharing are **off until 
 
 ## 👤 About
 
-Orbit is my solo project—designed, coded, and shipped end-to-end. I started it as a way to solve a real, everyday problem: figuring out which friends were actually free between classes. What began as a simple utility grew into a fully realized product.
+Orbit is a solo project—designed, coded, and shipped end-to-end. I started it as a way to solve a real, everyday problem: figuring out which friends were actually free between classes. What began as a simple schedule-matching utility grew into a fully realized social tool.
 
 <div align="center">
 
-**[🌐 Try Orbit live →](https://unorfl.github.io/Orbit/)**
-
-<sub>Free to use. If you'd like to reuse the code, an MIT license is a good default — feel free to add a <code>LICENSE</code> file.</sub>
+<sub>Released under the MIT License. Feel free to review the code and learn from the architecture.</sub>
 
 </div>
