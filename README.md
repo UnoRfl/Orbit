@@ -14,11 +14,6 @@
 
 </div>
 
-<p align="center">
-  <img src="assets/hero.png" alt="Orbit — home screen showing who's free right now" width="850"/>
-</p>
-
----
 
 ## ✨ What is Orbit?
 
