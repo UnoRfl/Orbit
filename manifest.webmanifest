@@ -1,0 +1,12 @@
+{
+  "name": "Orbit — See who's in your orbit.",
+  "short_name": "Orbit",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#100b18",
+  "theme_color": "#17121f",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
