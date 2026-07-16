@@ -1,4 +1,4 @@
-/* Orbit service worker — web push */
+/* Orbit Service - Property Of Unosys */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
 
