@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACTIVITY_CATALOG, ACT_KINDS, B, BADGE_DEFS, CAT, CATHEX, CATNAME, DAYS, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, KINDS, PRONOUN_PRESETS, SOCIALS, actOf, badgesOf, cleanHandle, cleanSocial, clockOf, decodePlace, flairOf, fmt, fname, hashStr, initialsOf, nowInfo, pxFor, sb, shownName, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACTIVITY_CATALOG, ACT_KINDS, B, BADGE_DEFS, CAT, CATHEX, CATNAME, DAYS, HOBBY_PRESETS, HOUR, START, END, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, KINDS, PRONOUN_PRESETS, SOCIALS, actOf, badgesOf, cleanHandle, cleanSocial, clockOf, decodePlace, flairOf, fmt, fname, hashStr, initialsOf, nowInfo, pxFor, sb, shownName, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = p?.accent1 || '#b06bff', a2 = p?.accent2 || '#2dd4bf';
