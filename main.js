@@ -1,9 +1,9 @@
-/* Orbit — auto-split module. Part of the Orbit single-page app.
-   See ARCHITECTURE.md for how the pieces fit together. */
+/* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useState } from './lib.js';
 import { B, sb } from './core.js';
 import { AuthScreen, SolarLoader } from './components.js';
-import { ConfirmHost, Settings, Shell } from './screens.js';
+import { ConfirmHost, Shell } from './shell.js';
+import { Settings } from './settings.js';
 
 function App() {
   const [session, setSession] = useState(undefined);
