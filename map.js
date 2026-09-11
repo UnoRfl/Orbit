@@ -385,7 +385,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
 
     ${mapMode==='geo' ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
         places=${planetsOf(active)} canAdd=${!!canAdd} myPlanetId=${myD?.pi||null}
-        liveFriends=${liveFriends} onOpenFriend=${onOpenFriend}
+        liveFriends=${liveFriends} onOpenFriend=${onOpenFriend} live=${live}
         friendsOnPlanet=${p=>friendsOnPlanet(active, p)}
         onOpenPlace=${p=>setSel(p)}
         onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}

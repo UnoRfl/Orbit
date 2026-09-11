@@ -32,7 +32,7 @@
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
-import { ageLabel, liveOf } from './live.js';
+import { LIVE_DURATIONS, ageLabel, untilLabel } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -182,12 +182,13 @@ const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
 export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPlaceAt, onOpenPlace, myPlanetId,
-                         liveFriends = [], onOpenFriend }) {
+                         liveFriends = [], onOpenFriend, live = null }) {
   const box       = useRef(null);
   const mapRef    = useRef(null);
   const markers   = useRef([]);
   const [status, setStatus]   = useState('loading');   // loading | ready | failed
   const [dropping, setDropping] = useState(null);      // a place awaiting its coordinates
+  const [askLive, setAskLive] = useState(false);       // duration picker open
 
   const placed   = places.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   const unplaced = places.filter(p => !Number.isFinite(p.lat) || !Number.isFinite(p.lng));
@@ -353,7 +354,23 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
 
     <div class="geoctl">
       <button class="geobtn" onClick=${locate} aria-label="Find my location">◎</button>
+      ${live && (live.active
+        ? html`<button class="geobtn live on" onClick=${()=>live.stop('Live location off')}
+            aria-label="Stop sharing live location"><span class="geodot"></span>${untilLabel(live.until)} · Stop</button>`
+        : html`<button class="geobtn live" onClick=${()=>setAskLive(v=>!v)}
+            aria-label="Share live location">📡 Go live</button>`)}
     </div>
+
+    ${live && askLive && !live.active && html`<div class="geolive">
+      <div style="font-size:12.5px;font-weight:600">Share your live location</div>
+      <div class="small" style="margin-top:3px;line-height:1.5">Friends see you move until it ends. It pauses when Orbit is closed or your screen locks — a website can't track in the background.</div>
+      <div class="pillrow" style="margin-top:9px">
+        ${LIVE_DURATIONS.map(d=>html`<button key=${d.min} class="pill"
+          onClick=${async()=>{ setAskLive(false); await live.start(d.min); }}>${d.label}</button>`)}
+        <button class="pill" onClick=${()=>setAskLive(false)}>Cancel</button>
+      </div>
+      ${live.err && html`<div class="errbox" style="margin-top:9px">${live.err}</div>`}
+    </div>`}
 
     ${dropping && html`<div class="geohint">
       Tap the map to place <b>${dropping.icon || '📍'} ${dropping.name}</b>

@@ -1035,3 +1035,15 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .livedot.stale{opacity:.62}
 .livedot.stale .livedot-ring{display:none}
 .livedot.stale .livedot-av{box-shadow:none;filter:grayscale(.45)}
+
+/* live-share control, sitting on the map beside "locate me" */
+.geoctl{flex-wrap:wrap;max-width:calc(100% - 20px)}
+.geobtn.live{width:auto;padding:0 13px;gap:7px;font-size:12px;font-weight:600;font-family:'Space Grotesk',sans-serif;
+  letter-spacing:.02em;white-space:nowrap}
+.geobtn.live.on{border-color:var(--ge);color:var(--ge);
+  background:linear-gradient(180deg,color-mix(in srgb, var(--ge) 18%, transparent),var(--panel))}
+.geodot{width:8px;height:8px;border-radius:50%;background:var(--ge);flex:none;
+  animation:livepulse 2s ease-out infinite}
+.geolive{position:absolute;left:10px;right:10px;bottom:58px;z-index:4;
+  background:rgba(20,14,28,.94);border:1px solid var(--line-strong);border-radius:14px;padding:12px 13px;
+  box-shadow:0 18px 46px -18px rgba(0,0,0,.9);animation:morphPop var(--t-mid) var(--ease-snap)}
