@@ -1,6 +1,88 @@
-/* Orbit Service - Property Of Unosys */
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+/* Orbit Service - Property Of Unosys
+   ------------------------------------------------------------------
+   Two jobs: web push (unchanged), and caching so the app opens
+   instantly on a phone instead of re-downloading every module over
+   campus wifi on every single launch.
+
+   Caching strategy, and why:
+   · Orbit has no build step, so filenames never carry a content hash
+     and a precache MANIFEST would have to be hand-bumped on every
+     deploy. Instead everything is cached as it is first fetched.
+   · Static assets (js/css/img/font) are stale-while-revalidate: the
+     cached copy is served immediately and a fresh copy is fetched in
+     the background for next time. Repeat loads are instant; a deploy
+     is picked up on the following visit.
+   · Navigations are network-first so a fresh deploy shows up right
+     away when there is signal, falling back to the cached shell when
+     there isn't — that is what makes the app work offline at all.
+   · Only same-origin GETs are touched. Supabase (auth, data, realtime)
+     and any other cross-origin call always goes straight to the
+     network, so nothing stale or private ever lands in the cache.
+
+   Bump VERSION to evict everything at once.
+   ------------------------------------------------------------------ */
+const VERSION = 'orbit-v1';
+const SHELL   = './index.html';
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(VERSION)
+      .then(c => c.add(new Request(SHELL, { cache: 'reload' })))
+      .catch(() => {})            // a failed precache must never block activation
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+const STATIC = /\.(?:js|mjs|css|png|jpg|jpeg|svg|webp|ico|woff2?|json|webmanifest)$/i;
+
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // Supabase & friends: untouched
+
+  // Navigations: network first, cached shell as the offline fallback.
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(SHELL, copy)).catch(() => {}); }
+          return res;
+        })
+        .catch(() => caches.match(SHELL).then(hit => hit || Response.error()))
+    );
+    return;
+  }
+
+  if (!STATIC.test(url.pathname)) return;
+
+  // Static: serve the cached copy at once, refresh it behind the scenes.
+  e.respondWith(
+    caches.match(req).then(hit => {
+      const net = fetch(req)
+        .then(res => {
+          if (res && res.ok && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(VERSION).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => hit);          // offline: the cached copy is the answer
+      return hit || net;
+    })
+  );
+});
+
+self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch {}

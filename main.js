@@ -25,6 +25,16 @@ try {
     '<div class="authcol"><div class="boot">Orbit could not start — check your internet connection and reload.</div></div>';
 }
 
+/* Register the service worker on boot rather than waiting for initPush(),
+   which only runs once a session exists. The worker is what caches the shell
+   and modules, so registering it here means a visitor's FIRST load already
+   primes the cache for their second one — and the app opens offline even for
+   someone who never turns on notifications. Registration is idempotent, so
+   initPush() calling register() again later is harmless. */
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+
 /* ============================================================
    ambient background — interactive, themed, switchable
    ------------------------------------------------------------
