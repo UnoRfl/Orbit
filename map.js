@@ -3,6 +3,7 @@ import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
 import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
 import { GeoMap, canUseGeoMap } from './geomap.js';
+import { LIVE_DURATIONS, liveOf, untilLabel, useLiveShare } from './live.js';
 import { Home } from './home.js';
 import { ChatView } from './chat.js';
 
@@ -40,6 +41,13 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   const friendPlaces = friends.map(f=>({ f, d: presencePlace(presence[f.id]) })).filter(x=>x.d);
   const matchSys = (d, sys) => d && (d.key===sys.key || normName(d.system)===normName(sys.name));
   const friendsInSys = sys => friendPlaces.filter(x=>matchSys(x.d, sys));
+  /* Friends broadcasting live coordinates right now. liveOf() re-checks ghost,
+     sharing and expiry client-side, so an expired row can never draw even if
+     realtime delivered it a moment before it lapsed. */
+  const liveFriends = friends
+    .map(f => ({ profile: profiles[f.id] || f, live: liveOf(presence[f.id]) }))
+    .filter(x => x.live);
+  const live = useLiveShare({ uid, myPres, setPres });
   const friendsOnPlanet = (sys, planet) => friendPlaces.filter(x=>
     (x.d.pi && planet.id && x.d.pi===planet.id) || (matchSys(x.d, sys) && normName(x.d.place)===normName(planet.name)));
 
@@ -105,6 +113,36 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       onClick=${()=>setPres({ ghost:!myPres?.ghost })}>
       👻 ${myPres?.ghost ? "Ghost mode on — you're invisible" : 'Ghost mode'}
     </button>
+
+    ${/* Live location lives in the same card as the other location controls,
+          so everything that reveals where you are is in one place. */''}
+    <div class="livebox">
+      ${live.active ? html`<${Fragment}>
+        <div class="liverow">
+          <span class="livepulse"></span>
+          <div style="min-width:0;flex:1">
+            <div style="font-size:13px;font-weight:600">Live location on</div>
+            <div class="rowsub">${untilLabel(live.until)}${live.accuracy ? ` · accurate to ~${Math.round(live.accuracy)}m` : ''}</div>
+          </div>
+          <button class="btn btn-soft-red" style="flex:none;padding:8px 12px" onClick=${()=>live.stop('Live location off')}>Stop</button>
+        </div>
+        <div class="set-hint" style="margin-top:8px">Only your accepted friends can see it, and it ends on its own. It pauses when Orbit is closed or your screen locks — a website can't track in the background.</div>
+      <//>` : html`<${Fragment}>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="display:flex;color:var(--faint)"><${IcRadio} size=${16}/></span>
+          <div style="min-width:0;flex:1">
+            <div style="font-size:13px;font-weight:600">Live location</div>
+            <div class="rowsub">Show friends where you are, moving, for a set time</div>
+          </div>
+        </div>
+        <div class="pillrow" style="margin-top:10px">
+          ${LIVE_DURATIONS.map(d=>html`<button key=${d.min} class="pill" disabled=${!!myPres?.ghost}
+            onClick=${()=>live.start(d.min)}>${d.label}</button>`)}
+        </div>
+        ${myPres?.ghost && html`<div class="set-hint" style="margin-top:8px">Turn ghost mode off first — it hides you from everyone.</div>`}
+        ${live.err && html`<div class="errbox" style="margin-top:10px">${live.err}</div>`}
+      <//>`}
+    </div>
   </div>`;
 
   const sheets = html`<${Fragment}>
@@ -347,6 +385,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
 
     ${mapMode==='geo' ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
         places=${planetsOf(active)} canAdd=${!!canAdd} myPlanetId=${myD?.pi||null}
+        liveFriends=${liveFriends} onOpenFriend=${onOpenFriend}
         friendsOnPlanet=${p=>friendsOnPlanet(active, p)}
         onOpenPlace=${p=>setSel(p)}
         onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}

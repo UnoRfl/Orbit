@@ -482,10 +482,22 @@ export function Shell({ session }) {
     setPushOn(false); toast('Phone notifications off');
   }
   async function setPres(patch) {
+    /* This upserts the WHOLE row, so every column has to be carried forward or
+       it gets nulled. The live_* fields matter especially: without them here,
+       checking in to a place would silently end an active live-location share. */
     const row = { user_id:uid, sharing:!!myPres?.sharing, ghost:!!myPres?.ghost, zone:myPres?.zone||null,
-                  activity: myPres?.activity ?? null, ...patch, updated_at:new Date().toISOString() };
+                  activity: myPres?.activity ?? null,
+                  live_lat: myPres?.live_lat ?? null, live_lng: myPres?.live_lng ?? null,
+                  live_acc: myPres?.live_acc ?? null, live_until: myPres?.live_until ?? null,
+                  ...patch, updated_at:new Date().toISOString() };
     setMyPres(row);
     let { data, error } = await sb.from('presence').upsert(row).select().maybeSingle();
+    if (error && /live_(lat|lng|acc|until)/i.test(error.message||'')) {
+      // live-location columns not migrated yet — sync everything else
+      const { live_lat, live_lng, live_acc, live_until, ...rest } = row;
+      ({ data, error } = await sb.from('presence').upsert(rest).select().maybeSingle());
+      if (!error && 'live_until' in patch) toast('Live location needs a database update');
+    }
     if (error && /activity/i.test(error.message||'')) {
       // activity column not migrated yet — sync the rest, nudge once if a status was being set
       const { activity, ...rest } = row;

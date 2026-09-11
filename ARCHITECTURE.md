@@ -26,7 +26,7 @@ Orbit/
 ```
 
 Dependencies point downward only (no cycles):
-`lib → core → components → (home, map+geomap, plans, chat, settings, staff) → shell → main`
+`lib → core → components → (home, map+geomap+live, plans, chat, settings, staff) → shell → main`
 
 ## Full maintainer's guide
 

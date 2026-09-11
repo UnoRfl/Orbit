@@ -31,7 +31,8 @@
    move the camera; it is never uploaded.
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { bootTier, hueCss, pauseBg, resumeBg, ui } from './core.js';
+import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
+import { ageLabel, liveOf } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -180,7 +181,8 @@ function pinEl(place, hue, count){
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
-export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPlaceAt, onOpenPlace, myPlanetId }) {
+export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPlaceAt, onOpenPlace, myPlanetId,
+                         liveFriends = [], onOpenFriend }) {
   const box       = useRef(null);
   const mapRef    = useRef(null);
   const markers   = useRef([]);
@@ -262,6 +264,55 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
       markers.current.push(m);
     }
   }, [status, system.key, JSON.stringify(placed.map(p => [p.id, p.lat, p.lng, p.icon, p.name])), myPlanetId]);
+
+  /* --- friends sharing live location --- */
+  /* Kept apart from the place markers: these move every few seconds, and
+     rebuilding the pins on every position update would be wasteful and would
+     fight the click handlers. Markers are reused by id and only moved. */
+  const liveMarkers = useRef(new Map());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== 'ready' || !map || !window.maplibregl) return;
+    const seen = new Set();
+
+    for (const { profile, live } of liveFriends) {
+      if (!live) continue;
+      const id = profile.id; seen.add(id);
+      let m = liveMarkers.current.get(id);
+      if (!m) {
+        const el = document.createElement('div');
+        el.className = 'livedot';
+        el.addEventListener('click', ev => { ev.stopPropagation(); onOpenFriend && onOpenFriend(id); });
+        m = new window.maplibregl.Marker({ element: el, anchor: 'center' });
+        m.setLngLat([live.lng, live.lat]).addTo(map);
+        liveMarkers.current.set(id, m);
+      } else {
+        m.setLngLat([live.lng, live.lat]);
+      }
+      const el = m.getElement();
+      // a fix older than LIVE_FRESH_MS is a last-known position, and says so
+      el.classList.toggle('stale', !live.fresh);
+      el.style.setProperty('--pa', profile.accent1 || '#b06bff');
+      el.style.setProperty('--pb', profile.accent2 || '#2dd4bf');
+      el.innerHTML =
+        `<span class="livedot-ring"></span>` +
+        (profile.avatar_url
+          ? `<img class="livedot-av" src="${escapeHtml(profile.avatar_url)}" alt="" referrerpolicy="no-referrer">`
+          : `<span class="livedot-av">${escapeHtml(initialsOf(shownName(profile)))}</span>`) +
+        `<span class="livedot-l">${escapeHtml(shownName(profile))}` +
+        (live.fresh ? '' : ` · ${escapeHtml(ageLabel(live.ageMs))}`) + `</span>`;
+    }
+
+    for (const [id, m] of liveMarkers.current) {
+      if (!seen.has(id)) { try { m.remove(); } catch {} liveMarkers.current.delete(id); }
+    }
+  }, [status, system.key, JSON.stringify(liveFriends.map(f => [f.profile.id, f.live?.lat, f.live?.lng, f.live?.fresh]))]);
+
+  // drop every live marker when the map itself goes away
+  useEffect(() => () => {
+    for (const [, m] of liveMarkers.current) { try { m.remove(); } catch {} }
+    liveMarkers.current.clear();
+  }, []);
 
   /* --- tapping the map either drops a new place or positions an existing one --- */
   useEffect(() => {
