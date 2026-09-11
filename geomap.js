@@ -35,7 +35,7 @@ import { hueCss, perfTier, ui } from './core.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
-const STYLE_URL    = 'https://tiles.openfreemap.org/styles/positron';
+const STYLE_URL    = 'https://tiles.openfreemap.org/styles/dark';
 
 /* Manila, so a brand-new system opens somewhere sane instead of null island. */
 export const FALLBACK_CENTRE = [120.9842, 14.5995];
@@ -71,31 +71,54 @@ function loadMapLibre(){
 
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-/* Repaint the off-the-shelf light style into the active Orbit theme. Only paint
-   properties are touched, so the style's own layer order and zoom rules stay
-   intact and this can be re-run whenever the theme changes. */
+/* OpenFreeMap ships a purpose-built `dark` style, so this does NOT repaint the
+   map — an earlier version inverted the light `positron` style layer by layer
+   and the result was flat and noisy: every road the same weight, labels
+   shouting in accent purple, highway shields as white blocks. The dark style
+   already has a proper hierarchy, so the theme is applied with a light touch:
+   the ground and the water follow Orbit's colourway, and everything else keeps
+   the cartography it was designed with. Re-runnable, so it can follow the
+   drifting Auto theme. */
 function applyTheme(map){
   let layers; try { layers = map.getStyle().layers || []; } catch { return; }
-  const ink   = cssVar('--canvas') || '#17121f';
-  const major = cssVar('--major')  || '#b06bff';
-  const land  = 'rgba(255,255,255,.035)';
-  const road  = 'rgba(255,255,255,.10)';
-  const water = 'rgba(60,120,190,.16)';
-  const label = cssVar('--muted')  || '#9a8fa8';
+  const ink = cssVar('--canvas') || '#17121f';
+  const ge  = cssVar('--ge') || '#2dd4bf';
 
   for (const layer of layers) {
-    const id = layer.id, isWater = /water|sea|ocean|river|lake/i.test(id);
+    const id = layer.id;
     try {
-      if (layer.type === 'background')   map.setPaintProperty(id, 'background-color', ink);
-      else if (layer.type === 'fill')    map.setPaintProperty(id, 'fill-color', isWater ? water : land);
-      else if (layer.type === 'line')    map.setPaintProperty(id, 'line-color', isWater ? water : road);
-      else if (layer.type === 'symbol') {
-        map.setPaintProperty(id, 'text-color', /road|highway|street/i.test(id) ? label : major);
-        map.setPaintProperty(id, 'text-halo-color', ink);
-        map.setPaintProperty(id, 'text-halo-width', 1.4);
+      if (layer.type === 'background') {
+        map.setPaintProperty(id, 'background-color', ink);
+      } else if (/water|ocean|sea|river|lake/i.test(id)) {
+        // water reads as the theme's cool accent, kept dark so labels stay legible
+        if (layer.type === 'fill') map.setPaintProperty(id, 'fill-color', mix(ink, ge, 0.22));
+        else if (layer.type === 'line') map.setPaintProperty(id, 'line-color', mix(ink, ge, 0.3));
+      } else if (/^landuse|^landcover|^park/i.test(id) && layer.type === 'fill') {
+        map.setPaintProperty(id, 'fill-color', mix(ink, '#ffffff', 0.045));
       }
     } catch {}
   }
+}
+
+/* tiny hex/rgb blend so the water tint tracks whatever the theme vars hold,
+   including the hsl() values the Auto theme writes */
+function mix(a, b, t){
+  const p = c => {
+    c = (c||'').trim();
+    if (c[0] === '#') { let h = c.slice(1); if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+      const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+    const m = c.match(/(-?[\d.]+)[ ,]+(-?[\d.]+)%?[ ,]+(-?[\d.]+)%?/);
+    if (c.startsWith('hsl') && m) return hsl(+m[1], +m[2], +m[3]);
+    if (m) return [+m[1], +m[2], +m[3]];
+    return [23,18,31];
+  };
+  const A = p(a), B = p(b);
+  return 'rgb(' + A.map((v,i)=>Math.round(v + (B[i]-v)*t)).join(',') + ')';
+}
+function hsl(h, s, l){
+  s/=100; l/=100; const a = s*Math.min(l,1-l);
+  const f = n => { const k = (n + h/30) % 12; return Math.round((l - a*Math.max(-1, Math.min(k-3, Math.min(9-k, 1))))*255); };
+  return [f(0), f(8), f(4)];
 }
 
 function pinEl(place, hue, count){
@@ -122,7 +145,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
 
   /* --- build the map once per system --- */
   useEffect(() => {
-    let dead = false, map = null;
+    let dead = false, map = null, ro = null;
     loadMapLibre().then(maplibregl => {
       if (dead || !box.current) return;
       const first = placed[0];
@@ -137,6 +160,16 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
       });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+      /* MapLibre measures its container once, at construction. Anything that
+         changes the box afterwards — fonts landing, the tab becoming visible,
+         a rotate, the desktop breakpoint — leaves the GL drawing buffer at the
+         old size unless it is told. Cheap insurance against a silently blank
+         or letterboxed map. */
+      if (window.ResizeObserver && box.current) {
+        ro = new ResizeObserver(() => { try { map.resize(); } catch {} });
+        ro.observe(box.current);
+      }
       /* Don't hang on a single 'load'. If the style was already cached the event
          can fire before this listener attaches, and a backgrounded/occluded tab
          may not composite for a long time — either way the spinner would stick
@@ -150,7 +183,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
       map.on('error', () => {});
     }).catch(() => { if (!dead) setStatus('failed'); });
 
-    return () => { dead = true; try { map && map.remove(); } catch {} mapRef.current = null; };
+    return () => { dead = true; try { ro && ro.disconnect(); } catch {} try { map && map.remove(); } catch {} mapRef.current = null; };
   }, [system.key]);
 
   /* --- the theme can change under us (including every frame on Auto) --- */
