@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, sb, ui } from './core.js';
+import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, resumeBg, sb, ui } from './core.js';
 import { Avatar, Bubble, Eyebrow, ImageAdjust, You, statusOf } from './components.js';
 
 export function ChatsScreen({ kit }) {
@@ -82,6 +82,22 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const sys = !isDm ? systems.find(s=>s.key===sel.ref) : null;
   const mod = !!sel.mod && (isDm ? !(thread && (thread.a===uid || thread.b===uid)) : !sys);
   useEffect(()=>{ if (sel.mod && isDm && !threads.some(t=>t.id===sel.ref)) loadModThread(sel.ref).then(setModThread); }, [sel.ref]);
+
+  /* Below 900px a chat pane is position:fixed/inset:0 and opaque, so the
+     ambient canvas behind it is drawing frames nobody can see — and chat is
+     where people spend the most time. Stop it while such a pane is up.
+     The test is the layout breakpoint, NOT the `dock` prop: `dock` only
+     controls the header's back button, and both call sites go fullscreen on a
+     phone while both show the background around them on a desktop. Tracked
+     live so rotating across the breakpoint resolves correctly either way. */
+  useEffect(()=>{
+    const mq = matchMedia('(max-width: 899px)');
+    let held = false;
+    const sync = ()=>{ if (mq.matches === held) return; held = mq.matches; held ? pauseBg() : resumeBg(); };
+    sync();
+    mq.addEventListener('change', sync);
+    return ()=>{ mq.removeEventListener('change', sync); if (held) resumeBg(); };
+  }, []);
 
   const peerId = isDm && thread ? (thread.a===uid ? thread.b : thread.a) : null;
   const peer = peerId ? profiles[peerId] : null;
@@ -184,8 +200,8 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const seen = isDm && !mod && lastMine && bucket.peerRead && rows[rows.length-1]?.sender===uid
     && new Date(bucket.peerRead) >= new Date(lastMine.created_at);
 
-  return html`<div class=${'chatpane'+(dock?' dock':'')} style=${`--mybub:${th.my};--chacc:${th.accent};--chfont:${ff}`}>
-    <div class="chathead">
+  return html`<div class=${'chatpane chat3d'+(dock?' dock':'')} style=${`--mybub:${th.my};--chacc:${th.accent};--chfont:${ff}`}>
+    <div class="chathead glass">
       <button class="xbtn" style="width:32px;height:32px" onClick=${onClose} aria-label="Back"><${IcBack} size=${15}/></button>
       ${isDm
         ? html`<${Avatar} p=${peer||{ id:peerId||'x' }} size=${34}/>`
@@ -224,7 +240,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       </div>
     </div>
 
-    ${!mod && html`<div class="composer">
+    ${!mod && html`<div class="composer glass">
       <button class="cbtn" aria-label="Emoji" onClick=${()=>setPane(pane==='emoji'?null:'emoji')}><${IcSmile} size=${19}/></button>
       <button class="cbtn" aria-label="Image or GIF" onClick=${()=>setPane(pane==='media'?null:'media')}><${IcImage} size=${19}/></button>
       <div class="cfield">
@@ -238,7 +254,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       ${pane==='media' && html`<${MediaPop} onSend=${(kind,u)=>doSend(kind,u)} onClose=${()=>setPane(null)}/>`}
     </div>`}
 
-    ${pane==='menu' && html`<div class="chatmenu">
+    ${pane==='menu' && html`<div class="chatmenu glass">
       ${canStyle && html`<button onClick=${()=>setPane('look')}>🎨 Personalize</button>`}
       <button onClick=${()=>{ muteChat(sel, !(reads[key]?.muted)); setPane(null); }}>${reads[key]?.muted ? '🔔 Unmute' : '🔕 Mute'}</button>
       ${isDm && peerId && html`<button onClick=${()=>{ setPane(null); onOpenFriend(peerId); }}>👤 View profile</button>`}
@@ -258,7 +274,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
 
 export function EmojiPop({ onPick, onClose }) {
   const [cat, setCat] = useState(0);
-  return html`<div class="chatpop">
+  return html`<div class="chatpop glass">
     <div class="poptabs">
       ${EMOJI_CATS.map((c,i)=>html`<button key=${i} class=${i===cat?'on':''} onClick=${()=>setCat(i)}>${c[0]}</button>`)}
       <button style="margin-left:auto" onClick=${onClose} aria-label="Close"><${IcX} size=${13}/></button>
@@ -294,7 +310,7 @@ export function MediaPop({ onSend, onClose }) {
       ? 'On Tenor / GIPHY: share → copy GIF link. Built-in search switches on once a free Tenor key is set (TENOR_KEY in the code).'
       : 'Links only — Orbit never stores the file. https images (jpg / png / webp / gif).'}</div>
   </div>`;
-  return html`<div class="chatpop">
+  return html`<div class="chatpop glass">
     <div class="poptabs">
       <button class=${tab==='img'?'on':''} onClick=${()=>setTab('img')}>🖼 Image link</button>
       <button class=${tab==='gif'?'on':''} onClick=${()=>setTab('gif')}>GIF</button>

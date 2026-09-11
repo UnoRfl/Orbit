@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useState } from './lib.js';
-import { B, sb } from './core.js';
+import { B, bgFor, sb } from './core.js';
 import { AuthScreen, SolarLoader } from './components.js';
 import { ConfirmHost, Shell } from './shell.js';
 import { Settings } from './settings.js';
@@ -35,31 +35,42 @@ try {
    Monochrome theme. Reads window.__orbit each frame, so the style
    picker + "Flying asteroids" toggle in Settings apply live.
 
-   Mobile performance: a quality tier (qlv 0/1/2) caps DPR + frame
-   rate and thins particle/grid counts; phones start at tier 1, and
-   if a device still can't hold framerate it auto-drops to tier 2.
+   Mobile performance, in the order it matters:
+     · The loop does nothing at all while the tab is hidden or while an
+       opaque fullscreen surface (a chat on a phone) covers the canvas.
+     · Heavy variants are unreachable on phones — core.js `bgFor()` clamps
+       the saved preference to the tier's budget before every frame.
+     · A quality tier (qlv 0/1/2, shared with CSS via <html data-perf>) caps
+       DPR + frame rate and thins particle/grid counts; if a device still
+       can't hold framerate it auto-drops a tier.
+     · The cursor glow (mix-blend-mode over the canvas) is removed on touch.
+     · Resize is debounced and URL-bar-slide resizes are ignored, so scrolling
+       no longer reallocates the canvas.
    Constellation links + nodes are batched into a handful of draw
    calls instead of hundreds. Contour technique adapted from the
    "Topography" background on 21st.dev / shadcn.io.
    ============================================================ */
 (function(){
   const cv=document.getElementById('waves'); if(!cv) return;
-  const ctx=cv.getContext('2d');
+  const ctx=cv.getContext('2d',{ alpha:true, desynchronized:true });
   const glow=document.getElementById('glow');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const rootStyle=document.documentElement.style;
   const R=Math.random;
 
   /* ---------- device / quality tier ---------- */
-  const COARSE=(()=>{ try{ return matchMedia('(pointer:coarse)').matches; }catch{ return false; } })();
-  const DEVMEM=(typeof navigator!=='undefined' && navigator.deviceMemory) || 8;
-  const CORES=(typeof navigator!=='undefined' && navigator.hardwareConcurrency) || 8;
-  let qlv = (COARSE || innerWidth<760 || DEVMEM<=4 || CORES<=4) ? 1 : 0;   // 0=full 1=lite 2=min
+  /* index.html already classified this device before first paint and wrote it
+     to <html data-perf>; reuse that number so CSS (glass, chat 3D) and the
+     canvas never disagree about what this phone can take. */
+  const ROOT=document.documentElement;
+  const COARSE=ROOT.hasAttribute('data-coarse');
+  let qlv = Math.max(0, Math.min(2, +(ROOT.getAttribute('data-perf')||0)));   // 0=full 1=lite 2=min
+  const setTier=v=>{ qlv=v; ROOT.setAttribute('data-perf', String(v)); };
   let OCT=3, Q=calcQ();
   function calcQ(){
     OCT = qlv>=1 ? 2 : 3;
     return {
-      dprCap:   qlv>=1 ? 1.5 : 2,
+      dprCap:   qlv>=2 ? 1 : (qlv>=1 ? 1.5 : 2),
       cell:     qlv>=2 ? 40 : (qlv>=1 ? 34 : 26),
       nlev:     qlv>=2 ? 6  : (qlv>=1 ? 7  : 9),
       nodeCap:  qlv>=2 ? 28 : (qlv>=1 ? 42 : 72),
@@ -91,10 +102,16 @@ try {
     m=str.match(/(\d+)[\s,]+(\d+)[\s,]+(\d+)/); if(m) return [+m[1],+m[2],+m[3]];
     return [176,107,255]; }
   let c1=[176,107,255], c2=[45,212,191];
+  /* The cursor glow is a mix-blend-mode:screen layer over a full-screen canvas,
+     which forces the compositor to re-read the backdrop on every move. It also
+     has nothing to track on a touch screen, so it is removed outright there
+     rather than left invisible but still composited. */
+  const USE_GLOW = !!glow && !COARSE;
+  if (glow && !USE_GLOW) glow.remove();
   function readTheme(){
     c1=parseColor(rootStyle.getPropertyValue('--major'));
     c2=parseColor(rootStyle.getPropertyValue('--ge'));
-    glow.style.background='radial-gradient(circle, '+rgba(c1,'.16')+', '+rgba(c2,'.05')+' 46%, transparent 70%)';
+    if (USE_GLOW) glow.style.background='radial-gradient(circle, '+rgba(c1,'.16')+', '+rgba(c2,'.05')+' 46%, transparent 70%)';
   }
 
   /* ---------- procedural noise (topographic) ---------- */
@@ -271,11 +288,15 @@ try {
     if(animate) time+=dt*0.001;
     mx+=(tx-mx)*0.09; my+=(ty-my)*0.09;
     const P=prefs();
-    if(pActive){ glow.style.opacity=1; glow.style.transform='translate('+(mx-glowHalf)+'px,'+(my-glowHalf)+'px)'; }
-    else glow.style.opacity=0;
+    if(USE_GLOW){
+      if(pActive){ glow.style.opacity=1; glow.style.transform='translate('+(mx-glowHalf)+'px,'+(my-glowHalf)+'px)'; }
+      else glow.style.opacity=0;
+    }
     if(--ct.v<=0){ readTheme(); ct.v=18; }
     ctx.clearRect(0,0,W,H);
-    render(P.bgStyle||'waves', animate);
+    // bgFor() clamps the saved preference to what this tier can afford, so a
+    // phone never runs the heavy variants even if the account picked one on a desktop.
+    render(bgFor(P.bgStyle||'waves', qlv), animate);
     if(P.asteroids && animate) drawAsteroids(now);
   }
 
@@ -286,18 +307,39 @@ try {
     if(warm<40){ warm++; return; }           // ignore startup / first paints
     accum+=dt; if(++cnt<50) return;
     const avg=accum/cnt; accum=0; cnt=0;
-    if(avg>27){ qlv++; Q=calcQ(); resize(); warm=0; }   // sustained <~37fps -> step down
+    if(avg>27){ setTier(qlv+1); Q=calcQ(); resize(); warm=0; }   // sustained <~37fps -> step down
   }
 
   let lastDraw=0;
   function loop(now){ requestAnimationFrame(loop);
+    /* Nothing to draw for: the tab is in the background, or an opaque
+       fullscreen surface (a chat on a phone) is sitting on top of the canvas.
+       Skipping the frame here also freezes `time`, so the field picks up
+       where it left off instead of jumping when you come back. */
+    if(document.hidden || ROOT.hasAttribute('data-bgpause')){ last=now; return; }
     if(reduced){ if(now-lastDraw<220) return; lastDraw=now; frame(now,false); return; }
     if(Q.frameMin && now-lastDraw < Q.frameMin) return;
     lastDraw=now; frame(now,true); adapt();
   }
 
-  addEventListener('resize',resize,{passive:true});
-  addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;pActive=true;},{passive:true});
+  /* On a phone every scroll that shows or hides the browser's URL bar fires a
+     resize, and each one was reallocating the canvas and rebuilding every
+     particle set — a stutter on exactly the gesture people use most. Ignore
+     height-only changes on touch (the canvas is already tall enough to cover
+     both states) and debounce the rest. */
+  let rsT=0, lastW=innerWidth, lastH=innerHeight;
+  function onResize(){
+    const w=innerWidth, h=innerHeight;
+    if(COARSE && w===lastW && Math.abs(h-lastH)<140) return;   // URL-bar slide only
+    lastW=w; lastH=h;
+    clearTimeout(rsT); rsT=setTimeout(resize,120);
+  }
+  addEventListener('resize',onResize,{passive:true});
+  addEventListener('orientationchange',()=>{ clearTimeout(rsT); rsT=setTimeout(resize,180); },{passive:true});
+  // coming back from a hidden tab or a fullscreen chat: reset the clock so the
+  // first frame doesn't integrate the whole time we were paused
+  document.addEventListener('visibilitychange',()=>{ last=performance.now(); },{passive:true});
+  if(!COARSE) addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;pActive=true;},{passive:true});
   addEventListener('touchmove',e=>{const c=e.touches[0];if(c){tx=c.clientX;ty=c.clientY;pActive=true;}},{passive:true});
   addEventListener('touchstart',e=>{const c=e.touches[0];if(c){tx=c.clientX;ty=c.clientY;mx=c.clientX;my=c.clientY;pActive=true;}},{passive:true});
 

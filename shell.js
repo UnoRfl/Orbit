@@ -948,17 +948,27 @@ export function Shell({ session }) {
           addClass=${addClass} delClass=${delClass} onPick=${d=>setSheet({t:'detail', d})} onImport=${()=>setSheet({t:'import'})} />`}
     </div>
 
-    <div class="nav"><div class="navin">
-      ${[['home','Orbit',IcHome],['map','Map',IcPin],['chats','Chats',IcChat],['plans','Plans',IcCal],['you','You',IcUser],
-         ...(myRole ? [['staff','Staff',IcShield]] : [])].map(([id,lbl,Ic])=>{
-        const on = tab===id && !friendOpen;
-        return html`<button key=${id} class=${'navbtn'+(on?' on':'')} onClick=${()=>{setOpenFriend(null);setTab(id)}}>
-          <${Ic} size=${21}/><span>${lbl}</span>
-          ${id==='plans' && myInvites.length>0 && html`<span class="navbadge">${myInvites.length}</span>`}
-          ${id==='chats' && chatsBadge>0 && html`<span class="navbadge">${chatsBadge>99?'99+':chatsBadge}</span>`}
-          ${id==='staff' && staffOpenN>0 && html`<span class="navbadge">${staffOpenN}</span>`}
-        </button>`;})}
-    </div></div>
+    ${(()=>{
+      /* One selection pill that travels to the tab you picked instead of five
+         that blink on and off. The buttons are evenly sized, so the ink's
+         position is just its index — hand CSS the count and the index and the
+         whole thing is a single transform transition (horizontal on mobile,
+         vertical once the nav becomes a side rail). */
+      const tabs = [['home','Orbit',IcHome],['map','Map',IcPin],['chats','Chats',IcChat],['plans','Plans',IcCal],['you','You',IcUser],
+                    ...(myRole ? [['staff','Staff',IcShield]] : [])];
+      const ai = Math.max(0, tabs.findIndex(([id])=>id===tab));
+      return html`<div class="nav"><div class="navin glass" style=${`--navn:${tabs.length};--navi:${ai}`}>
+        <div class="navink" aria-hidden="true"></div>
+        ${tabs.map(([id,lbl,Ic])=>{
+          const on = tab===id && !friendOpen;
+          return html`<button key=${id} class=${'navbtn'+(on?' on':'')} onClick=${()=>{setOpenFriend(null);setTab(id)}}>
+            <${Ic} size=${21}/><span>${lbl}</span>
+            ${id==='plans' && myInvites.length>0 && html`<span class="navbadge">${myInvites.length}</span>`}
+            ${id==='chats' && chatsBadge>0 && html`<span class="navbadge">${chatsBadge>99?'99+':chatsBadge}</span>`}
+            ${id==='staff' && staffOpenN>0 && html`<span class="navbadge">${staffOpenN}</span>`}
+          </button>`;})}
+      </div></div>`;
+    })()}
 
     <${Sheet} open=${sheet?.t==='friends'} onClose=${()=>setSheet(null)} accent="var(--ge)">
       <${FriendsSheet} uid=${uid} graph=${graph} profiles=${profiles} blocks=${blocks}
@@ -998,7 +1008,7 @@ export function Shell({ session }) {
         onDeleteAccount=${deleteAccount} />`}
     <//>
 
-    <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast">${t.em && html`<span class="em">${t.em}</span>`}${t.text}</div>`)}</div>
+    <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast glass">${t.em && html`<span class="em">${t.em}</span>`}${t.text}</div>`)}</div>
   </div>`;
 }
 
@@ -1021,7 +1031,7 @@ export function ConfirmHost() {
   if (!q) return null;
   const done = v => { const r=q._res; setQ(null); r&&r(v); };
   return html`<div class="confirmwrap" onClick=${e=>{ if(e.target===e.currentTarget) done(false); }}>
-    <div class="confirmcard" role="alertdialog" aria-modal="true">
+    <div class="confirmcard glass" role="alertdialog" aria-modal="true">
       <div class="confirmtitle">${q.title||'Are you sure?'}</div>
       ${q.body && html`<div class="confirmbody">${q.body}</div>`}
       <div class="confirmrow">

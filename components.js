@@ -129,7 +129,7 @@ export const Eyebrow = ({color='var(--major)', children}) => html`<div class="ey
 export function Sheet({ open, onClose, accent='var(--major)', children }) {
   if (!open) return null;
   return html`<div class="sheetback" onClick=${onClose}>
-    <div class="sheet" onClick=${e=>e.stopPropagation()}>
+    <div class="sheet glass-lg" onClick=${e=>e.stopPropagation()}>
       <div class="sheetbar" style=${`background:linear-gradient(90deg,${accent},transparent 72%)`}></div>
       ${children}
     </div></div>`;
@@ -770,7 +770,7 @@ export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUn
   const cls = 'bub ' + (mine?'me':'them') + (cont?' cont':'');
   return html`<div class=${'msgrow'+(mine?' me':'')+(cont?'':' gap')}>
     ${!mine && group && html`<div class="msgav">${!cont && html`<button style="background:none;border:none;padding:0;cursor:pointer" onClick=${onOpenSender}><${Avatar} p=${p||{}} size=${24}/></button>`}</div>`}
-    <div style=${`min-width:0;display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:min(340px,78%)`}>
+    <div class="bubcol" style=${`min-width:0;display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:min(340px,78%)`}>
       ${!mine && group && !cont && html`<div class="msgname">${p?fname(p):'…'}</div>`}
       ${m.deleted
         ? html`<div class=${cls+' gone'}>message unsent</div>`

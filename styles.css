@@ -717,3 +717,233 @@ button.logrow:hover .rowname{color:#fff}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+
+/* ================================================================
+   LIQUID GLASS · SMOOTH MORPH · CHAT DEPTH
+   ----------------------------------------------------------------
+   One place for the material and the motion. Everything here keys
+   off <html data-perf> (0 full · 1 phones/mid · 2 low-end), which
+   index.html stamps before first paint and main.js can step down at
+   runtime, so a weak device never renders the expensive version for
+   even one frame.
+
+   The rule that keeps this fast: backdrop-filter is charged by AREA.
+   Small chrome (nav, chat header, composer, menus, toasts) really
+   blurs. Big surfaces and anything that repeats down a list — cards,
+   rows, bubbles — get the *look* of glass from a gradient tint and a
+   specular rim only, which costs nothing at all.
+   ================================================================ */
+:root{
+  /* material */
+  --glass-blur:20px;
+  --glass-sat:155%;
+  --glass-base:rgba(24,18,32,.58);          /* what sits under the blur   */
+  --glass-tint:rgba(255,255,255,.055);      /* top-down sheen             */
+  --glass-line:rgba(255,255,255,.11);       /* body edge                  */
+  --glass-rim:rgba(255,255,255,.32);        /* lit corner of the rim      */
+  --glass-rim-dim:rgba(255,255,255,.05);
+  --glass-hi:rgba(255,255,255,.14);         /* inner top highlight        */
+  --glass-lo:rgba(0,0,0,.26);               /* inner bottom shade         */
+  --glass-cast:0 14px 40px -18px rgba(0,0,0,.75);
+
+  /* motion */
+  --ease-morph:cubic-bezier(.22,1,.36,1);   /* settles, never overshoots  */
+  --ease-snap:cubic-bezier(.34,1.32,.52,1); /* a little bounce on entry   */
+  --t-fast:.15s; --t-mid:.28s; --t-slow:.44s;
+  --morph-blur:7px;                         /* focus-pull on screen entry */
+  --press:.975;                             /* tap-down scale             */
+}
+/* Phones blur less and skip the focus-pull; the entry still reads as a morph
+   because the scale + travel curve is what carries it, not the blur. */
+html[data-perf="1"]{ --glass-blur:13px; --glass-sat:132%; --morph-blur:0px; --t-slow:.38s }
+html[data-perf="2"]{ --glass-blur:8px;  --glass-sat:115%; --morph-blur:0px; --t-slow:.3s;
+                     --glass-cast:0 8px 22px -14px rgba(0,0,0,.7) }
+
+/* No backdrop-filter support, or the OS asked for less transparency:
+   fall back to the solid panel. Same shape, same rim, no sampling. */
+html[data-noglass] .glass,
+html[data-noglass] .glass-lg{ background-color:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none }
+@media (prefers-reduced-transparency: reduce){
+  .glass,.glass-lg{ background-color:var(--panel)!important;
+    backdrop-filter:none!important;-webkit-backdrop-filter:none!important }
+}
+
+/* ---------- the material ---------- */
+.glass,.glass-lg,.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  position:relative;
+  background-color:var(--glass-base);
+  background-image:linear-gradient(180deg,var(--glass-tint),rgba(255,255,255,.014) 44%,rgba(255,255,255,0) 76%);
+  border:1px solid var(--glass-line);
+  box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--glass-cast);
+}
+.glass{ backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+/* Large surfaces only sample the backdrop where the GPU can afford the area. */
+html[data-perf="0"] .glass-lg{
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+html:not([data-perf="0"]) .glass-lg{ background-color:var(--panel2);
+  background-color:color-mix(in srgb, var(--panel2) 92%, transparent) }
+/* .glass-lite never blurs — for anything that repeats down a list. */
+.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  background-color:var(--panel);
+  background-color:color-mix(in srgb, var(--panel) 90%, transparent);
+  box-shadow:inset 0 1px 0 var(--glass-hi) }
+.convrow.on{ background-color:rgba(176,107,255,.14);
+  background-color:color-mix(in srgb, var(--major) 15%, transparent);border-color:var(--major) }
+
+/* A rim is absolutely positioned, so inside a SCROLLING box it scrolls away
+   with the content. Those surfaces keep the inset highlight (which is painted
+   against the border box and stays put) and skip the rim. */
+.sheet::before,.chatovercard::before{ display:none }
+
+/* The refracted rim: a 1px gradient border, bright where the light would
+   catch a bevel and fading away around the curve. Masked so it paints the
+   edge only. This is what actually sells "glass" — not the blur. */
+.glass::before,.glass-lg::before,.glass-lite::before,
+.card::before,.cardrow::before,.convrow::before,.authcard::before,.set-card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:0;
+  background:linear-gradient(146deg,var(--glass-rim),var(--glass-rim-dim) 30%,
+             rgba(255,255,255,0) 58%,var(--glass-rim-dim) 76%,rgba(255,255,255,.18));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+
+/* ---------- smooth morph: one motion language on everything touchable ---------- */
+.btn,.pill,.iconbtn,.xbtn,.cbtn,.csend,.cardrow,.convrow,.theme-tile,.authtab,.navbtn,.lookswatch,.ghosticon{
+  transition:transform var(--t-fast) var(--ease-morph),
+             background-color var(--t-mid) var(--ease-morph),
+             border-color var(--t-mid) var(--ease-morph),
+             box-shadow var(--t-mid) var(--ease-morph),
+             color var(--t-mid) var(--ease-morph);
+}
+.btn:active,.pill:active,.iconbtn:active,.xbtn:active,.cbtn:active,.csend:not(:disabled):active,
+.cardrow:active,.convrow:active,.theme-tile:active,.authtab:active,.lookswatch:active{ transform:scale(var(--press)) }
+.navbtn:active{ transform:scale(.94) }
+/* lift on hover, but only where there is a real cursor */
+@media (hover:hover) and (pointer:fine){
+  .cardrow:hover,.convrow:hover{ transform:translateY(-1px) }
+}
+
+@keyframes morphIn{
+  from{ opacity:0;transform:translate3d(0,16px,0) scale(.968);filter:blur(var(--morph-blur)) }
+  to  { opacity:1;transform:none;filter:blur(0) }
+}
+@keyframes morphSheet{
+  from{ opacity:0;transform:translate3d(0,26px,0) scale(.975) }
+  to  { opacity:1;transform:none }
+}
+@keyframes morphPop{
+  from{ opacity:0;transform:scale(.94) translate3d(0,6px,0) }
+  to  { opacity:1;transform:none }
+}
+
+/* screens change by morphing instead of cutting */
+.content{ animation:morphIn var(--t-slow) var(--ease-morph) }
+.sheet{ animation:morphSheet var(--t-slow) var(--ease-morph) }
+.chatmenu,.chatpop,.toast{ animation:morphPop var(--t-mid) var(--ease-snap) }
+.chatpane{ animation:morphIn var(--t-mid) var(--ease-morph) }
+
+/* ---------- where the material goes ---------- */
+.navin{ background:var(--glass-base);border-top:1px solid var(--glass-line) }
+.sheet{ background-color:var(--glass-base) }
+.toast{ background-color:rgba(36,29,46,.72) }
+.chathead,.composer{ background-color:rgba(24,18,32,.62) }
+.chatmenu,.chatpop{ background-color:rgba(31,23,40,.74) }
+
+/* The nav's morphing selection — one pill that travels between tabs instead
+   of five that blink on and off. --navn = tab count, --navi = active index,
+   both set by shell.js, so the travel is a single transform transition. */
+.navin{ position:relative }
+.navink{
+  position:absolute;left:8px;top:8px;z-index:0;pointer-events:none;
+  width:calc((100% - 16px) / var(--navn,5));
+  height:calc(100% - 16px - env(safe-area-inset-bottom));
+  border-radius:13px;
+  background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.028));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17), 0 4px 14px -8px var(--major);
+  transform:translate3d(calc(var(--navi,0) * 100%),0,0);
+  transition:transform var(--t-slow) var(--ease-morph);
+}
+.navbtn{ z-index:1 }
+
+/* ================================================================
+   CHAT — the shallow-screen illusion
+   ----------------------------------------------------------------
+   Flat elements, but the two bubble columns are hinged on their
+   anchored edge and turned a few degrees toward the middle under a
+   long perspective. Because the perspective origin belongs to the
+   pane and not to the scroller, the angle a bubble presents changes
+   as it travels past the centre line — which is what reads as a
+   screen bending away at its edges rather than a static skew. A
+   faint edge shade does the rest: a curved surface catches less
+   light where it turns away from you.
+
+   Deliberately small (~3°). Chat only — nothing else in Orbit tilts.
+   ================================================================ */
+.chat3d .msgs{
+  perspective:var(--ch-persp,820px);
+  perspective-origin:50% 44%;
+  transform-style:preserve-3d;
+}
+.chat3d .bubcol{
+  transform-origin:left center;
+  transform:rotateY(var(--ch-tilt,3.6deg)) translateZ(var(--ch-depth,-6px));
+  transition:transform var(--t-mid) var(--ease-morph);
+}
+.chat3d .msgrow.me .bubcol{
+  transform-origin:right center;
+  transform:rotateY(calc(var(--ch-tilt,3.6deg) * -1)) translateZ(var(--ch-depth,-6px));
+}
+/* the surface turning away from the light at the left and right edges */
+.chat3d .chatbody::after{
+  content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    linear-gradient(90deg, rgba(3,1,7,.30), rgba(3,1,7,0) 15%, rgba(3,1,7,0) 85%, rgba(3,1,7,.30)),
+    radial-gradient(125% 96% at 50% 46%, rgba(3,1,7,0) 56%, rgba(3,1,7,.20));
+}
+/* Phones tilt less and sit closer, so the foreshortening stays gentle on a
+   narrow column; the weakest tier drops the 3D entirely rather than paying
+   for a composited layer per bubble while the list scrolls. */
+html[data-perf="1"] .chat3d .msgs{ --ch-persp:900px }
+html[data-perf="1"] .chat3d .bubcol{ --ch-tilt:3deg;--ch-depth:-4px }
+html[data-perf="2"] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-perf="2"] .chat3d .bubcol,
+html[data-perf="2"] .chat3d .msgrow.me .bubcol{ transform:none }
+html[data-perf="2"] .chat3d .chatbody::after{ display:none }
+html[data-rm] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-rm] .chat3d .bubcol,
+html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
+
+/* glass bubbles — tint + rim only, never a blur: this repeats per message */
+.bub.them{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 70%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 6px 16px -12px rgba(0,0,0,.9);
+}
+.bub.me{ box-shadow:inset 0 1px 0 rgba(255,255,255,.24), 0 6px 18px -12px rgba(0,0,0,.85) }
+.cfield{ background-color:var(--panel2);
+         background-color:color-mix(in srgb, var(--panel2) 82%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+         transition:border-color var(--t-mid) var(--ease-morph),box-shadow var(--t-mid) var(--ease-morph) }
+.cfield:focus-within{ border-color:color-mix(in srgb, var(--chacc) 55%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 3px color-mix(in srgb, var(--chacc) 13%, transparent) }
+
+/* ---------- desktop: the nav is a column, so the ink slides down ---------- */
+@media (min-width:900px){
+  .navin{ background:var(--glass-base) }
+  /* the side rail stacks with a 2px gap, so the ink's height and its travel
+     both have to allow for the gutters or it drifts off the last tab */
+  .navink{
+    width:calc(100% - 16px);
+    height:calc((100% - 16px - (var(--navn,5) - 1) * 2px) / var(--navn,5));
+    transform:translate3d(0,calc(var(--navi,0) * (100% + 2px)),0);
+    border-radius:11px;
+  }
+  .navbtn.on{ background:none }          /* the travelling ink is the highlight now */
+  .chatpane{ background-color:var(--panel);
+             background-color:color-mix(in srgb, var(--panel) 88%, transparent) }
+}
+.theme-tile.locked{opacity:.42;cursor:not-allowed;filter:grayscale(.7)}
+.theme-tile.locked:active{transform:none}

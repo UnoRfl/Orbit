@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, html, useState } from './lib.js';
-import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, cleanHandle, decodePlace, flairOf, fname, pingChime, sb, shownName, ui } from './core.js';
+import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui } from './core.js';
 import { Avatar, Bubble, NameFx, PwInput, Toggle, You } from './components.js';
 import { Home } from './home.js';
 
@@ -109,24 +109,40 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
         </div>
       </div>
 
-      <div class="set-section">
+      ${(()=>{
+        /* Two of the six variants cost far more per frame than the rest
+           (per-pixel noise, additive blending) and are what made weaker
+           phones crawl. Rather than quietly swapping them out, show them
+           greyed with the reason — the choice is still yours on a desktop,
+           and the stored preference is never overwritten. */
+        const tier = perfTier();
+        const blocked = BG_IDS.filter(id=>!bgAllowed(id, tier));
+        const names = blocked.map(id=>BG_STYLES[id].name);
+        const list = names.length<3 ? names.join(' and ') : names.slice(0,-1).join(', ')+' and '+names[names.length-1];
+        const many = blocked.length>1;
+        return html`<div class="set-section">
         <div class="set-eyebrow">Background style</div>
         <div class="theme-grid">
-          ${BG_IDS.map(id=>{ const b=BG_STYLES[id]; return html`<button key=${id}
-            class=${'theme-tile bgtile'+((prefs.bgStyle||'waves')===id?' on':'')}
-            onClick=${()=>patch({ bgStyle:id })}>
-            <div class="bgglyph">${b.g}</div>
+          ${BG_IDS.map(id=>{ const b=BG_STYLES[id], ok=bgAllowed(id, tier); return html`<button key=${id}
+            class=${'theme-tile bgtile'+((prefs.bgStyle||'waves')===id?' on':'')+(ok?'':' locked')}
+            disabled=${!ok}
+            title=${ok?'':'Too heavy for this device'}
+            onClick=${()=>{ if(ok) patch({ bgStyle:id }); }}>
+            <div class="bgglyph">${ok?b.g:'🔒'}</div>
             <div class="tname">${b.name}</div>
-            <div class="tdesc">${b.desc}</div>
+            <div class="tdesc">${ok ? b.desc : 'Desktop only'}</div>
           </button>`; })}
         </div>
+        ${blocked.length>0 && html`<div class="set-hint" style="margin-top:10px">
+          ${list} ${many?'redraw':'redraws'} the whole screen every frame — too much for this device, so ${many?'they are':'it is'} off here. Orbit falls back to Ambient Waves. Open Orbit on a laptop to use ${many?'them':'it'}.
+        </div>`}
         <div class="set-card" style="margin-top:12px">
           <${Toggle} label="Flying asteroids" hint="Rocks drifting past in the distance."
             on=${prefs.asteroids} onClick=${()=>patch({ asteroids:!prefs.asteroids })}/>
           <${Toggle} label="Ping sound" hint="A soft chime when a friend pings you."
             on=${prefs.sounds} onClick=${()=>{ const on=!prefs.sounds; patch({ sounds:on }); if(on) pingChime(); }}/>
         </div>
-      </div>
+      </div>`; })()}
     <//>`}
 
     ${tab==='account' && html`<${Fragment}>
