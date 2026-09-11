@@ -22,10 +22,11 @@ Orbit/
 ├── staff.js          Moderation panel
 ├── main.js           App root, session boot, background canvas
 ├── manifest.webmanifest · sw.js · icon.png · tos.html
+└── sql/             Reviewed migrations (see sql/README.md)
 ```
 
 Dependencies point downward only (no cycles):
-`lib → core → components → (home, map, plans, chat, settings, staff) → shell → main`
+`lib → core → components → (home, map+geomap, plans, chat, settings, staff) → shell → main`
 
 ## Full maintainer's guide
 

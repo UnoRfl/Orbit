@@ -279,7 +279,13 @@ export const store = {
    ever needing a copy of your layout. Friends "cluster" into the
    same system when you both name it the same thing.
    ============================================================ */
-export const SYS_KEY = 'orbit.systems.v1';
+/* Bumped to v2 when places moved from abstract orbital positions to real
+   coordinates. Every stored place in Supabase was cleared at the same time,
+   so a device carrying a v1 layout would be showing planets that no longer
+   exist anywhere. Reading a new key re-seeds a clean Campus system and the
+   old blob is dropped rather than left behind in localStorage. */
+export const SYS_KEY = 'orbit.systems.v2';
+try{ localStorage.removeItem('orbit.systems.v1'); }catch{}
 export const SYSTEM_HUES = [265, 190, 150, 330, 40, 210, 300, 95];
 export const EMOJI_SUGGESTIONS = ['🏠','🏫','🛍️','☕','🍜','🍔','🏀','🎮','🏋️','📚','🎬','🚉','🌳','🏖️','⛪','🏥','💻','🎤','🎨','🍦','🧋','🏬','🚗','✈️'];
 export const SYSTEM_GLYPHS = ['🪐','🌌','🌠','⭐','☄️','🌟','🔭','🚀','🛸','✨'];

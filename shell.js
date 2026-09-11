@@ -254,7 +254,7 @@ export function Shell({ session }) {
           .insert({ name:c.name, glyph:c.glyph||'🪐', hue:c.hue??265, owner:uid }).select().single();
         if (error) return;                               // migration SQL not run yet — try again next load
         if (row && (c.planets||[]).length)
-          await sb.from('planets').insert(c.planets.map(p=>({ system_id:row.id, name:p.name, icon:p.icon||'📍', created_by:uid })));
+          await sb.from('planets').insert(c.planets.map(p=>({ system_id:row.id, name:p.name, icon:p.icon||'📍', lat:Number.isFinite(p.lat)?p.lat:null, lng:Number.isFinite(p.lng)?p.lng:null, created_by:uid })));
       }
       saveSystems(loadSystems().filter(s=>s.kind==='campus'));
       localStorage.setItem('orbit.systems.migrated','1');
@@ -669,9 +669,15 @@ export function Shell({ session }) {
     if (error) toast(/leader/i.test(error.message||'') ? 'Only the leader can change that' : 'Could not save');
     loadShared();
   }
-  async function addSharedPlanet(sysId, { name, icon }) {
-    const { error } = await sb.from('planets').insert({ system_id:sysId, name, icon, created_by:uid });
+  async function addSharedPlanet(sysId, { name, icon, lat=null, lng=null }) {
+    const { error } = await sb.from('planets').insert({ system_id:sysId, name, icon, lat, lng, created_by:uid });
     if (error) toast('Could not add — the leader may have locked planet-adding');
+    loadShared();
+  }
+  // drop an existing place onto real coordinates (map view)
+  async function moveSharedPlanet(p, lat, lng) {
+    const { error } = await sb.from('planets').update({ lat, lng }).eq('id', p.id);
+    if (error) { toast('You can only move places you added'); return; }
     loadShared();
   }
   async function delSharedPlanet(p) {
@@ -681,7 +687,7 @@ export function Shell({ session }) {
     if (d && d.pi===p.id) setPres({ zone:null });
     loadShared();
   }
-  const sysActions = { createSystem, deleteSystem, leaveSystem, respondSystemInvite, inviteToSystem, kickMember, updateSystem, addSharedPlanet, delSharedPlanet };
+  const sysActions = { createSystem, deleteSystem, leaveSystem, respondSystemInvite, inviteToSystem, kickMember, updateSystem, addSharedPlanet, moveSharedPlanet, delSharedPlanet };
 
   /* ---------- chat mutations ---------- */
   const applyIncoming = n => {

@@ -955,3 +955,50 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 }
 .theme-tile.locked{opacity:.42;cursor:not-allowed;filter:grayscale(.7)}
 .theme-tile.locked:active{transform:none}
+
+/* ============ real map (geomap.js) ============ */
+.geowrap{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;
+  overflow:hidden;isolation:isolate;background:var(--canvas)}
+.geomap{position:absolute;inset:0}
+.geoload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;background:var(--canvas)}
+.geofail{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  width:100%;aspect-ratio:1/1.05;border:1px dashed var(--line-strong);border-radius:18px;padding:20px;color:var(--muted)}
+/* MapLibre ships a light chrome; bring it into the theme */
+.geowrap .maplibregl-ctrl-attrib{background:rgba(15,10,22,.72)!important;color:var(--faint)!important;font-size:9px}
+.geowrap .maplibregl-ctrl-attrib a{color:var(--muted)!important}
+.geowrap .maplibregl-ctrl-group{background:var(--panel);border:1px solid var(--line);box-shadow:none}
+.geowrap .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+.geowrap .maplibregl-ctrl-group button span{filter:invert(1) opacity(.7)}
+
+.geopin{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;
+  transform:translateY(4px);transition:transform var(--t-fast) var(--ease-morph)}
+.geopin:hover{transform:translateY(1px)}
+.geopin-i{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50% 50% 50% 4px;
+  transform:rotate(-45deg);font-size:15px;
+  background:radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--ph,var(--major)) 62%, transparent), rgba(18,12,26,.96));
+  border:1.5px solid color-mix(in srgb, var(--ph,var(--major)) 78%, transparent);
+  box-shadow:0 0 16px -3px color-mix(in srgb, var(--ph,var(--major)) 85%, transparent), 0 4px 10px -4px rgba(0,0,0,.9)}
+.geopin-i>*{transform:rotate(45deg)}
+.geopin.me .geopin-i{border-color:var(--ge);box-shadow:0 0 18px -2px var(--ge)}
+.geopin-n{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:var(--now);
+  color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;
+  border:1.5px solid var(--canvas)}
+.geopin-l{margin-top:3px;font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+  background:rgba(12,8,18,.78);border-radius:999px;padding:2px 7px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+
+.geoctl{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;gap:7px}
+.geobtn{width:38px;height:38px;border-radius:11px;background:var(--panel);border:1px solid var(--line-strong);
+  color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px -8px rgba(0,0,0,.9)}
+.geohint{position:absolute;left:10px;right:10px;top:10px;z-index:3;background:rgba(20,14,28,.88);
+  border:1px solid var(--line-strong);border-radius:11px;padding:8px 11px;font-size:12px;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;text-align:center}
+.geotray{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(12,8,18,.92) 34%)}
+
+/* the Orbit-view / Map-view switch */
+.mapmode{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);
+  border:1px solid var(--line);flex:none}
+.mapmode button{background:none;border:none;color:var(--muted);font-size:11.5px;font-weight:600;cursor:pointer;
+  padding:6px 12px;border-radius:999px;transition:background var(--t-mid) var(--ease-morph),color var(--t-mid) var(--ease-morph)}
+.mapmode button.on{background:rgba(176,107,255,.16);color:var(--ink)}

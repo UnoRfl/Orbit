@@ -1,7 +1,8 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
-import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, systemPhrase, ui } from './core.js';
+import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
+import { GeoMap, canUseGeoMap } from './geomap.js';
 import { Home } from './home.js';
 import { ChatView } from './chat.js';
 
@@ -14,6 +15,14 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState(null);   // {t:'newsys'} | {t:'addplanet'} | {t:'people'} | {t:'publog'}
   const [logTab, setLogTab] = useState('log');
+  /* Orbit view (the orrery) vs Map view (real coordinates). Remembered per
+     device, and forced back to the orrery on hardware that can't take
+     MapLibre so the tab always renders something. */
+  const geoOk = canUseGeoMap();
+  const [mapMode, setMapMode] = useState(()=>{
+    try{ return (geoOk && localStorage.getItem('orbit.mapmode')==='geo') ? 'geo' : 'orbit'; }catch{ return 'orbit'; }
+  });
+  const setMode = m => { setMapMode(m); try{ localStorage.setItem('orbit.mapmode', m); }catch{} };
   const areaRef = useRef(null);
   const [dim, setDim] = useState({ w:0, h:0 });
 
@@ -47,14 +56,25 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
 
   const commitLocal = next => { setLocalSys(next); saveSystems(next); };
   const addSystem = async spec => { const row = await actions.createSystem(spec); setForm(null); if(row){ setSel(null); setEdit(false); setActiveKey(row.id); } };
-  const addPlanet = async ({ name, icon }) => {
+  const addPlanet = async ({ name, icon, lat=null, lng=null }) => {
     if (!active) return;
     if (active.kind==='campus') {
-      commitLocal(localSys.map(s=> s.kind==='campus' ? { ...s, planets:[...(s.planets||[]), { id:genId('p_'), name, icon }] } : s));
+      commitLocal(localSys.map(s=> s.kind==='campus' ? { ...s, planets:[...(s.planets||[]), { id:genId('p_'), name, icon, lat, lng }] } : s));
     } else {
-      await actions.addSharedPlanet(active.key, { name, icon });
+      await actions.addSharedPlanet(active.key, { name, icon, lat, lng });
     }
     setForm(null);
+  };
+  /* Give an existing place its coordinates — used by the map's "not on the map
+     yet" tray, and by dragging a pin. Same two storage paths as addPlanet. */
+  const placeAt = async (planet, lat, lng) => {
+    if (!active) return;
+    if (active.kind==='campus') {
+      commitLocal(localSys.map(s=> s.kind==='campus'
+        ? { ...s, planets:(s.planets||[]).map(p=> p.id===planet.id ? { ...p, lat, lng } : p) } : s));
+    } else {
+      await actions.moveSharedPlanet(planet, lat, lng);
+    }
   };
   const removePlanet = async planet => {
     if (!active) return;
@@ -92,7 +112,10 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       ${form?.t==='newsys' && html`<${NewSystemForm} onSave=${addSystem} onClose=${()=>setForm(null)} />`}
     <//>
     <${Sheet} open=${form?.t==='addplanet'} onClose=${()=>setForm(null)} accent="var(--ge)">
-      ${form?.t==='addplanet' && active && html`<${AddPlanetForm} system=${active} onSave=${addPlanet} onClose=${()=>setForm(null)} />`}
+      ${form?.t==='addplanet' && active && html`<${AddPlanetForm} system=${active}
+        at=${Number.isFinite(form.lat) ? { lat:form.lat, lng:form.lng } : null}
+        onSave=${spec=>addPlanet({ ...spec, lat:form.lat ?? null, lng:form.lng ?? null })}
+        onClose=${()=>setForm(null)} />`}
     <//>
     <${Sheet} open=${form?.t==='people'} onClose=${()=>setForm(null)} accent="var(--major)">
       ${form?.t==='people' && active && active.kind==='shared' && html`<${SystemPeople} sys=${active} uid=${uid} me=${me}
@@ -309,11 +332,26 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       ${active.kind==='shared' && html`<button class="sysedit" style="padding:8px 10px" onClick=${()=>setForm({t:'people'})} aria-label="Members"><${IcUsers} size=${15}/></button>`}
       ${canAdd && html`<button class="sysedit" style="padding:8px 10px" onClick=${()=>setForm({t:'addplanet'})} aria-label="Add a place"><${IcPlus} size=${15}/></button>`}
     </div>
-    <div class="hint" style="margin-top:-6px;margin-bottom:12px">${active.kind==='campus'
-      ? 'Your campus, as planets. Tap one to see who’s there and check in.'
-      : `A shared system${isLeader?' you lead':''} — everyone here sees the same planets. Tap one to check in.`}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:-6px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="hint" style="margin:0;flex:1;min-width:160px">${mapMode==='geo'
+        ? (canAdd ? 'Tap the map to pin a place. Tap a pin to see who’s there and check in.'
+                  : 'Tap a pin to see who’s there and check in.')
+        : (active.kind==='campus'
+          ? 'Your campus, as planets. Tap one to see who’s there and check in.'
+          : `A shared system${isLeader?' you lead':''} — everyone here sees the same planets. Tap one to check in.`)}</div>
+      ${geoOk && html`<div class="mapmode" role="group" aria-label="Map view">
+        <button class=${mapMode==='orbit'?'on':''} onClick=${()=>setMode('orbit')}>Orbit</button>
+        <button class=${mapMode==='geo'?'on':''}   onClick=${()=>setMode('geo')}>Map</button>
+      </div>`}
+    </div>
 
-    <div class="maparea space" ref=${areaRef}>
+    ${mapMode==='geo' ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
+        places=${planetsOf(active)} canAdd=${!!canAdd} myPlanetId=${myD?.pi||null}
+        friendsOnPlanet=${p=>friendsOnPlanet(active, p)}
+        onOpenPlace=${p=>setSel(p)}
+        onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}
+        onAddAt=${(lat,lng)=>setForm({ t:'addplanet', lat, lng })} />`
+    : html`<div class="maparea space" ref=${areaRef}>
       <div class="mapstars"></div>
       ${w>0 && html`<svg class="map-svg" viewBox=${`0 0 ${w} ${h}`} width=${w} height=${h}>
         <defs>
@@ -352,7 +390,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
           </button>`)}
       ${w>0 && layout.map(L=> labels[L.i] && html`<div key=${'lbl'+L.id} class=${'planet-label'+(sel===L.id?' on':'')}
           style=${`left:${labels[L.i].x}px;top:${labels[L.i].y}px`}>${L.name}${L.cnt>0?html`<span class="cnt"> · ${L.cnt}</span>`:''}</div>`)}
-    </div>
+    </div>`}
 
     ${active.kind==='shared' && html`<div style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -446,7 +484,7 @@ export function NewSystemForm({ onSave, onClose }) {
   </div>`;
 }
 
-export function AddPlanetForm({ system, onSave, onClose }) {
+export function AddPlanetForm({ system, onSave, onClose, at=null }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('📍');
   const [busy, setBusy] = useState(false);
@@ -454,7 +492,8 @@ export function AddPlanetForm({ system, onSave, onClose }) {
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Add a place</div>
       <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
-    <div class="hint" style="margin-top:-8px;margin-bottom:4px">A spot you actually go — home, a café, the mall. It becomes a planet in ${system?.name}${system?.kind==='shared'?' that the whole circle can see':''}.</div>
+    <div class="hint" style="margin-top:-8px;margin-bottom:4px">A spot you actually go — home, a café, the mall. It becomes a place in ${system?.name}${system?.kind==='shared'?' that the whole circle can see':''}.</div>
+    ${at && html`<div class="okbox" style="margin-top:10px">📍 Pinned where you tapped — ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}</div>`}
     <div class="flabel">Name</div>
     <input class="input" placeholder="e.g. Home, SM Molino, Kuya's café" value=${name} maxLength=${28} onInput=${e=>setName(e.target.value)} />
     <div class="flabel">Icon</div>
