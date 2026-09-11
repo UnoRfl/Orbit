@@ -71,49 +71,91 @@ function loadMapLibre(){
 
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-/* OpenFreeMap ships a purpose-built `dark` style, so this does NOT repaint the
-   map — an earlier version inverted the light `positron` style layer by layer
-   and the result was flat and noisy: every road the same weight, labels
-   shouting in accent purple, highway shields as white blocks. The dark style
-   already has a proper hierarchy, so the theme is applied with a light touch:
-   the ground and the water follow Orbit's colourway, and everything else keeps
-   the cartography it was designed with. Re-runnable, so it can follow the
-   drifting Auto theme. */
+/* OpenFreeMap's `dark` style is a fork of CARTO Dark Matter, which is built to
+   sit UNDER bright data overlays rather than to be read as a map: its
+   background is rgb(12,12,12), its buildings are rgb(10,10,10) — darker than
+   the ground they stand on — minor roads are #181818, and place labels are a
+   dim grey. Straight out of the box it reads as a black rectangle.
+
+   So the style's layer hierarchy is kept (it is good) and every structural
+   layer is re-anchored onto a deliberate brightness ladder built from Orbit's
+   own --canvas. Each step is a mix toward white, so the whole thing stays in
+   whatever colourway is active and simply gets legible. Nudge LIFT to taste:
+   it scales the entire ladder at once. */
+const LIFT = 1;                       // 0.8 = moodier · 1 = default · 1.3 = brighter
+
+/* ground → buildings → roads, in increasing order of how much they should
+   stand out. Values are "percent of the way from --canvas toward white". */
+const LADDER = [
+  [/^background$/,                          0.00],
+  [/^landcover_ice_shelf|^landcover_glacier/,0.04],
+  [/^landuse_residential/,                  0.05],
+  [/^landcover_wood|^landuse_park/,         0.09],
+  [/^road_area_pier|^road_pier/,            0.10],
+  [/^building/,                             0.14],   // must sit above the ground
+  [/^aeroway-area|^aeroway-runway$/,        0.12],
+  [/^railway.*dashline$/,                   0.06],
+  [/^railway/,                              0.17],
+  [/^highway_path/,                         0.15],
+  [/^highway_minor|^aeroway-taxiway/,       0.21],
+  [/_casing$/,                              0.13],   // casings stay under their inner
+  [/^highway_major_subtle|^highway_motorway_subtle/, 0.22],
+  [/^highway_major_inner/,                  0.30],
+  [/^highway_motorway_inner|^aeroway-runway-casing/, 0.40],
+  [/^boundary/,                             0.24],
+];
+
 function applyTheme(map){
   let layers; try { layers = map.getStyle().layers || []; } catch { return; }
-  const ink = cssVar('--canvas') || '#17121f';
-  const ge  = cssVar('--ge') || '#2dd4bf';
+  const ink   = cssVar('--canvas') || '#17121f';
+  const ge    = cssVar('--ge')     || '#2dd4bf';
+  const muted = cssVar('--muted')  || '#9a8fa8';
+  const text  = cssVar('--ink')    || '#f4eef7';
+  const step  = t => mix(ink, '#ffffff', Math.min(0.92, t * LIFT));
 
   for (const layer of layers) {
-    const id = layer.id;
+    const id = layer.id, type = layer.type;
     try {
-      if (layer.type === 'background') {
-        map.setPaintProperty(id, 'background-color', ink);
-      } else if (/water|ocean|sea|river|lake/i.test(id)) {
-        // water reads as the theme's cool accent, kept dark so labels stay legible
-        if (layer.type === 'fill') map.setPaintProperty(id, 'fill-color', mix(ink, ge, 0.22));
-        else if (layer.type === 'line') map.setPaintProperty(id, 'line-color', mix(ink, ge, 0.3));
-      } else if (/^landuse|^landcover|^park/i.test(id) && layer.type === 'fill') {
-        map.setPaintProperty(id, 'fill-color', mix(ink, '#ffffff', 0.045));
+      // water is the one thing that is not grey — it carries the theme accent
+      if (/water|waterway|ocean|sea|river|lake/i.test(id) && type !== 'symbol') {
+        const c = mix(ink, ge, 0.30 * LIFT);
+        if (type === 'fill') map.setPaintProperty(id, 'fill-color', c);
+        else if (type === 'line') map.setPaintProperty(id, 'line-color', c);
+        continue;
       }
+      if (type === 'symbol') {
+        // Dark Matter's labels are rgb(101,101,101) — too dim to read on a phone
+        const isPlace = /^place_/.test(id);
+        map.setPaintProperty(id, 'text-color', isPlace ? text : muted);
+        map.setPaintProperty(id, 'text-halo-color', ink);
+        map.setPaintProperty(id, 'text-halo-width', 1.5);
+        map.setPaintProperty(id, 'text-halo-blur', 0.5);
+        continue;
+      }
+      const hit = LADDER.find(([re]) => re.test(id));
+      if (!hit) continue;
+      const c = step(hit[1]);
+      if (type === 'background')  map.setPaintProperty(id, 'background-color', c);
+      else if (type === 'fill')   map.setPaintProperty(id, 'fill-color', c);
+      else if (type === 'line')   map.setPaintProperty(id, 'line-color', c);
     } catch {}
   }
 }
 
-/* tiny hex/rgb blend so the water tint tracks whatever the theme vars hold,
-   including the hsl() values the Auto theme writes */
+/* tiny hex/rgb/hsl blend so every step tracks whatever the theme vars hold,
+   including the hsl() values the drifting Auto theme writes each frame */
 function mix(a, b, t){
-  const p = c => {
-    c = (c||'').trim();
-    if (c[0] === '#') { let h = c.slice(1); if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
-      const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
-    const m = c.match(/(-?[\d.]+)[ ,]+(-?[\d.]+)%?[ ,]+(-?[\d.]+)%?/);
-    if (c.startsWith('hsl') && m) return hsl(+m[1], +m[2], +m[3]);
-    if (m) return [+m[1], +m[2], +m[3]];
-    return [23,18,31];
-  };
-  const A = p(a), B = p(b);
+  const A = parseCol(a), B = parseCol(b);
   return 'rgb(' + A.map((v,i)=>Math.round(v + (B[i]-v)*t)).join(',') + ')';
+}
+function parseCol(c){
+  c = (c||'').trim();
+  if (c[0] === '#') { let h = c.slice(1); if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  const m = c.match(/(-?[\d.]+)[ ,]+(-?[\d.]+)%?[ ,]+(-?[\d.]+)%?/);
+  if (/^hsl/i.test(c) && m) return hsl(+m[1], +m[2], +m[3]);
+  if (m) return [+m[1], +m[2], +m[3]];
+  return [23,18,31];
 }
 function hsl(h, s, l){
   s/=100; l/=100; const a = s*Math.min(l,1-l);
