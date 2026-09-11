@@ -213,6 +213,15 @@ export function perfTier(){
   return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
 }
 export const isCoarse = () => document.documentElement.hasAttribute('data-coarse');
+/* The tier as measured at boot. Use this to decide whether a FEATURE is
+   available; use perfTier() only to decide how pretty to draw it. They differ
+   because main.js lowers data-perf when the background canvas struggles, and a
+   struggling background says nothing about whether MapLibre can run. */
+export function bootTier(){
+  const d = document.documentElement;
+  const v = +(d.getAttribute('data-perf0') ?? d.getAttribute('data-perf') ?? 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
+}
 
 /* Background canvas is fully hidden whenever a fullscreen surface
    (a chat on mobile) sits on top of it. Every such surface pushes a

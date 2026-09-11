@@ -52,6 +52,11 @@
     if (!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter','blur(2px)') || CSS.supports('-webkit-backdrop-filter','blur(2px)')))) d.setAttribute('data-noglass','1');
   } catch (e) {}
   d.setAttribute('data-perf', String(t));
+  /* data-perf0 is the tier as measured at boot and is NEVER changed afterwards.
+     data-perf can be stepped DOWN at runtime when the ambient canvas can't hold
+     framerate — that should lower visual quality, but it must not remove whole
+     features, or a brief stutter makes the map option vanish mid-session. */
+  d.setAttribute('data-perf0', String(t));
 })();
 </script>
 

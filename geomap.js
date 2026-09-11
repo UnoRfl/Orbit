@@ -31,7 +31,7 @@
    move the camera; it is never uploaded.
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { hueCss, perfTier, ui } from './core.js';
+import { bootTier, hueCss, pauseBg, resumeBg, ui } from './core.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -48,7 +48,12 @@ export function webglOk(){
 }
 /* Tier 2 devices get the orrery instead: MapLibre's memory footprint is the
    problem there, not the framerate, and there is no quality knob for that. */
-export const canUseGeoMap = () => perfTier() < 2 && webglOk();
+/* Deliberately bootTier() and NOT perfTier(): main.js lowers the live tier
+   whenever the ambient canvas drops frames, and opening a map is exactly the
+   moment that happens — so keying off the live tier made the Map switch vanish
+   mid-session and reappear on a reload. Whether MapLibre can run is a property
+   of the device, not of how the background canvas is coping. */
+export const canUseGeoMap = () => bootTier() < 2 && webglOk();
 
 let _libPromise = null;
 function loadMapLibre(){
@@ -82,27 +87,27 @@ const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(
    own --canvas. Each step is a mix toward white, so the whole thing stays in
    whatever colourway is active and simply gets legible. Nudge LIFT to taste:
    it scales the entire ladder at once. */
-const LIFT = 1;                       // 0.8 = moodier · 1 = default · 1.3 = brighter
+const LIFT = 1;                       // 0.75 = moodier · 1 = default · 1.4 = brighter
 
 /* ground → buildings → roads, in increasing order of how much they should
    stand out. Values are "percent of the way from --canvas toward white". */
 const LADDER = [
-  [/^background$/,                          0.00],
-  [/^landcover_ice_shelf|^landcover_glacier/,0.04],
-  [/^landuse_residential/,                  0.05],
-  [/^landcover_wood|^landuse_park/,         0.09],
-  [/^road_area_pier|^road_pier/,            0.10],
-  [/^building/,                             0.14],   // must sit above the ground
-  [/^aeroway-area|^aeroway-runway$/,        0.12],
-  [/^railway.*dashline$/,                   0.06],
-  [/^railway/,                              0.17],
-  [/^highway_path/,                         0.15],
-  [/^highway_minor|^aeroway-taxiway/,       0.21],
-  [/_casing$/,                              0.13],   // casings stay under their inner
-  [/^highway_major_subtle|^highway_motorway_subtle/, 0.22],
-  [/^highway_major_inner/,                  0.30],
-  [/^highway_motorway_inner|^aeroway-runway-casing/, 0.40],
-  [/^boundary/,                             0.24],
+  [/^background$/,                          0.05],
+  [/^landcover_ice_shelf|^landcover_glacier/,0.10],
+  [/^landuse_residential/,                  0.12],
+  [/^landcover_wood|^landuse_park/,         0.18],
+  [/^road_area_pier|^road_pier/,            0.20],
+  [/^building/,                             0.26],   // must sit above the ground
+  [/^aeroway-area|^aeroway-runway$/,        0.24],
+  [/^railway.*dashline$/,                   0.12],
+  [/^railway/,                              0.32],
+  [/^highway_path/,                         0.28],
+  [/^highway_minor|^aeroway-taxiway/,       0.40],
+  [/_casing$/,                              0.26],   // casings stay under their inner
+  [/^highway_major_subtle|^highway_motorway_subtle/, 0.42],
+  [/^highway_major_inner/,                  0.56],
+  [/^highway_motorway_inner|^aeroway-runway-casing/, 0.70],
+  [/^boundary/,                             0.44],
 ];
 
 function applyTheme(map){
@@ -118,7 +123,7 @@ function applyTheme(map){
     try {
       // water is the one thing that is not grey — it carries the theme accent
       if (/water|waterway|ocean|sea|river|lake/i.test(id) && type !== 'symbol') {
-        const c = mix(ink, ge, 0.30 * LIFT);
+        const c = mix(ink, ge, 0.42 * LIFT);
         if (type === 'fill') map.setPaintProperty(id, 'fill-color', c);
         else if (type === 'line') map.setPaintProperty(id, 'line-color', c);
         continue;
@@ -184,6 +189,11 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
 
   const placed   = places.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   const unplaced = places.filter(p => !Number.isFinite(p.lat) || !Number.isFinite(p.lng));
+
+  /* The ambient canvas is almost entirely hidden behind the map, and running two
+     animated surfaces at once is what drove main.js's adaptive downgrade — which
+     then removed the Map switch. Stop it while map view is open. */
+  useEffect(() => { pauseBg(); return resumeBg; }, []);
 
   /* --- build the map once per system --- */
   useEffect(() => {

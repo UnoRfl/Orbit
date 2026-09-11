@@ -26,7 +26,7 @@
 
    Bump VERSION to evict everything at once.
    ------------------------------------------------------------------ */
-const VERSION = 'orbit-v2';
+const VERSION = 'orbit-v3';
 const SHELL   = './index.html';
 
 self.addEventListener('install', e => {
@@ -81,10 +81,16 @@ self.addEventListener('fetch', e => {
   };
 
   if (isCode) {
-    // Network first: a deploy is live immediately, and the cache only answers
-    // when the network genuinely cannot.
-    e.respondWith(fetch(req).then(save).catch(() =>
-      caches.match(req).then(hit => hit || Response.error())));
+    /* Network first, and explicitly `cache: 'no-cache'`. Without that the SW's
+       own fetch() is still served by the HTTP cache, and GitHub Pages sends a
+       max-age on these files — so a plain network-first still handed back last
+       deploy's module and the only cure was refreshing several times. 'no-cache'
+       revalidates with the server (a 304 when unchanged), so it is cheap and
+       always correct. The cache only answers when the network genuinely cannot. */
+    e.respondWith(
+      fetch(req, { cache: 'no-cache' }).then(save)
+        .catch(() => caches.match(req).then(hit => hit || Response.error()))
+    );
     return;
   }
 

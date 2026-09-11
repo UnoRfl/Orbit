@@ -32,7 +32,22 @@ try {
    someone who never turns on notifications. Registration is idempotent, so
    initPush() calling register() again later is harmless. */
 if ('serviceWorker' in navigator) {
-  addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Browsers only check sw.js on navigation and can hold a cached copy for
+      // a day; ask explicitly so a deploy is noticed on this visit.
+      try { reg.update(); } catch {}
+    }).catch(()=>{});
+
+    /* When a NEW worker takes over mid-session, the page is already running the
+       previous deploy's modules. Reload once so the whole app is from one
+       deploy — the guard stops the reload/claim cycle from looping. */
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return; reloading = true;
+      location.reload();
+    });
+  });
 }
 
 /* ============================================================
