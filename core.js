@@ -201,17 +201,73 @@ export const THEMES = {
 };
 export const THEME_IDS = Object.keys(THEMES);
 
+/* ============================================================
+   DEVICE TIER
+   index.html stamps data-perf on <html> before first paint
+   (0 = full, 1 = lite phones/mid, 2 = min low-end). main.js can
+   step it down at runtime. Read it through perfTier() so every
+   module agrees on one number instead of each re-sniffing UA.
+   ============================================================ */
+export function perfTier(){
+  const v = +(document.documentElement.getAttribute('data-perf') || 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
+}
+export const isCoarse = () => document.documentElement.hasAttribute('data-coarse');
+/* The tier as measured at boot. Use this to decide whether a FEATURE is
+   available; use perfTier() only to decide how pretty to draw it. They differ
+   because main.js lowers data-perf when the background canvas struggles, and a
+   struggling background says nothing about whether MapLibre can run. */
+export function bootTier(){
+  const d = document.documentElement;
+  const v = +(d.getAttribute('data-perf0') ?? d.getAttribute('data-perf') ?? 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
+}
+
+/* Background canvas is fully hidden whenever a fullscreen surface
+   (a chat on mobile) sits on top of it. Every such surface pushes a
+   pause on mount and pops it on unmount; main.js skips its whole
+   frame while the count is above zero. Counted rather than boolean
+   so two overlapping surfaces can't un-pause each other. */
+let __bgPaused = 0;
+const __syncBgPause = () => {
+  const d = document.documentElement;
+  if (__bgPaused > 0) d.setAttribute('data-bgpause','1'); else d.removeAttribute('data-bgpause');
+};
+export function pauseBg(){ __bgPaused++; __syncBgPause(); }
+export function resumeBg(){ __bgPaused = Math.max(0, __bgPaused - 1); __syncBgPause(); }
+
 // Interactive background variants. Each is themed (reads --major/--ge live),
 // so it recolours on every colourway and greys out on Monochrome.
+//
+// `cost` is what the variant costs per frame, and it is what decides which
+// phones may pick it:
+//   1 = cheap   (a few hundred line segments)      — every device
+//   2 = medium  (per-frame gradients / O(n²) links) — tier 0 + 1
+//   3 = heavy   (per-pixel noise, additive blending) — tier 0 (desktop) only
+// Topographic re-evaluates fractal noise across the whole grid every frame and
+// Aurora composites with 'lighter' over full-width gradients; both are what made
+// weaker phones drop to single-digit framerates, so they stay off there.
 export const BG_STYLES = {
-  waves:{         name:'Ambient Waves',  desc:'Flowing wave field',    g:'〰' },
-  topo:{          name:'Topographic',    desc:'Contour terrain lines', g:'◎' },
-  starfield:{     name:'Starfield',      desc:'Parallax drifting stars',g:'✦' },
-  orbits:{        name:'Orbits',         desc:'Planets circling',      g:'☉' },
-  constellation:{ name:'Constellation',  desc:'Connected star web',    g:'✧' },
-  aurora:{        name:'Aurora',         desc:'Soft light ribbons',    g:'≈' },
+  waves:{         name:'Ambient Waves',  desc:'Flowing wave field',    g:'〰', cost:1 },
+  topo:{          name:'Topographic',    desc:'Contour terrain lines', g:'◎', cost:3 },
+  starfield:{     name:'Starfield',      desc:'Parallax drifting stars',g:'✦', cost:1 },
+  orbits:{        name:'Orbits',         desc:'Planets circling',      g:'☉', cost:2 },
+  constellation:{ name:'Constellation',  desc:'Connected star web',    g:'✧', cost:2 },
+  aurora:{        name:'Aurora',         desc:'Soft light ribbons',    g:'≈', cost:3 },
 };
 export const BG_IDS = Object.keys(BG_STYLES);
+
+// Highest background cost this device is allowed to run: desktop everything,
+// phones up to medium, low-end phones cheap only.
+export const bgBudget = (tier = perfTier()) => (tier >= 2 ? 1 : tier >= 1 ? 2 : 3);
+export const bgAllowed = (id, tier = perfTier()) => (BG_STYLES[id]?.cost || 1) <= bgBudget(tier);
+// What to actually render: the pick if this device can afford it, else the
+// cheapest variant. The stored preference is never rewritten, so the same
+// account still gets its real choice back on a desktop.
+export function bgFor(id, tier = perfTier()){
+  const pick = BG_STYLES[id] ? id : 'waves';
+  return bgAllowed(pick, tier) ? pick : 'waves';
+}
 export const DEFAULT_PREFS = { asteroids:true, bgStyle:'waves', sounds:false, autoSpeed:60 };
 
 export const store = {
@@ -232,7 +288,13 @@ export const store = {
    ever needing a copy of your layout. Friends "cluster" into the
    same system when you both name it the same thing.
    ============================================================ */
-export const SYS_KEY = 'orbit.systems.v1';
+/* Bumped to v2 when places moved from abstract orbital positions to real
+   coordinates. Every stored place in Supabase was cleared at the same time,
+   so a device carrying a v1 layout would be showing planets that no longer
+   exist anywhere. Reading a new key re-seeds a clean Campus system and the
+   old blob is dropped rather than left behind in localStorage. */
+export const SYS_KEY = 'orbit.systems.v2';
+try{ localStorage.removeItem('orbit.systems.v1'); }catch{}
 export const SYSTEM_HUES = [265, 190, 150, 330, 40, 210, 300, 95];
 export const EMOJI_SUGGESTIONS = ['🏠','🏫','🛍️','☕','🍜','🍔','🏀','🎮','🏋️','📚','🎬','🚉','🌳','🏖️','⛪','🏥','💻','🎤','🎨','🍦','🧋','🏬','🚗','✈️'];
 export const SYSTEM_GLYPHS = ['🪐','🌌','🌠','⭐','☄️','🌟','🔭','🚀','🛸','✨'];
@@ -359,12 +421,22 @@ export function startAutoTheme(){
     root.setProperty('--now',   c(H+300,80,72));
     document.querySelector('meta[name=theme-color]')?.setAttribute('content','#100b18');
   };
+  /* Writing five custom properties on <html> invalidates style for the WHOLE
+     document, so doing it every frame was recalculating the entire app 60x a
+     second — on its own enough to make the Auto theme unusable on a phone.
+     The drift is slow (a full spectrum over ~60s), so a step finer than ~0.4°
+     is invisible: throttle to a hue quantum and skip the write when nothing
+     visibly changed. Costs one extra rAF callback, saves every recalc. */
   const t0 = performance.now();
+  const step = perfTier() >= 1 ? 1.2 : 0.4;   // degrees of hue per repaint
+  let lastH = NaN;
   const loop = (t)=>{
-    const secPer = Math.max(6, (window.__orbit?.autoSpeed)||60);
-    const H = ((t - t0)/1000) * (360/secPer);
-    set(H);
     __autoRAF = requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const secPer = Math.max(6, (window.__orbit?.autoSpeed)||60);
+    const H = Math.round((((t - t0)/1000) * (360/secPer)) / step) * step;
+    if (H === lastH) return;
+    lastH = H; set(H);
   };
   __autoRAF = requestAnimationFrame(loop);
 }

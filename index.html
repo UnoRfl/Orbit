@@ -28,6 +28,38 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<script>
+/* ============================================================
+   Device tier — decided BEFORE first paint so CSS can gate glass,
+   3D and motion immediately instead of flashing the heavy version.
+     data-perf   0 = full · 1 = lite (phones / mid) · 2 = min (low-end)
+     data-coarse touch pointer (no hover, no cursor glow)
+     data-rm     the OS asked for reduced motion
+   main.js can step data-perf DOWN at runtime if a device still can't
+   hold framerate; everything keyed off it follows automatically.
+   ============================================================ */
+(function(){
+  var d = document.documentElement, t = 0;
+  try {
+    var coarse = matchMedia('(pointer:coarse)').matches;
+    var mem    = navigator.deviceMemory || 8;          // undefined on iOS -> 8
+    var cpu    = navigator.hardwareConcurrency || 8;
+    var small  = Math.min(innerWidth || 9999, (screen && screen.width) || 9999) < 760;
+    if (coarse || small) t = 1;
+    if ((mem <= 4 && cpu <= 4) || (coarse && mem <= 4)) t = 2;
+    if (coarse) d.setAttribute('data-coarse', '1');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.setAttribute('data-rm', '1');
+    if (!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter','blur(2px)') || CSS.supports('-webkit-backdrop-filter','blur(2px)')))) d.setAttribute('data-noglass','1');
+  } catch (e) {}
+  d.setAttribute('data-perf', String(t));
+  /* data-perf0 is the tier as measured at boot and is NEVER changed afterwards.
+     data-perf can be stepped DOWN at runtime when the ambient canvas can't hold
+     framerate — that should lower visual quality, but it must not remove whole
+     features, or a brief stutter makes the map option vanish mid-session. */
+  d.setAttribute('data-perf0', String(t));
+})();
+</script>
+
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">
 {
