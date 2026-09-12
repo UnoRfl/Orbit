@@ -48,6 +48,8 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
     .map(f => ({ profile: profiles[f.id] || f, live: liveOf(presence[f.id]) }))
     .filter(x => x.live);
   const live = useLiveShare({ uid, myPres, setPres });
+  // my own broadcast, read back through the same rules friends' rows go through
+  const meLive = (() => { const l = liveOf(myPres); return l ? { profile: me || { id: uid }, live: l } : null; })();
   const friendsOnPlanet = (sys, planet) => friendPlaces.filter(x=>
     (x.d.pi && planet.id && x.d.pi===planet.id) || (matchSys(x.d, sys) && normName(x.d.place)===normName(planet.name)));
 
@@ -385,7 +387,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
 
     ${mapMode==='geo' ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
         places=${planetsOf(active)} canAdd=${!!canAdd} myPlanetId=${myD?.pi||null}
-        liveFriends=${liveFriends} onOpenFriend=${onOpenFriend} live=${live}
+        liveFriends=${liveFriends} onOpenFriend=${onOpenFriend} live=${live} meLive=${meLive}
         friendsOnPlanet=${p=>friendsOnPlanet(active, p)}
         onOpenPlace=${p=>setSel(p)}
         onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}

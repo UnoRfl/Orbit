@@ -1047,3 +1047,9 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .geolive{position:absolute;left:10px;right:10px;bottom:58px;z-index:4;
   background:rgba(20,14,28,.94);border:1px solid var(--line-strong);border-radius:14px;padding:12px 13px;
   box-shadow:0 18px 46px -18px rgba(0,0,0,.9);animation:morphPop var(--t-mid) var(--ease-snap)}
+
+/* your own live dot — distinct from a friend's so you can find yourself */
+.livedot.me .livedot-av{border-color:var(--ge);
+  box-shadow:0 0 0 2px var(--canvas), 0 0 18px -1px var(--ge)}
+.livedot.me .livedot-ring{border-color:var(--ge);opacity:.75}
+.livedot.me .livedot-l{background:var(--ge);color:#0f0a16;font-weight:700}
