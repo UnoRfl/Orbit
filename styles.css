@@ -1053,3 +1053,8 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
   box-shadow:0 0 0 2px var(--canvas), 0 0 18px -1px var(--ge)}
 .livedot.me .livedot-ring{border-color:var(--ge);opacity:.75}
 .livedot.me .livedot-l{background:var(--ge);color:#0f0a16;font-weight:700}
+
+/* a fix too coarse to be a "spot" — softened so it reads as an area, not a pin */
+.livedot.coarse .livedot-av{border-style:dashed;box-shadow:none}
+.livedot.coarse .livedot-ring{display:none}
+.livedot.coarse .livedot-l{background:rgba(12,8,18,.72);font-weight:600}

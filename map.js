@@ -124,7 +124,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
           <span class="livepulse"></span>
           <div style="min-width:0;flex:1">
             <div style="font-size:13px;font-weight:600">Live location on</div>
-            <div class="rowsub">${untilLabel(live.until)}${live.accuracy ? ` · accurate to ~${Math.round(live.accuracy)}m` : ''}</div>
+            <div class="rowsub">${untilLabel(live.until)}${live.accuracy ? ` · accurate to about ${Math.round(live.accuracy)}m` : ''}</div>
           </div>
           <button class="btn btn-soft-red" style="flex:none;padding:8px 12px" onClick=${()=>live.stop('Live location off')}>Stop</button>
         </div>

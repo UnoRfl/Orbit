@@ -32,7 +32,7 @@
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
-import { LIVE_DURATIONS, ageLabel, untilLabel } from './live.js';
+import { COARSE_M, LIVE_DURATIONS, ageLabel, untilLabel } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -168,6 +168,22 @@ function hsl(h, s, l){
   const f = n => { const k = (n + h/30) % 12; return Math.round((l - a*Math.max(-1, Math.min(k-3, Math.min(9-k, 1))))*255); };
   return [f(0), f(8), f(4)];
 }
+
+/* A GPS fix is a circle, not a point. Drawing only a dot implies a precision
+   the reading does not have — which is exactly what "it's inaccurate" looks
+   like. Built as a real polygon in lat/lng rather than a pixel radius, so it
+   scales correctly with zoom without any per-frame maths. */
+function circlePoly(lat, lng, metres, steps = 56) {
+  const ring = [];
+  const dLat = metres / 111320;
+  const dLng = metres / (111320 * Math.max(0.15, Math.cos(lat * Math.PI / 180)));
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    ring.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
+  }
+  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } };
+}
+const ACC_SRC = 'orbit-accuracy';
 
 function pinEl(place, hue, count){
   const el = document.createElement('div');
@@ -309,12 +325,34 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
           ? `<img class="livedot-av" src="${escapeHtml(profile.avatar_url)}" alt="" referrerpolicy="no-referrer">`
           : `<span class="livedot-av">${escapeHtml(initialsOf(shownName(profile)))}</span>`) +
         `<span class="livedot-l">${isMe ? 'You' : escapeHtml(shownName(profile))}` +
-        (live.fresh ? '' : ` · ${escapeHtml(ageLabel(live.ageMs))}`) + `</span>`;
+        (live.fresh ? '' : ` · ${escapeHtml(ageLabel(live.ageMs))}`) +
+        (Number.isFinite(live.acc) && live.acc > COARSE_M ? ` · ~${Math.round(live.acc)}m` : '') +
+        `</span>`;
+      // a fix this coarse is a neighbourhood, not a spot
+      el.classList.toggle('coarse', Number.isFinite(live.acc) && live.acc > COARSE_M);
     }
 
     for (const [id, m] of liveMarkers.current) {
       if (!seen.has(id)) { try { m.remove(); } catch {} liveMarkers.current.delete(id); }
     }
+
+    /* accuracy halos, one polygon per fix that reported one */
+    const feats = all
+      .filter(x => x.live && Number.isFinite(x.live.acc) && x.live.acc > 0)
+      .map(x => circlePoly(x.live.lat, x.live.lng, Math.min(x.live.acc, 2000)));
+    const data = { type: 'FeatureCollection', features: feats };
+    try {
+      const src = map.getSource(ACC_SRC);
+      if (src) src.setData(data);
+      else {
+        map.addSource(ACC_SRC, { type: 'geojson', data });
+        const ge = cssVar('--ge') || '#2dd4bf';
+        map.addLayer({ id: ACC_SRC + '-fill', type: 'fill', source: ACC_SRC,
+          paint: { 'fill-color': ge, 'fill-opacity': 0.06 } });
+        map.addLayer({ id: ACC_SRC + '-line', type: 'line', source: ACC_SRC,
+          paint: { 'line-color': ge, 'line-opacity': 0.5, 'line-width': 1.2 } });
+      }
+    } catch {}
   }, [status, system.key,
       JSON.stringify(liveFriends.map(f => [f.profile.id, f.live?.lat, f.live?.lng, f.live?.fresh])),
       JSON.stringify(meLive?.live ? [meLive.live.lat, meLive.live.lng, meLive.live.fresh] : null)]);

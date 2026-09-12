@@ -49,6 +49,14 @@ export const LIVE_FRESH_MS = 90 * 1000;
    this is a free Supabase project. Write when the position has actually moved,
    or when enough time has passed that a friend would otherwise think we froze. */
 const MIN_MOVE_M  = 12;
+/* How long to shop around for a good first fix, and the accuracy at which we
+   stop waiting. 25m is roughly a decent GPS lock; a laptop on wifi will never
+   reach it and simply uses its best effort within the window. */
+const ACQUIRE_MS    = 7000;
+const GOOD_ENOUGH_M = 25;
+/* Beyond this the position is a neighbourhood, not a place, and the UI says so
+   rather than drawing a confident dot. */
+export const COARSE_M = 120;
 const MIN_EVERY_MS = 25 * 1000;
 const MAX_EVERY_MS = 60 * 1000;
 
@@ -142,13 +150,25 @@ export function useLiveShare({ uid, myPres, setPres }) {
     const mins = Math.min(LIVE_MAX_MIN, Math.max(1, minutes | 0));
     const untilIso = new Date(Date.now() + mins * 60000).toISOString();
 
-    // Get one fix first, so nothing is written until a position actually exists
-    // and the permission prompt is resolved before the UI claims to be sharing.
+    /* Don't commit the FIRST fix. Devices answer immediately with whatever they
+       already have — usually a cell-tower or wifi estimate good to hundreds of
+       metres — and then sharpen to real GPS over the next few seconds. Taking
+       fix #1 is why a share can open a suburb away from where you are.
+       So sample briefly and keep the best, stopping early once it is good
+       enough that waiting longer would not help. */
     const first = await new Promise(res => {
-      navigator.geolocation.getCurrentPosition(
-        p => res({ ok: true, p }),
-        e => res({ ok: false, e }),
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      let best = null, done = false, id = null;
+      const finish = out => { if (done) return; done = true;
+        try { if (id != null) navigator.geolocation.clearWatch(id); } catch {}
+        clearTimeout(timer); res(out); };
+      const timer = setTimeout(() => finish(best ? { ok:true, p:best } : { ok:false, e:{ code:3 } }), ACQUIRE_MS);
+      id = navigator.geolocation.watchPosition(
+        p => {
+          if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+          if (best.coords.accuracy <= GOOD_ENOUGH_M) finish({ ok:true, p:best });
+        },
+        e => { if (!best) finish({ ok:false, e }); },
+        { enableHighAccuracy: true, timeout: ACQUIRE_MS, maximumAge: 0 }
       );
     });
     if (!first.ok) {
@@ -186,7 +206,10 @@ export function useLiveShare({ uid, myPres, setPres }) {
         const moved = (L.lat == null) ? Infinity : metresBetween(L, { lat, lng });
         const since = now - L.at;
         // moved somewhere worth reporting, but not more often than MIN_EVERY_MS
-        const onMove = moved >= MIN_MOVE_M && since >= MIN_EVERY_MS;
+        /* Require the move to clear the fix's own error, or a wifi-located
+           laptop "walks" hundreds of metres a minute while sitting still. */
+        const need = Math.max(MIN_MOVE_M, Math.min(accuracy || 0, 80));
+        const onMove = moved >= need && since >= MIN_EVERY_MS;
         // standing still: a heartbeat anyway, so the dot stays "live" not "last seen"
         const onBeat = since >= MAX_EVERY_MS;
         if (!onMove && !onBeat) return;
