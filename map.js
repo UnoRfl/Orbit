@@ -3,11 +3,11 @@ import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
 import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
 import { GeoMap, canUseGeoMap } from './geomap.js';
-import { LIVE_DURATIONS, liveOf, untilLabel, useLiveShare } from './live.js';
+import { LIVE_DURATIONS, liveOf, untilLabel } from './live.js';
 import { Home } from './home.js';
 import { ChatView } from './chat.js';
 
-export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres, setPres, classesBy, events, respondInvite,
+export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres, setPres, live, classesBy, events, respondInvite,
                      shared, actions, onNewCosmic, onOpenEvent, onOpenFriend,
                      updates=null, isFounder=false, publishUpdate, deleteUpdate, chat }) {
   const [localSys, setLocalSys] = useState(loadSystems);          // campus extras live on-device
@@ -47,7 +47,8 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   const liveFriends = friends
     .map(f => ({ profile: profiles[f.id] || f, live: liveOf(presence[f.id]) }))
     .filter(x => x.live);
-  const live = useLiveShare({ uid, myPres, setPres });
+  /* `live` is a prop now — the watch belongs to the shell so it survives tab
+     switches. See the comment on useLiveShare's call site in shell.js. */
   // my own broadcast, read back through the same rules friends' rows go through
   const meLive = (() => { const l = liveOf(myPres); return l ? { profile: me || { id: uid }, live: l } : null; })();
   const friendsOnPlanet = (sys, planet) => friendPlaces.filter(x=>

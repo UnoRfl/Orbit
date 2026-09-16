@@ -3,6 +3,7 @@ import { h, html, useEffect, useRef, useState } from './lib.js';
 import { BADGE_DEFS, CAT, DAYS, DEFAULT_PREFS, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, PUSH_PUBLIC_KEY, applyTheme, badgesOf, chatKeyOf, decodePlace, fmt, fname, groupBy, loadSystems, msgPreview, pingChime, roleOf, saveSystems, sb, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
+import { useLiveShare } from './live.js';
 import { MapScreen } from './map.js';
 import { Creator, Detail, ImportSheet, Inbox, PingSheet, Plans } from './plans.js';
 import { ChatsScreen } from './chat.js';
@@ -507,6 +508,13 @@ export function Shell({ session }) {
     if (error) { toast("Couldn't sync that — try again"); }
     else if (data) setMyPres(data);
   }
+  /* The live-location watch lives HERE, not in the Map screen, because only one
+     tab is mounted at a time: the moment you tapped Home, MapScreen unmounted,
+     its effect cleanup cleared the GPS watch, and your share went on advertising
+     itself as live from wherever you happened to be standing when you left the
+     map. Friends saw a dot that never moved again. Owned by the shell, it runs
+     for as long as Orbit is open, whatever you are looking at. */
+  const live = useLiveShare({ uid, myPres, setPres });
   async function createEvent({ kind, title, day, start_min, end_min, place, invitees, system_id=null, emoji=null }) {
     const row = { host:uid, kind, title, day, start_min, end_min, place };
     if (system_id) row.system_id = system_id;
@@ -949,7 +957,7 @@ export function Shell({ session }) {
           onOpenFriend=${id=>setOpenFriend(id)} onYou=${()=>setTab('you')} onAdd=${()=>setSheet({t:'friends'})}
           onMessage=${id=>openDm(id)} onStudy=${(fid,slot)=>setSheet({t:'creator', pre:fid, slot})} />`
       : tab==='map' ? html`<${MapScreen} uid=${uid} me=${me} friends=${friends} profiles=${profiles} nameOf=${nameOf}
-          presence=${presence} myPres=${myPres} setPres=${setPres} classesBy=${classesBy} events=${events}
+          presence=${presence} myPres=${myPres} setPres=${setPres} live=${live} classesBy=${classesBy} events=${events}
           respondInvite=${respondInvite} shared=${{ accepted:sharedAccepted, invited:sharedInvited }} actions=${sysActions}
           onNewCosmic=${s=>setSheet({t:'creator', sys:s})} onOpenEvent=${e=>setSheet({t:'detail', d:{type:'event',row:e}})}
           onOpenFriend=${id=>setOpenFriend(id)}

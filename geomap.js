@@ -391,16 +391,47 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     return () => { try { map.off('click', onClick); } catch {} };
   }, [status, dropping, canAdd, onAddAt, onPlaceAt]);
 
+  /* Locate me. getCurrentPosition with a generous maximumAge is the wrong tool
+     here: the browser answers instantly with the wifi/ISP estimate it already
+     had — possibly half an hour old — so the camera confidently flies to a spot
+     that can be a suburb off, and does it again every time you press the
+     button. Sample instead, move the camera each time the fix gets tighter, and
+     stop as soon as it is genuinely good. Still camera-only; nothing is
+     uploaded. */
+  const locId = useRef(null);
+  const [locating, setLocating] = useState(false);
+  useEffect(() => () => { try { locId.current != null && navigator.geolocation.clearWatch(locId.current); } catch {} }, []);
+
   function locate(){
     if (!navigator.geolocation) { ui.toast('This browser has no location support'); return; }
-    navigator.geolocation.getCurrentPosition(
+    if (locId.current != null) return;                    // a burst is already running
+    let best = null, done = false;
+    const stopBurst = () => {
+      if (done) return; done = true;
+      clearTimeout(timer);
+      try { if (locId.current != null) navigator.geolocation.clearWatch(locId.current); } catch {}
+      locId.current = null; setLocating(false);
+    };
+    const timer = setTimeout(() => { if (!best) ui.toast("Couldn't get a location fix"); stopBurst(); }, 10000);
+    setLocating(true);
+    locId.current = navigator.geolocation.watchPosition(
       pos => {
-        const map = mapRef.current; if (!map) return;
-        // camera only — this never leaves the device
-        map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 16.5 });
+        if (best && pos.coords.accuracy >= best.coords.accuracy) return;
+        best = pos;
+        const map = mapRef.current;
+        if (map) map.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          // don't pretend a 900m estimate is a doorstep — frame it as the area it is
+          zoom: pos.coords.accuracy > COARSE_M ? 13.5 : 16.5,
+        });
+        if (pos.coords.accuracy <= 25) stopBurst();
       },
-      () => ui.toast('Location is blocked for Orbit'),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      e => {
+        if (best) return;
+        ui.toast(e && e.code === 1 ? 'Location is blocked for Orbit' : "Couldn't get a location fix");
+        stopBurst();
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }
 
@@ -415,7 +446,8 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     ${status === 'loading' && html`<div class="geoload"><div class="small">loading map…</div></div>`}
 
     <div class="geoctl">
-      <button class="geobtn" onClick=${locate} aria-label="Find my location">◎</button>
+      <button class=${'geobtn'+(locating?' busy':'')} onClick=${locate}
+        aria-label="Find my location">${locating ? '◌' : '◎'}</button>
       ${live && (live.active
         ? html`<button class="geobtn live on" onClick=${()=>live.stop('Live location off')}
             aria-label="Stop sharing live location"><span class="geodot"></span>${untilLabel(live.until)} · Stop</button>`

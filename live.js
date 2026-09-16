@@ -59,6 +59,20 @@ const GOOD_ENOUGH_M = 25;
 export const COARSE_M = 120;
 const MIN_EVERY_MS = 25 * 1000;
 const MAX_EVERY_MS = 60 * 1000;
+/* A later fix this much tighter than the one we last published is worth
+   publishing even though the dot barely moves: it is the wifi-estimate ->
+   GPS-lock correction, and without it the coarse first fix is the only thing a
+   stationary user ever broadcasts. That is what "it keeps putting me in the
+   same place" actually is. */
+const ACC_IMPROVE_RATIO = 0.6;
+const ACC_IMPROVE_MIN_MS = 4000;
+/* Mobile browsers suspend a geolocation watch when the tab is backgrounded or
+   the screen locks, and they do not reliably resume it afterwards. A watch that
+   has quietly died is indistinguishable from a user who has not moved, so we
+   re-arm it rather than trust it: if nothing has arrived in this long while the
+   page is visible, the watch is dead, not idle. */
+const WATCHDOG_MS = 45 * 1000;
+const WATCHDOG_EVERY_MS = 10 * 1000;
 
 /* metres between two coordinates — equirectangular is plenty at these distances
    and avoids the trig cost of haversine on every tick */
@@ -115,15 +129,21 @@ export function useLiveShare({ uid, myPres, setPres }) {
   const [err, setErr]   = useState(null);
   const [acc, setAcc]   = useState(null);
   const watchId = useRef(null);
-  const last    = useRef({ at: 0, lat: null, lng: null });
+  const last    = useRef({ at: 0, lat: null, lng: null, acc: null });
   const untilRef = useRef(0);
+  /* The watch outlives the render that created it, so reading setPres out of
+     that render's closure means writing with a stale snapshot of the presence
+     row — and setPres upserts the WHOLE row. That is how a GPS tick could undo
+     a check-in made after the share started. Always use the current one. */
+  const setPresRef = useRef(setPres);
+  setPresRef.current = setPres;
 
   const until  = myPres?.live_until ? Date.parse(myPres.live_until) : 0;
   const active = !!until && until > Date.now() && !myPres?.ghost && !!myPres?.sharing;
   untilRef.current = until;
 
   async function push(lat, lng, accuracy, untilIso) {
-    await setPres({
+    await setPresRef.current({
       sharing: true, ghost: false,
       live_lat: lat, live_lng: lng,
       live_acc: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
@@ -136,11 +156,11 @@ export function useLiveShare({ uid, myPres, setPres }) {
       try { navigator.geolocation.clearWatch(watchId.current); } catch {}
       watchId.current = null;
     }
-    last.current = { at: 0, lat: null, lng: null };
+    last.current = { at: 0, lat: null, lng: null, acc: null };
     setAcc(null);
     // null the columns rather than just letting them expire — nothing should
     // outlive the session it belonged to
-    await setPres({ live_lat: null, live_lng: null, live_acc: null, live_until: null });
+    await setPresRef.current({ live_lat: null, live_lng: null, live_acc: null, live_until: null });
     if (reason) ui.toast(reason);
   }
 
@@ -179,8 +199,13 @@ export function useLiveShare({ uid, myPres, setPres }) {
     }
     const { latitude, longitude, accuracy } = first.p.coords;
     setAcc(accuracy);
-    last.current = { at: Date.now(), lat: latitude, lng: longitude };
+    last.current = { at: Date.now(), lat: latitude, lng: longitude, acc: accuracy };
     await push(latitude, longitude, accuracy, untilIso);
+    /* Committing a coarse fix is deliberate — friends should see something
+       immediately — but it is a neighbourhood, not a spot, and the watch below
+       will replace it the moment GPS actually locks. Say that rather than
+       letting a 900m guess sit there looking authoritative. */
+    if (accuracy > COARSE_M) ui.toast('Rough fix for now — it sharpens once GPS locks');
   }
 
   /* The watch lives only while a session is open. Re-created if the session
@@ -193,35 +218,71 @@ export function useLiveShare({ uid, myPres, setPres }) {
       }
       return;
     }
-    if (watchId.current != null) return;
+    /* Last time the browser handed us anything at all — not the last time we
+       wrote. The watchdog below judges the watch by this. */
+    let lastTick = Date.now();
 
-    watchId.current = navigator.geolocation.watchPosition(
-      p => {
-        const { latitude: lat, longitude: lng, accuracy } = p.coords;
-        setAcc(accuracy);
-        const now = Date.now();
-        if (untilRef.current && now >= untilRef.current) { stop('Live location ended'); return; }
+    const onFix = p => {
+      lastTick = Date.now();
+      const { latitude: lat, longitude: lng, accuracy } = p.coords;
+      setAcc(accuracy);
+      const now = Date.now();
+      if (untilRef.current && now >= untilRef.current) { stop('Live location ended'); return; }
 
-        const L = last.current;
-        const moved = (L.lat == null) ? Infinity : metresBetween(L, { lat, lng });
-        const since = now - L.at;
-        // moved somewhere worth reporting, but not more often than MIN_EVERY_MS
-        /* Require the move to clear the fix's own error, or a wifi-located
-           laptop "walks" hundreds of metres a minute while sitting still. */
-        const need = Math.max(MIN_MOVE_M, Math.min(accuracy || 0, 80));
-        const onMove = moved >= need && since >= MIN_EVERY_MS;
-        // standing still: a heartbeat anyway, so the dot stays "live" not "last seen"
-        const onBeat = since >= MAX_EVERY_MS;
-        if (!onMove && !onBeat) return;
+      const L = last.current;
+      const moved = (L.lat == null) ? Infinity : metresBetween(L, { lat, lng });
+      const since = now - L.at;
+      // moved somewhere worth reporting, but not more often than MIN_EVERY_MS
+      /* Require the move to clear the fix's own error, or a wifi-located
+         laptop "walks" hundreds of metres a minute while sitting still. */
+      const need = Math.max(MIN_MOVE_M, Math.min(accuracy || 0, 80));
+      const onMove = moved >= need && since >= MIN_EVERY_MS;
+      /* The correction case. The published fix was a wifi guess good to
+         hundreds of metres; GPS has now locked to ten. The dot may hardly move
+         — the guess was centred near you — so the distance gate above rejects
+         it forever and you stay pinned wherever the estimate landed. Judge the
+         fix by how much better it is, not only by how far it travelled. */
+      const sharper = Number.isFinite(accuracy) && Number.isFinite(L.acc)
+        && L.acc > GOOD_ENOUGH_M
+        && accuracy < L.acc * ACC_IMPROVE_RATIO
+        && since >= ACC_IMPROVE_MIN_MS;
+      // standing still: a heartbeat anyway, so the dot stays "live" not "last seen"
+      const onBeat = since >= MAX_EVERY_MS;
+      if (!onMove && !onBeat && !sharper) return;
 
-        last.current = { at: now, lat, lng };
-        push(lat, lng, accuracy, new Date(untilRef.current).toISOString()).catch(()=>{});
-      },
-      e => { if (e && e.code === 1) stop('Location permission was revoked'); },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
-    );
+      last.current = { at: now, lat, lng, acc: accuracy };
+      push(lat, lng, accuracy, new Date(untilRef.current).toISOString()).catch(()=>{});
+    };
+
+    const onErr = e => { if (e && e.code === 1) stop('Location permission was revoked'); };
+
+    /* maximumAge is 0 on purpose. A cached reading served back to us looks like
+       a fresh one, so the heartbeat re-publishes the same coordinates minute
+       after minute and the dot sits still while you walk. GPS is already awake
+       under enableHighAccuracy, so insisting on a live reading costs nothing
+       we were not paying. */
+    const arm = () => {
+      if (watchId.current != null) { try { navigator.geolocation.clearWatch(watchId.current); } catch {} }
+      lastTick = Date.now();
+      watchId.current = navigator.geolocation.watchPosition(
+        onFix, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    };
+    arm();
+
+    /* Coming back to the tab is the moment a stuck share is most obvious, and
+       the moment the browser is least likely to have kept the watch alive. */
+    const wake = () => { if (!document.hidden) arm(); };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('pageshow', wake);
+    const dog = setInterval(() => {
+      if (document.hidden) return;            // suspended is expected, not broken
+      if (Date.now() - lastTick > WATCHDOG_MS) arm();
+    }, WATCHDOG_EVERY_MS);
 
     return () => {
+      clearInterval(dog);
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('pageshow', wake);
       if (watchId.current != null) {
         try { navigator.geolocation.clearWatch(watchId.current); } catch {}
         watchId.current = null;
