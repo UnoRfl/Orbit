@@ -1,0 +1,15 @@
+# Orbit has no package.json — the browser loads preact, htm and supabase-js
+# straight from esm.sh at pinned versions in index.html's import map, and
+# MapLibre from cdnjs. Dependabot cannot see those, so the only ecosystem it can
+# watch here is the actions used by the workflows. That still matters: those are
+# pinned to SHAs, and a SHA never updates itself.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels: [security, dependencies]
