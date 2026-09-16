@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, resumeBg, sb, ui } from './core.js';
-import { Avatar, Bubble, Eyebrow, ImageAdjust, You, statusOf } from './components.js';
+import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
 
 export function ChatsScreen({ kit }) {
   const { uid, threads, reads, ov, sel, setSel, systems, profiles, nameOf, blocks, openDm, ensureProfiles, friends, db, isFounder } = kit;
@@ -16,8 +16,7 @@ export function ChatsScreen({ kit }) {
 
   return html`<div class="chatsplit" style="animation:pop .2s ease">
     <div class="chatlist">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <${Eyebrow}>Chats<//>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
         <button class="sysedit" style="padding:6px 11px;flex:none" onClick=${()=>setPick(true)}><${IcPlus} size=${12}/> New</button>
       </div>
       ${db===false && html`<div class="card" style="margin-top:12px">
@@ -62,8 +61,7 @@ export function ChatsScreen({ kit }) {
 
     ${sel ? html`<${ChatView} key=${kSel} kit=${kit} sel=${sel} onClose=${()=>setSel(null)}/>`
           : html`<div class="chatempty"><div style="font-size:34px">💬</div>
-              <div style="font-weight:600;margin-top:8px;color:var(--ink)">Pick a conversation</div>
-              <div class="hint">Your DMs and system chats live here.</div></div>`}
+              <div style="font-weight:600;margin-top:8px;color:var(--ink)">Pick a conversation</div></div>`}
 
     ${pick && html`<${FriendPickPop} friends=${friends} onClose=${()=>setPick(false)}
       onPick=${async id=>{ setPick(false); await openDm(id); }}/>`}

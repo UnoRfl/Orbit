@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useState } from './lib.js';
-import { DAYS, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, actOf, ago, decodePlace, fmt, fname, nowInfo, presencePlace, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, nowInfo, presencePlace, PROFILE_VIEW, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
 import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
 export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
@@ -257,7 +257,10 @@ export function FriendsSheet({ uid, graph, profiles, blocks=[], sendRequest, acc
     const term = q.trim().replace(/[%,()]/g,'');
     if (term.length<2) { setResults([]); return; }
     setBusy(true);
-    const { data } = await sb.from('profiles').select('*')
+    /* profiles_view, not profiles: display_name comes back null for anyone who
+       turned "show full name" off, so they are findable by handle and not by the
+       name they asked Orbit not to show. That is the point. */
+    const { data } = await sb.from(PROFILE_VIEW).select('*')
       .or(`handle.ilike.%${term}%,display_name.ilike.%${term}%`).neq('id', uid).limit(8);
     setResults(data||[]); setBusy(false);
   }

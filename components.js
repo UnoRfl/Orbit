@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACTIVITY_CATALOG, ACT_KINDS, B, BADGE_DEFS, CAT, CATHEX, CATNAME, DAYS, HOBBY_PRESETS, HOUR, START, END, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, KINDS, PRONOUN_PRESETS, SOCIALS, actOf, badgesOf, cleanHandle, cleanSocial, clockOf, decodePlace, flairOf, fmt, fname, hashStr, initialsOf, nowInfo, pxFor, sb, shownName, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, PRONOUN_PRESETS, pxFor, sb, shownName, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = p?.accent1 || '#b06bff', a2 = p?.accent2 || '#2dd4bf';
@@ -256,6 +256,30 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
   myClasses.forEach(c=>counts[c.day]++);
   myEvents.forEach(e=>{ if(e.day>=0 && e.day<=5) counts[e.day]++; });
 
+  /* Traffic. Every schedule Orbit has loaded — yours and your friends' — binned
+     by hour, so the grid shows when people are actually busy instead of making
+     you read six columns and guess. Built per hour rather than per half hour,
+     and only non-empty hours are drawn, so a quiet week costs almost no DOM.
+     Skipped entirely on the lowest device tier, which is already dropping
+     effects to hold framerate. */
+  const heat = useMemo(() => {
+    if (perfTier() >= 2) return null;
+    const grid = new Map();               // "day:hour" -> people busy
+    const bump = (day, s, e) => {
+      if (day < 0 || day > 5) return;
+      for (let h = Math.floor(s/60); h < Math.ceil(e/60); h++) {
+        if (h < START/60 || h >= END/60) continue;
+        const k = day + ':' + h;
+        grid.set(k, (grid.get(k) || 0) + 1);
+      }
+    };
+    for (const list of Object.values(classesByOwner || {}))
+      for (const c of (list || [])) bump(c.day, c.start_min, c.end_min);
+    for (const e of (events || [])) bump(e.day, e.start_min, e.end_min);
+    let peak = 0; for (const v of grid.values()) peak = Math.max(peak, v);
+    return peak > 1 ? { grid, peak } : null;   // one person busy is not traffic
+  }, [classesByOwner, events]);
+
   // jump the viewport to "today, around now" on mount
   useEffect(() => {
     const el = scRef.current; if (!el) return;
@@ -271,9 +295,18 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
       <div class="dow" style=${i===nd.day?'color:var(--now)':''}>${d}</div>
       <div class="cnt">${counts[i]||'—'}</div></div>`)}
     <div class="taxis" style=${`height:${rows*HOUR}px`}>
-      ${Array.from({length:rows+1}).map((_,hh)=>html`<div key=${hh} class="hr" style=${`top:${hh*HOUR}px`}>${fmt((7+hh)*60)}</div>`)}
+      ${Array.from({length:rows+1}).map((_,hh)=>html`<div key=${hh} class=${'hr'+((START/60+hh)%6===0?' major':'')} style=${`top:${hh*HOUR}px`}>${
+        /* The last gridline closes the day at 24:00. fmt() renders that as
+           "12PM" because the hour lands on 24 — draw the line, drop the label. */
+        hh === rows ? '' : fmt(START+hh*60)}</div>`)}
     </div>
     ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${rows*HOUR}px`}>
+      ${heat && Array.from({length:(END-START)/60}).map((_,hh)=>{
+        const n = heat.grid.get(di + ':' + (START/60+hh)) || 0;
+        if (!n) return null;
+        return html`<div key=${'h'+hh} class="heat" title=${n + (n===1?' person':' people') + ' booked at ' + fmt(START+hh*60)}
+          style=${`top:${hh*HOUR}px;height:${HOUR}px;opacity:${(0.10 + 0.52*(n/heat.peak)).toFixed(3)}`}></div>`;
+      })}
       ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
           onClick=${()=>onPick && onPick({type:'class', row:c})}>
         <span class="cname">${c.name}</span>

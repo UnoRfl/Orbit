@@ -179,7 +179,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
         <${Eyebrow} color="var(--ge)">Your systems<//>
         <button class=${'sysedit'+(edit?' on':'')} style="padding:6px 11px" onClick=${()=>setEdit(!edit)}>${edit?'Done':'Edit'}</button>
       </div>
-      <div class="hint" style="margin-bottom:2px">Each system is a circle — a shared group with its own planets. Tap in to see who's where and check in.</div>
+      ${allSystems.length <= 1 && html`<div class="hint" style="margin-bottom:2px">Each system is a circle — a shared group with its own planets. Tap in to see who's where and check in.</div>`}
 
       ${shared.invited.map(({sys,mem})=>html`<div key=${sys.id} class="card sysinvite">
         <div style="display:flex;align-items:center;gap:10px">

@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useMemo, useRef, useState } from './lib.js';
 import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, ago, fmt, fname, nowInfo, ui, zoneName } from './core.js';
-import { Avatar, Eyebrow, You, conflictsFor } from './components.js';
+import { Avatar, You, conflictsFor } from './components.js';
 
 export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen }) {
   const nd = nowInfo();
@@ -11,8 +11,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
   const waiting = events.filter(e=>e.host===uid && (e.event_invitees||[]).some(i=>i.status==='pending'));
 
   return html`<div>
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <${Eyebrow} color="var(--nstp)">Plans<//>
+    <div style="display:flex;align-items:center;justify-content:flex-end">
       <button class="btn btn-grad" style="border-radius:999px;padding:8px 14px" onClick=${onNew}><${IcPlus} size=${15}/> New plan</button>
     </div>
 

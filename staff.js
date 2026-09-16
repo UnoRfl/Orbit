@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useState } from './lib.js';
-import { BADGE_DEFS, IcFlag, IcTrash, IcUser, IcX, ago, badgesOf, fname, roleOf, sb, shownName, ui } from './core.js';
+import { ago, BADGE_DEFS, badgesOf, fname, IcFlag, IcTrash, IcUser, IcX, PROFILE_VIEW, roleOf, sb, shownName, ui } from './core.js';
 import { Avatar, BadgeChips, Eyebrow, You } from './components.js';
 
 export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, actions, onOpenProfile, openMod }) {
@@ -27,7 +27,9 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
   async function search() {
     const t = q.trim().replace(/[%,()]/g,''); if (t.length<2) { setRes([]); return; }
     setBusy(true);
-    try{ const { data:d } = await sb.from('profiles').select('*').or(`handle.ilike.%${t}%,display_name.ilike.%${t}%`).limit(8);
+    /* Staff read the view too — internal.is_staff() inside it hands moderators
+       the unredacted name, suspension and ban reason. */
+    try{ const { data:d } = await sb.from(PROFILE_VIEW).select('*').or(`handle.ilike.%${t}%,display_name.ilike.%${t}%`).limit(8);
       setRes(d||[]); }catch{ setRes([]); }
     setBusy(false);
   }

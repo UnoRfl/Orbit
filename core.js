@@ -23,7 +23,11 @@ export const ZONES = [
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // wake the free-tier database the moment the script runs — its cold start
 // then overlaps the boot screen instead of stacking after it
-try{ sb.from('profiles').select('id', { head:true, count:'exact' }).limit(1).then(()=>{}, ()=>{}); }catch{}
+/* Reads go through this view, never the table: it redacts display_name for
+   anyone who hid it, and ban_reason / suspended_until for everyone but you and
+   staff. `authenticated` has no SELECT on public.profiles at all. */
+export const PROFILE_VIEW = 'profiles_view';
+try{ sb.from(PROFILE_VIEW).select('id', { head:true, count:'exact' }).limit(1).then(()=>{}, ()=>{}); }catch{}
 
 /* imperative UI bridge — any component can fire a branded confirm or a
    toast without prop-drilling. Shell wires the real handlers on mount;
@@ -35,7 +39,13 @@ export const ui = {
 
 /* ---------- constants ---------- */
 export const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
-export const HOUR = 52, START = 7*60, END = 19*60;
+/* The grid used to run 07:00-19:00, which quietly decided that nothing worth
+   scheduling happens at night. Night classes, shifts, and anyone revising at
+   1am simply had nowhere to be drawn — a block outside the window was clamped
+   by pxFor() onto the edge and looked like it started at 7am. The day is now
+   the whole day. HOUR comes down so 24 rows stay scrollable rather than
+   becoming a 1250px column. */
+export const HOUR = 40, START = 0, END = 24*60;
 export const CAT = { major:'var(--major)', ge:'var(--ge)', pe:'var(--pe)', nstp:'var(--nstp)' };
 export const CATHEX = { major:'#b06bff', ge:'#2dd4bf', pe:'#34d399', nstp:'#f5b544' };
 export const CATNAME = { major:'Major', ge:'Gen Ed', pe:'PE', nstp:'NSTP' };

@@ -154,6 +154,13 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .hr{position:absolute;right:6px;transform:translateY(-6px);font-size:9.5px;color:var(--faint);font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
 .track{position:relative;border-left:1px solid var(--line);
   background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour) - 1px),var(--line) calc(var(--hour) - 1px),var(--line) var(--hour))}
+/* Traffic: how many people are booked in this hour, across every schedule
+   Orbit has loaded. Sits behind the blocks, never in front of them. */
+.heat{position:absolute;left:0;right:0;background:var(--ge);pointer-events:auto;z-index:0}
+.cls,.evt{z-index:1}
+/* Midnight, 06:00, 12:00, 18:00 read brighter, so a 24-hour column is still
+   scannable at a glance instead of 25 identical grey numbers. */
+.hr.major{color:var(--ink);opacity:.62;font-weight:600}
 .track.wknd{background-color:rgba(255,255,255,.015)}
 .track.today{background-color:rgba(255,93,143,.028)}
 .cls{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;

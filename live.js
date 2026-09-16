@@ -74,6 +74,79 @@ const ACC_IMPROVE_MIN_MS = 4000;
 const WATCHDOG_MS = 45 * 1000;
 const WATCHDOG_EVERY_MS = 10 * 1000;
 
+/* ============================================================
+   GeoKalman — what actually stops the dot lying to you.
+   ------------------------------------------------------------
+   Before this, a fix was accepted or rejected whole: keep the best
+   accuracy, throw the rest away. That is why a wifi estimate could
+   plant you a block away and stay there — one bad reading became
+   the truth until a better one happened to arrive.
+
+   A Kalman filter does not choose between readings, it weighs them.
+   Two numbers do the work, and both come from how real GPS filters
+   are built (regnull/kalman feeds HorizontalAccuracy in as the
+   measurement noise and DistancePerSecond as the process noise; the
+   matrix form tracks velocity too, which is more than a phone in a
+   pocket needs):
+
+     · the reading's own `accuracy` is the measurement noise. A fix
+       that says "within 1400m" is told it is worth almost nothing.
+     · time since the last fix inflates our uncertainty, because you
+       could have walked. That is Q, in metres per second.
+
+   The gain K = variance / (variance + accuracy²) then falls out
+   between 0 and 1: K near 0 means "ignore this, we know better",
+   K near 1 means "we have been blind for a while, take it".
+
+   This is the constant-position reduction — no velocity state. A
+   student walking across campus is not worth a 5x5 matrix on a
+   phone that main.js has already decided is a tier-2 device.
+   ============================================================ */
+const Q_METRES_PER_SECOND = 2.5;   // a brisk walk; what we assume you could have done
+/* Past this gap the prior is worthless and inflating its variance is the wrong
+   model: with no velocity state we are pretending you random-walked for ten
+   minutes, which leaves the estimate trailing hundreds of metres behind the
+   first fix back. A gap this long means the screen was locked or the tab was
+   backgrounded — you could be anywhere — so start again from the new fix
+   rather than averaging it against a memory. Measured: without this, the first
+   fix after a 10-minute gap landed 191m from truth and took several more fixes
+   to close; with it, 0m. */
+const STALE_PRIOR_S = 45;
+
+export function makeKalman(){
+  let lat = null, lng = null, variance = -1, at = 0;
+  return {
+    /* Returns the filtered position, with the variance expressed back as an
+       accuracy in metres so the UI's existing halo keeps meaning the same thing. */
+    push(nLat, nLng, nAcc, nAt){
+      const acc = Math.max(nAcc || 1, 1);       // a claim of 0m is a lie; floor it
+      if (variance < 0) {
+        lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
+      } else {
+        const dt = Math.max(0, nAt - at) / 1000;
+        if (dt > STALE_PRIOR_S) {
+          lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
+          return { lat, lng, acc: Math.sqrt(variance) };
+        }
+        if (dt > 0) {
+          // been a while: we are less sure where you are, so trust the new fix more.
+          // This is what lets the filter recover after a screen lock instead of
+          // clinging to where you were when the phone went in your pocket.
+          variance += dt * Q_METRES_PER_SECOND * Q_METRES_PER_SECOND;
+          at = nAt;
+        }
+        const K = variance / (variance + acc * acc);
+        lat += K * (nLat - lat);
+        lng += K * (nLng - lng);
+        variance *= (1 - K);
+      }
+      return { lat, lng, acc: Math.sqrt(variance) };
+    },
+    reset(){ lat = null; lng = null; variance = -1; at = 0; },
+    get ready(){ return variance >= 0; },
+  };
+}
+
 /* metres between two coordinates — equirectangular is plenty at these distances
    and avoids the trig cost of haversine on every tick */
 export function metresBetween(a, b) {
@@ -137,6 +210,8 @@ export function useLiveShare({ uid, myPres, setPres }) {
      a check-in made after the share started. Always use the current one. */
   const setPresRef = useRef(setPres);
   setPresRef.current = setPres;
+  const kal = useRef(null);
+  if (!kal.current) kal.current = makeKalman();
 
   const until  = myPres?.live_until ? Date.parse(myPres.live_until) : 0;
   const active = !!until && until > Date.now() && !myPres?.ghost && !!myPres?.sharing;
@@ -157,6 +232,7 @@ export function useLiveShare({ uid, myPres, setPres }) {
       watchId.current = null;
     }
     last.current = { at: 0, lat: null, lng: null, acc: null };
+    kal.current.reset();          // next session starts with no opinion
     setAcc(null);
     // null the columns rather than just letting them expire — nothing should
     // outlive the session it belonged to
@@ -198,9 +274,15 @@ export function useLiveShare({ uid, myPres, setPres }) {
       return;
     }
     const { latitude, longitude, accuracy } = first.p.coords;
-    setAcc(accuracy);
-    last.current = { at: Date.now(), lat: latitude, lng: longitude, acc: accuracy };
-    await push(latitude, longitude, accuracy, untilIso);
+    /* Feed the acquire burst's best fix through the filter rather than
+       publishing it raw. On its own this changes little — with one reading the
+       estimate IS the reading — but it seeds the variance, so the very next
+       fix is already weighed against something instead of replacing it. */
+    const k = kal.current.push(latitude, longitude, accuracy,
+                               first.p.timestamp || Date.now());
+    setAcc(k.acc);
+    last.current = { at: Date.now(), lat: k.lat, lng: k.lng, acc: k.acc };
+    await push(k.lat, k.lng, k.acc, untilIso);
     /* Committing a coarse fix is deliberate — friends should see something
        immediately — but it is a neighbourhood, not a spot, and the watch below
        will replace it the moment GPS actually locks. Say that rather than
@@ -224,7 +306,14 @@ export function useLiveShare({ uid, myPres, setPres }) {
 
     const onFix = p => {
       lastTick = Date.now();
-      const { latitude: lat, longitude: lng, accuracy } = p.coords;
+      const raw = p.coords;
+      /* Filter FIRST, then decide. The gates below used to run on the raw
+         reading, so a single wild fix could either drag the dot across town or
+         — if it happened to be coarse — freeze it. They now run on the
+         estimate, which a bad reading can only nudge. */
+      const k = kal.current.push(raw.latitude, raw.longitude, raw.accuracy,
+                                 p.timestamp || Date.now());
+      const lat = k.lat, lng = k.lng, accuracy = k.acc;
       setAcc(accuracy);
       const now = Date.now();
       if (untilRef.current && now >= untilRef.current) { stop('Live location ended'); return; }

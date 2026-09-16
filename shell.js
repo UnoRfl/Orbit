@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { BADGE_DEFS, CAT, DAYS, DEFAULT_PREFS, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, PUSH_PUBLIC_KEY, applyTheme, badgesOf, chatKeyOf, decodePlace, fmt, fname, groupBy, loadSystems, msgPreview, pingChime, roleOf, saveSystems, sb, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
@@ -106,13 +106,13 @@ export function Shell({ session }) {
   const ensureProfiles = async ids => {
     const need = [...new Set(ids)].filter(i=>i && i!==uid && !profRef.current[i]);
     if (!need.length) return;
-    const { data } = await sb.from('profiles').select('*').in('id', need);
+    const { data } = await sb.from(PROFILE_VIEW).select('*').in('id', need);
     if (data?.length) setProfiles(m=>({ ...m, ...Object.fromEntries(data.map(p=>[p.id,p])) }));
   };
   const refreshProfiles = async ids => {          // force-refetch: badges / suspension just changed
     const want = [...new Set(ids)].filter(Boolean);
     if (!want.length) return;
-    const { data } = await sb.from('profiles').select('*').in('id', want);
+    const { data } = await sb.from(PROFILE_VIEW).select('*').in('id', want);
     if (data?.length) setProfiles(m=>({ ...m, ...Object.fromEntries(data.map(p=>[p.id,p])) }));
   };
 
@@ -120,11 +120,16 @@ export function Shell({ session }) {
   const friendIdsOf = g => g.friends.map(r=>r.requester===uid?r.addressee:r.requester);
 
   async function loadMe() {
-    const { data, error } = await sb.from('profiles').select('*').eq('id', uid).maybeSingle();
+    const { data, error } = await sb.from(PROFILE_VIEW).select('*').eq('id', uid).maybeSingle();
     if (error) { if ((error.code==='42P01')||/does not exist/i.test(error.message)) setFatal('db'); return null; }
     if (data) { setMe(data); return data; }
     const fallback = { id:uid, handle:'user_'+uidTail()+uidTail().slice(0,4), display_name:'New Student' };
-    const { data:ins } = await sb.from('profiles').insert(fallback).select().maybeSingle();
+    /* No .select() on the write. Reads come back through profiles_view, which
+       is the only thing `authenticated` is allowed to read — an INSERT ... RETURNING
+       would need SELECT on the table itself. */
+    const { error:ie } = await sb.from('profiles').insert(fallback);
+    if (ie) { setMe(fallback); return fallback; }
+    const { data:ins } = await sb.from(PROFILE_VIEW).select('*').eq('id', uid).maybeSingle();
     setMe(ins||fallback); return ins||fallback;
   }
   async function loadMyPresence() {
@@ -816,12 +821,12 @@ export function Shell({ session }) {
     await sb.from('classes').delete().eq('id', id);
   }
   async function saveProfile(patch, silent=false) {
-    let { data, error } = await sb.from('profiles').update(patch).eq('id', uid).select().maybeSingle();
+    let { data, error } = await sb.from('profiles').update(patch).eq('id', uid);
     if (error && ('school' in patch) && /school/i.test(error.message||'')) {
       // school column not added yet — save the rest, tell them once
       const { school, ...rest } = patch;
       if (Object.keys(rest).length) {
-        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid).select().maybeSingle());
+        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid));
       } else { data=null; error=null; }
       if (!error) toast('Saved — run the school-column SQL in Supabase to store schools');
     }
@@ -829,7 +834,7 @@ export function Shell({ session }) {
       // flair column not added yet — save the rest, point at the migration once
       const { flair, ...rest } = patch;
       if (Object.keys(rest).length) {
-        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid).select().maybeSingle());
+        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid));
       } else { data=null; error=null; }
       if (!error) toast('Your flair didn’t sync — try again later');
     }
@@ -838,11 +843,15 @@ export function Shell({ session }) {
       // v4 profile columns not added yet — save what the DB knows, point at the migration once
       const rest = { ...patch }; V4.forEach(k=>delete rest[k]);
       if (Object.keys(rest).length) {
-        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid).select().maybeSingle());
+        ({ data, error } = await sb.from('profiles').update(rest).eq('id', uid));
       } else { data=null; error=null; }
       if (!error) toast('Run the newest orbit migration to unlock the new profile');
     }
     if (error) { toast(/duplicate|unique/i.test(error.message) ? 'That handle is taken' : 'Could not save'); return false; }
+    /* The write cannot return the new row any more (no SELECT on the table), so
+       read it back through the view. Same shape, minus the columns nobody else
+       is allowed to see — and for your own row the view redacts nothing. */
+    ({ data } = await sb.from(PROFILE_VIEW).select('*').eq('id', uid).maybeSingle());
     if (data) { setMe(data); if (!silent) toast('Saved', '✓'); }
     return true;
   }
