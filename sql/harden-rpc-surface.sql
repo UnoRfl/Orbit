@@ -1,10 +1,8 @@
 -- Shrink what an anonymous caller can invoke over /rest/v1/rpc/...
 --
--- PART 1 IS ALREADY APPLIED to the live project (migration
--- harden_public_rpc_surface, 2026-09-16). It is kept here so the database can
--- be rebuilt from this folder.
---
--- PART 2 IS NOT APPLIED YET. Run it in the Supabase SQL editor.
+-- BOTH PARTS ARE APPLIED to the live project (migrations
+-- harden_public_rpc_surface and harden_public_rpc_surface_revoke_from_public,
+-- 2026-09-16). Kept here so the database can be rebuilt from this folder.
 --
 -- Context: the Supabase security advisor flags every SECURITY DEFINER function
 -- in `public` as callable from the REST API. Most of those flags are noise —
@@ -15,7 +13,7 @@
 
 
 -- ============================================================
--- PART 1 — applied
+-- PART 1
 -- ============================================================
 
 -- Trigger functions were exposed as RPC endpoints purely by accident of living
@@ -36,7 +34,7 @@ alter function public.presence_clear_live() set search_path = public, pg_temp;
 
 
 -- ============================================================
--- PART 2 — still to run
+-- PART 2
 -- ============================================================
 --
 -- The first attempt at this wrote `revoke execute ... from anon` and changed
@@ -94,8 +92,16 @@ grant execute on function public.presence_clear_live()  to service_role;
 -- where n.nspname = 'public' and p.prosecdef
 -- order by anon_exec desc, p.proname;
 --
--- After part 2, the only functions left with anon_exec = true should be the
--- three RLS helpers above.
+-- Result after both parts (Supabase security advisor, 2026-09-16):
+--   anon-callable SECURITY DEFINER functions   12 -> 3
+--   mutable search_path                         1 -> 0
+--
+-- The three that remain are chat_dm_member, chat_sys_member and
+-- chat_is_founder, for the reason above. The advisor also lists 12 functions as
+-- callable by `authenticated`; that is the app's own signed-in API surface —
+-- admin_* refuse a non-staff caller, dm_open and sys_set_chat_look require
+-- auth.uid(), chat_retention_sweep is founder-only, and the founder calls it
+-- from the app as an authenticated user, so it has to stay reachable to them.
 
 
 -- ============================================================
