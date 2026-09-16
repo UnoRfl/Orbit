@@ -174,17 +174,12 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .evt .ctime{color:#e7d9f5}
 .nowline{position:absolute;left:0;right:0;height:2px;z-index:7;pointer-events:none;background:var(--now);box-shadow:0 0 8px rgba(255,93,143,.8)}
 .nowline::before{content:"";position:absolute;left:-2px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--now);box-shadow:0 0 10px rgba(255,93,143,.9)}
-
-/* map */
-.maparea{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;overflow:hidden;isolation:isolate;
-  background:radial-gradient(700px 400px at 30% -10%, rgba(176,107,255,.10), transparent 60%), var(--panel)}
 .mapgrid{position:absolute;inset:0;opacity:.6;
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
 .zone{position:absolute;transform:translate(-50%,-50%);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;
   padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:76px;transition:border-color .15s ease,background .15s ease}
 .zone.on{background:rgba(45,212,191,.14);border-color:var(--ge)}
 .zname{font-size:10px;color:var(--ink);font-weight:600;font-family:'Space Grotesk',sans-serif;white-space:nowrap}
-.zav{display:flex;margin-top:2px;min-height:22px;align-items:center}
 .zav .avatar{border:1.5px solid var(--panel)}
 .quiet{font-size:9.5px;color:var(--faint)}
 
@@ -297,18 +292,13 @@ a{color:var(--ge)}
 @keyframes twinkle{to{opacity:.32}}
 
 .map-orbit{position:absolute;border-radius:50%;border:1px dashed rgba(255,255,255,.045);pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%)}
-.map-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:7px;z-index:2}
 .map-center-star{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 40% 40%, #fff8d6, #f5b544 45%, #b45309 100%);
   box-shadow:0 0 22px rgba(245,181,68,.55), 0 0 44px rgba(245,181,68,.25);position:relative}
 .map-center-star::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(245,181,68,.25);animation:sun-pulse 3.6s ease-in-out infinite}
 @keyframes sun-pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.4);opacity:0}}
 .map-center-label{font-family:'Space Grotesk',sans-serif;font-size:8px;letter-spacing:.34em;color:rgba(255,255,255,.45);font-weight:600}
-
-.planet-zone{position:absolute;transform:translate(-50%,-50%);background:none;border:none;cursor:pointer;padding:0;line-height:0;transition:transform .18s ease}
-.planet-zone:hover{transform:translate(-50%,-50%) scale(1.08)}
 .planet-zone.on{transform:translate(-50%,-50%) scale(1.1)}
 .planet-body{width:50px;height:50px;border-radius:50%;position:relative;transition:box-shadow .2s ease}
-.planet-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .planet-zone.on .planet-body{box-shadow:0 0 0 2px rgba(255,255,255,.4), 0 0 32px currentColor}
 
 .planet-body.p-purple{background:radial-gradient(circle at 32% 28%, #e6c5ff, #b06bff 45%, #4b1976 100%);color:#b06bff;box-shadow:0 0 22px rgba(176,107,255,.35)}
@@ -321,12 +311,7 @@ a{color:var(--ge)}
 .planet-body.ring::after{content:'';position:absolute;left:-14px;right:-14px;top:50%;height:65%;
   transform:translateY(-50%) rotate(-22deg);border-radius:50%;
   border:2px solid rgba(255,255,255,.35);border-left-color:transparent;border-right-color:transparent;pointer-events:none}
-.planet-zone .zav{position:absolute;top:-6px;right:-8px;display:flex}
 .planet-zone .zav .avatar{border:2px solid #0b0714}
-.map-svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
-.planet-label{position:absolute;transform:translate(-50%,-50%);z-index:6000;pointer-events:none;
-  font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;color:#fff;letter-spacing:.03em;white-space:nowrap;
-  text-shadow:0 1px 3px rgba(0,0,0,.95), 0 0 7px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.9)}
 .planet-label .cnt{color:var(--ge);font-weight:700}
 .planet-label.on{text-shadow:0 0 10px var(--major), 0 1px 3px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.9)}
 .planet-zone .zname{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;color:#fff;letter-spacing:.06em;
@@ -427,8 +412,6 @@ a{color:var(--ge)}
 /* dashed "add a place" planet inside a system */
 .planet-zone.add .planet-body{background:rgba(255,255,255,.03);border:1.5px dashed var(--line-strong);box-shadow:none;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .planet-zone.add:hover .planet-body{border-color:var(--major);color:var(--major)}
-.planet-zone .pdel{position:absolute;top:-7px;left:-9px;width:20px;height:20px;border-radius:50%;background:#2a1620;border:1px solid rgba(255,93,143,.55);
-  color:#ffb1c8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:7}
 
 /* emoji picker */
 .emojigrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:8px}
@@ -733,7 +716,6 @@ button.logrow:hover .rowname{color:#fff}
   *{animation:none!important;transition:none!important}
 }
 
-
 /* ================================================================
    LIQUID GLASS · SMOOTH MORPH · CHAT DEPTH
    ----------------------------------------------------------------
@@ -1013,12 +995,6 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
   display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;text-align:center}
 .geotray{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
   background:linear-gradient(transparent,rgba(12,8,18,.92) 34%)}
-
-/* the Orbit-view / Map-view switch */
-.mapmode{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);
-  border:1px solid var(--line);flex:none}
-.mapmode button{background:none;border:none;color:var(--muted);font-size:11.5px;font-weight:600;cursor:pointer;
-  padding:6px 12px;border-radius:999px;transition:background var(--t-mid) var(--ease-morph),color var(--t-mid) var(--ease-morph)}
 .mapmode button.on{background:rgba(176,107,255,.16);color:var(--ink)}
 
 /* ============ live location (live.js · geomap.js) ============ */
@@ -1070,3 +1046,6 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .livedot.coarse .livedot-av{border-style:dashed;box-shadow:none}
 .livedot.coarse .livedot-ring{display:none}
 .livedot.coarse .livedot-l{background:rgba(12,8,18,.72);font-weight:600}
+
+/* a handle someone already has — flagged while it can still be changed */
+.input.bad{border-color:var(--now)}

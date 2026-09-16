@@ -280,45 +280,73 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
     return peak > 1 ? { grid, peak } : null;   // one person busy is not traffic
   }, [classesByOwner, events]);
 
-  // jump the viewport to "today, around now" on mount
+  /* The day is drawn three times, stacked, and the viewport lives in the middle
+     copy. Scroll far enough either way and we silently jump back a day's worth
+     of pixels — the pixels under the cursor are identical, so it reads as one
+     continuous loop rather than a column that dead-ends at midnight. 3am is
+     then just below 11pm, the way it actually is. */
+  const dayH = rows * HOUR;
+  const COPIES = 3;
+
   useEffect(() => {
     const el = scRef.current; if (!el) return;
     const t = nowInfo();
-    el.scrollTop = Math.max(0, pxFor(t.min) - Math.min(el.clientHeight||420, 420)*0.35);
+    // middle copy, positioned at "now"
+    el.scrollTop = dayH + Math.max(0, pxFor(t.min) - Math.min(el.clientHeight||420, 420)*0.35);
     const hd = el.querySelector('.hcell.today');
     if (hd) el.scrollLeft = Math.max(0, hd.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - 48);
   }, [ownerId]);
+
+  useEffect(() => {
+    const el = scRef.current; if (!el) return;
+    /* Remember the exact offset we jumped to rather than setting a "skip the
+       next event" flag. A flag gets swallowed by whichever scroll event arrives
+       first, which during a fast flick is somebody else's — and then a real
+       wrap gets skipped and the grid dead-ends after all. */
+    let expected = -1;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      if (expected >= 0 && Math.abs(y - expected) < 1.5) { expected = -1; return; }
+      if (y < dayH * 0.5)       { expected = y + dayH; el.scrollTop = expected; }
+      else if (y > dayH * 1.5)  { expected = y - dayH; el.scrollTop = expected; }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [dayH]);
 
   return html`<div class="board"><div class="gridscroll" ref=${scRef}><div class="sgrid">
     <div class="htime"></div>
     ${DAYS.map((d,i)=>html`<div key=${d} class=${'hcell'+(i===nd.day?' today':'')}>
       <div class="dow" style=${i===nd.day?'color:var(--now)':''}>${d}</div>
       <div class="cnt">${counts[i]||'—'}</div></div>`)}
-    <div class="taxis" style=${`height:${rows*HOUR}px`}>
-      ${Array.from({length:rows+1}).map((_,hh)=>html`<div key=${hh} class=${'hr'+((START/60+hh)%6===0?' major':'')} style=${`top:${hh*HOUR}px`}>${
-        /* The last gridline closes the day at 24:00. fmt() renders that as
-           "12PM" because the hour lands on 24 — draw the line, drop the label. */
-        hh === rows ? '' : fmt(START+hh*60)}</div>`)}
+    <div class="taxis" style=${`height:${COPIES*dayH}px`}>
+      ${Array.from({length:COPIES*rows}).map((_,i)=>{
+        const hh = i % rows;
+        return html`<div key=${i} class=${'hr'+((START/60+hh)%6===0?' major':'')}
+          style=${`top:${i*HOUR}px`}>${fmt(START+hh*60)}</div>`;
+      })}
     </div>
-    ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${rows*HOUR}px`}>
+    ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${COPIES*dayH}px`}>
+      ${Array.from({length:COPIES}).map((_,cp)=>{ const off = cp*dayH; return html`<${Fragment} key=${'c'+cp}>
       ${heat && Array.from({length:(END-START)/60}).map((_,hh)=>{
         const n = heat.grid.get(di + ':' + (START/60+hh)) || 0;
         if (!n) return null;
         return html`<div key=${'h'+hh} class="heat" title=${n + (n===1?' person':' people') + ' booked at ' + fmt(START+hh*60)}
-          style=${`top:${hh*HOUR}px;height:${HOUR}px;opacity:${(0.10 + 0.52*(n/heat.peak)).toFixed(3)}`}></div>`;
+          style=${`top:${off+hh*HOUR}px;height:${HOUR}px;opacity:${(0.10 + 0.52*(n/heat.peak)).toFixed(3)}`}></div>`;
       })}
-      ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
+      ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${off+pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
           onClick=${()=>onPick && onPick({type:'class', row:c})}>
         <span class="cname">${c.name}</span>
         ${!compact && html`<span class="cmeta">${c.meta}</span>`}
         <span class="ctime">${fmt(c.start_min)}–${fmt(c.end_min)}</span>
       </div>`)}
-      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
+      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${off+pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
           onClick=${()=>onPick && onPick({type:'event', row:e})}>
         <span class="cname">${e.emoji||KINDS[e.kind]?.emoji||'✨'} ${e.title}</span>
         <span class="ctime">${fmt(e.start_min)}–${fmt(e.end_min)}</span>
       </div>`)}
-      ${di===nd.day && nd.min>=START && nd.min<=END && html`<div class="nowline" style=${`top:${pxFor(nd.min)}px`}></div>`}
+      ${di===nd.day && html`<div class="nowline" style=${`top:${off+pxFor(nd.min)}px`}></div>`}
+      <//>`; })}
     </div>`)}
   </div></div></div>`;
 }
@@ -436,12 +464,53 @@ export function PwInput({ value, onInput, placeholder, autocomplete, show, setSh
 
 export function AuthScreen() {
   const [mode, setMode] = useState('in');
-  const [f, setF] = useState({ name:'', handle:'', course:'', school:'', email:'', password:'', confirm:'' });
+  const [f, setF] = useState({ name:'', handle:'', course:'', school:'', email:'', password:'' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [show, setShow] = useState(false);
+  const [more, setMore] = useState(false);       // course + school, folded away
+  const [touchedHandle, setTouchedHandle] = useState(false);
+  const [handleState, setHandleState] = useState(null);   // null | 'checking' | 'free' | 'taken'
   const set = k => e => setF(v=>({ ...v, [k]: k==='handle' ? cleanHandle(e.target.value) : e.target.value }));
+
+  /* Nobody wants to invent a username. Derive one from the name as they type,
+     and stop the moment they edit it themselves. */
+  useEffect(() => {
+    if (mode !== 'up' || touchedHandle) return;
+    const base = cleanHandle(f.name.replace(/\s+/g, ''));
+    setF(v => (v.handle === base ? v : { ...v, handle: base }));
+  }, [f.name, mode, touchedHandle]);
+
+  /* Tell them the handle is taken while they can still change it, instead of
+     after they have filled in the whole form and pressed the button. */
+  useEffect(() => {
+    if (mode !== 'up' || f.handle.length < 3) { setHandleState(null); return; }
+    let dead = false;
+    setHandleState('checking');
+    const t = setTimeout(async () => {
+      try {
+        /* An RPC, not a table read: whoever is filling this in is not signed in
+           yet, and anon has no read on the profile directory by design. The
+           function answers this one question and nothing else. */
+        const { data, error } = await sb.rpc('handle_available', { p_handle: f.handle });
+        if (dead) return;
+        setHandleState(error ? null : (data === false ? 'taken' : 'free'));
+      } catch { if (!dead) setHandleState(null); }
+    }, 450);
+    return () => { dead = true; clearTimeout(t); };
+  }, [f.handle, mode]);
+
+  /* Checked as they type so the button can say why it is disabled, rather than
+     the form failing after a round trip. */
+  const issues = [];
+  if (mode === 'up') {
+    if (!f.name.trim()) issues.push('your name');
+    if (f.handle.length < 3) issues.push('a handle of at least 3 characters');
+    if (handleState === 'taken') issues.push('a handle nobody has taken');
+    if (!/.+@.+\..+/.test(f.email.trim())) issues.push('a valid email');
+    if (f.password.length < 6) issues.push('a password of at least 6 characters');
+  }
 
   const friendly = m => {
     if (!m) return 'Something went wrong. Try again.';
@@ -461,7 +530,6 @@ export function AuthScreen() {
         if (!f.name.trim()) throw new Error('Add your name.');
         if (f.handle.length<3) throw new Error('Handle needs 3–20 letters/numbers/underscores.');
         if (f.password.length<6) throw new Error('Password needs at least 6 characters.');
-        if (f.password!==f.confirm) throw new Error("Passwords don't match — check the confirm field.");
         const { data, error } = await sb.auth.signUp({
           email:f.email.trim(), password:f.password,
           options:{ data:{ display_name:f.name.trim(), handle:f.handle, course:f.course.trim(), school:f.school.trim() } }
@@ -471,7 +539,10 @@ export function AuthScreen() {
           // best effort — needs the school column; ignored if it's not there yet
           await sb.from('profiles').update({ school:f.school.trim() }).eq('id', data.session.user.id);
         }
-        if (!data.session) setOk('Account created — but email confirmation is still ON in Supabase, so check your inbox for a confirm link. (To make sign-ups instant: Supabase → Authentication → Providers → Email → turn off "Confirm email".)');
+        /* This used to print Supabase dashboard instructions at whoever was
+           signing up, which meant nothing to a student. Tell them what to do;
+           the setup note belongs in the README. */
+        if (!data.session) setOk('Account created. Check your email for a confirmation link, then come back and sign in.');
       } else {
         const { error } = await sb.auth.signInWithPassword({ email:f.email.trim(), password:f.password });
         if (error) throw error;
@@ -505,33 +576,42 @@ export function AuthScreen() {
         <div class="flabel">Your name</div>
         <input class="input" value=${f.name} onInput=${set('name')} placeholder="Your full name" autocomplete="name"/>
         <div class="flabel">Handle · how friends find you</div>
-        <input class="input" value=${f.handle} onInput=${set('handle')} placeholder="yourhandle" autocapitalize="none" autocomplete="username"/>
-        <div class="formrow">
-          <div>
-            <div class="flabel">Course · optional</div>
-            <input class="input" value=${f.course} onInput=${set('course')} placeholder="BSIT · 1st Yr"/>
-          </div>
-          <div>
-            <div class="flabel">School · optional</div>
-            <input class="input" value=${f.school} onInput=${set('school')} placeholder="Your school"/>
-          </div>
-        </div>
+        <input class=${'input'+(handleState==='taken'?' bad':'')} value=${f.handle}
+          onInput=${e=>{ setTouchedHandle(true); set('handle')(e); }}
+          placeholder="yourhandle" autocapitalize="none" autocomplete="username"/>
+        <div class="small" style="margin-top:4px;min-height:15px">${
+          handleState==='taken' ? html`<span style="color:var(--now)">@${f.handle} is taken — try another</span>`
+          : handleState==='free' ? html`<span style="color:var(--ge)">@${f.handle} is free</span>`
+          : handleState==='checking' ? 'checking…'
+          : (!touchedHandle && f.handle) ? html`<span>from your name — tap to change</span>` : ''}</div>
+        ${more
+          ? html`<div class="formrow">
+              <div>
+                <div class="flabel">Course</div>
+                <input class="input" value=${f.course} onInput=${set('course')} placeholder="BSIT · 1st Yr"/>
+              </div>
+              <div>
+                <div class="flabel">School</div>
+                <input class="input" value=${f.school} onInput=${set('school')} placeholder="Your school"/>
+              </div>
+            </div>`
+          : html`<button class="btn" style="margin-top:10px;width:100%;padding:9px;font-size:12px"
+              onClick=${()=>setMore(true)}>+ Add course & school (optional)</button>`}
       <//>`}
       <div class="flabel">Email</div>
       <input class="input" type="email" value=${f.email} onInput=${set('email')} placeholder="you@email.com" autocomplete="email" inputmode="email"/>
       <div class="flabel">Password</div>
       <${PwInput} value=${f.password} onInput=${set('password')} placeholder="at least 6 characters"
         autocomplete=${mode==='up'?'new-password':'current-password'} show=${show} setShow=${setShow} onEnter=${mode==='in'?go:null}/>
-      ${mode==='up' && html`<${Fragment}>
-        <div class="flabel">Confirm password</div>
-        <${PwInput} value=${f.confirm} onInput=${set('confirm')} placeholder="type it again"
-          autocomplete="new-password" show=${show} setShow=${setShow} onEnter=${go}/>
-      <//>`}
+
       ${err && html`<div class="errbox">${err}</div>`}
       ${ok && html`<div class="okbox">${ok}</div>`}
-      <button class="btn btn-grad btn-block" style="margin-top:16px;padding:13px" disabled=${busy} onClick=${go}>
+      <button class="btn btn-grad btn-block" style="margin-top:16px;padding:13px"
+        disabled=${busy || (mode==='up' && issues.length>0)} onClick=${go}>
         ${busy ? 'One sec…' : (mode==='up' ? 'Create my account' : 'Sign in')}
       </button>
+      ${mode==='up' && !busy && issues.length>0 && html`<div class="small" style="margin-top:7px;text-align:center">
+        Still need ${issues[0]}${issues.length>1 ? ` · +${issues.length-1} more` : ''}</div>`}
       <div class="authdiv">or</div>
       <button class="btn btn-block btn-google" disabled=${busy} onClick=${google}>
         <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>

@@ -100,6 +100,69 @@ jobs:
         with:
           advanced-security: true
 
+  ai-review:
+    # Anthropic's own reviewer: Claude reads the diff and reasons about it,
+    # which catches the class of bug a pattern matcher cannot — an auth check
+    # that is present but wrong, a policy that reads right and denies nothing.
+    #
+    # It needs CLAUDE_API_KEY, which is metered API billing and NOT covered by a
+    # Claude subscription. Orbit stays free, so the job is wired up and inert:
+    # with no secret set it skips every step and costs nothing. Add the secret
+    # and it starts reviewing pull requests.
+    name: Claude security review (inert without CLAUDE_API_KEY)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write        # to leave the findings as review comments
+    env:
+      HAS_KEY: ${{ secrets.CLAUDE_API_KEY != '' }}
+    steps:
+      - if: env.HAS_KEY == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - if: env.HAS_KEY == 'true'
+        uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+      - if: env.HAS_KEY != 'true'
+        run: echo "No CLAUDE_API_KEY set - skipping the AI review. This is expected."
+
+  secrets-shape:
+    # gitleaks catches known secret formats. This catches the one that would
+    # actually end Orbit: a Supabase service_role key, which bypasses every RLS
+    # policy in the database. The publishable key in core.js is meant to be
+    # public and is explicitly allowed.
+    name: No secret keys committed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Refuse a real secret key anywhere in the tree
+        run: |
+          # Match key SHAPES, not the words. The first attempt grepped for
+          # "service_role" and tripped on core.js's own comment telling you not
+          # to put one there — a check that fails on prose is a check people
+          # learn to ignore.
+          #
+          #   sb_secret_...  new-style Supabase secret key
+          #   eyJ........    a JWT, which is what the legacy service_role key is
+          #
+          # The publishable key (sb_publishable_) is meant to ship and is not
+          # matched. sql/ is excluded: it discusses roles by name on purpose.
+          if grep -rInE --exclude-dir=.git --exclude-dir=sql                -e 'sb_secret_[A-Za-z0-9_-]{8,}'                -e 'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{8,}' . ; then
+            echo "::error::That looks like a real secret key. A Supabase service_role key bypasses every RLS policy - rotate it immediately."
+            exit 1
+          fi
+          echo "No secret-shaped key present."
+
   dast:
     name: ZAP baseline against the live site
     runs-on: ubuntu-latest

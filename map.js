@@ -20,12 +20,6 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
      device, and forced back to the orrery on hardware that can't take
      MapLibre so the tab always renders something. */
   const geoOk = canUseGeoMap();
-  const [mapMode, setMapMode] = useState(()=>{
-    try{ return (geoOk && localStorage.getItem('orbit.mapmode')==='geo') ? 'geo' : 'orbit'; }catch{ return 'orbit'; }
-  });
-  const setMode = m => { setMapMode(m); try{ localStorage.setItem('orbit.mapmode', m); }catch{} };
-  const areaRef = useRef(null);
-  const [dim, setDim] = useState({ w:0, h:0 });
 
   const campusLocal = localSys.find(s=>s.kind==='campus') || seedSystems()[0];
   const allSystems = [
@@ -54,14 +48,6 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   const friendsOnPlanet = (sys, planet) => friendPlaces.filter(x=>
     (x.d.pi && planet.id && x.d.pi===planet.id) || (matchSys(x.d, sys) && normName(x.d.place)===normName(planet.name)));
 
-  useEffect(()=>{
-    const el = areaRef.current; if(!el) return;
-    const measure = ()=>{ const r=el.getBoundingClientRect(); setDim({ w:r.width, h:r.height }); };
-    measure();
-    let ro; if(window.ResizeObserver){ ro=new ResizeObserver(measure); ro.observe(el); }
-    else addEventListener('resize', measure, { passive:true });
-    return ()=>{ if(ro) ro.disconnect(); else removeEventListener('resize', measure); };
-  },[activeKey]);
   // if the system I'm inside gets deleted / I get removed, fall back to the grid
   useEffect(()=>{ if(activeKey && !allSystems.find(s=>s.key===activeKey)) { setActiveKey(null); setSel(null); } },[allSystems.length]);
 
@@ -296,66 +282,17 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
     </div>`;
   }
 
-  /* ============ DETAIL: one system's top-down orrery ============ */
-  const items = planetsOf(active).concat(canAdd ? [{ add:true }] : []);
-  const N = Math.max(1, items.length);
-  const P = items.filter(it=>!it.add).length;
-  const w = dim.w, h = dim.h;
-  const cx = w/2, cy = h/2;
-  const ranks = N>1 ? N-1 : 1;
-  const pBase = Math.round(Math.max(26, Math.min(40, 40 - Math.max(0, P-3)*2.2)));
-  const RMin = 44;
-  const RMax = Math.max(RMin+28, Math.min(w, h)/2 - Math.round(pBase*0.6) - 10);
-
-  const layout = items.map((it,i)=>{
-    const R = RMin + (RMax-RMin)*(ranks?i/ranks:0);
-    const a = -Math.PI/2 + i*GOLDEN_ANGLE;
-    const isAdd = !!it.add;
-    const size = isAdd ? Math.max(22, Math.round(pBase*0.85)) : Math.max(24, Math.min(42, Math.round(pBase * SIZE_VAR[i % SIZE_VAR.length])));
-    const planet = isAdd ? null : it;
-    const meHere = !isAdd && sharingOn && myD && ((myD.pi && myD.pi===planet.id) || (matchSys(myD, active) && normName(myD.place)===normName(planet.name)));
-    const faces = isAdd ? [] : friendsOnPlanet(active, planet);
-    const cnt = faces.length + (meHere?1:0);
-    const skin = PLANET_SKIN[i%PLANET_SKIN.length];
-    return { i, id: isAdd?'__add__':planet.id, isAdd, planet, name: isAdd?'Add place':planet.name,
-      R, px: cx+Math.cos(a)*R, py: cy+Math.sin(a)*R, size,
-      zi: sel===(isAdd?'__add__':planet.id) ? 2600 : 2000,
-      skin, colors: isAdd ? ['#9a8fa8','#6f6480','#4a4358'] : SKIN_COLORS[skin], meHere, faces, cnt };
+  /* ============ DETAIL: one system's places ============ */
+  /* The orrery is gone — a system opens straight onto the real map. Everything
+     that used to fall out of its layout pass (who is standing where, whether
+     that includes you) is all the detail panel below ever needed. */
+  const placeInfo = p => ({
+    planet: p,
+    meHere: !!(sharingOn && myD &&
+      ((myD.pi && myD.pi === p.id) || (matchSys(myD, active) && normName(myD.place) === normName(p.name)))),
+    faces: friendsOnPlanet(active, p),
   });
-
-  /* place labels so text never lands on a planet, the sun, or another label */
-  const labels = [];
-  if (w>0) {
-    const ovl = (a,b)=>{ const ox=Math.max(0,Math.min(a.x+a.hw,b.x+b.hw)-Math.max(a.x-a.hw,b.x-b.hw));
-      const oy=Math.max(0,Math.min(a.y+a.hh,b.y+b.hh)-Math.max(a.y-a.hh,b.y-b.hh)); return ox*oy; };
-    const gap=8, lh=15;
-    const cw = Math.min(Math.max(active.name.length*6.4+8,40),150);
-    const centerBox = { x:cx, y:cy+18, hw:cw/2, hh:9 };
-    const meta = layout.map(L=>{ const txt=L.name+(L.cnt>0?` · ${L.cnt}`:'');
-      return { lw:Math.min(Math.max(txt.length*6.2+6,34),140), pr:L.size/2+5 }; });
-    const place = new Array(layout.length).fill(null);
-    const candsFor = i => { const L=layout[i], m=meta[i], dB=m.pr+gap+lh/2, off=[
-        [0,dB],[0,-dB],[0,dB+lh+5],[0,-(dB+lh+5)],
-        [m.lw*0.5,dB],[-m.lw*0.5,dB],[m.lw*0.5,-dB],[-m.lw*0.5,-dB],
-        [m.lw*0.62,0],[-m.lw*0.62,0],[0,dB+2*(lh+5)],[0,-(dB+2*(lh+5))] ];
-      return off.map(([dx,dy])=>({ x:L.px+dx, y:L.py+dy })); };
-    const score = (i, box) => { let s = Math.abs(box.x-layout[i].px)*0.15;
-      if (box.y-box.hh<4) s+=1e4; if (box.y+box.hh>h-4) s+=1e4;
-      if (box.x-box.hw<2) s+=(2-(box.x-box.hw))*8; if (box.x+box.hw>w-2) s+=((box.x+box.hw)-(w-2))*8;
-      for (const Pt of layout) s += 3*ovl(box,{ x:Pt.px, y:Pt.py, hw:Pt.size/2+2, hh:Pt.size/2+2 });
-      s += 5*ovl(box, centerBox);
-      for (let j=0;j<place.length;j++){ if (j===i||!place[j]) continue; s += 6*ovl(box, place[j]); }
-      return s; };
-    const assign = i => { const hw=meta[i].lw/2; let best=null, bs=Infinity;
-      for (const c of candsFor(i)){ const box={ x:c.x, y:c.y, hw, hh:lh/2 }; const s=score(i,box); if (s<bs){ bs=s; best=box; } }
-      place[i]=best; };
-    const order = layout.map((_,i)=>i).sort((A,B)=>layout[A].py-layout[B].py);
-    for (const i of order) assign(i);
-    for (let sweep=0; sweep<3; sweep++) for (const i of order) assign(i);
-    layout.forEach((L,i)=>{ labels[i] = place[i] ? { x:place[i].x, y:place[i].y } : { x:L.px, y:L.py }; });
-  }
-
-  const orbits = layout.map(L=>({ i:L.i, id:L.id, R:L.R, colors:L.colors }));
+  const P = planetsOf(active).length;
   const emptySys = P===0;
   const nd0 = nowInfo();
   const cosmic = active.kind==='shared'
@@ -374,65 +311,23 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       ${canAdd && html`<button class="sysedit" style="padding:8px 10px" onClick=${()=>setForm({t:'addplanet'})} aria-label="Add a place"><${IcPlus} size=${15}/></button>`}
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:-6px;margin-bottom:12px;flex-wrap:wrap">
-      <div class="hint" style="margin:0;flex:1;min-width:160px">${mapMode==='geo'
-        ? (canAdd ? 'Tap the map to pin a place. Tap a pin to see who’s there and check in.'
-                  : 'Tap a pin to see who’s there and check in.')
-        : (active.kind==='campus'
-          ? 'Your campus, as planets. Tap one to see who’s there and check in.'
-          : `A shared system${isLeader?' you lead':''} — everyone here sees the same planets. Tap one to check in.`)}</div>
-      ${geoOk && html`<div class="mapmode" role="group" aria-label="Map view">
-        <button class=${mapMode==='orbit'?'on':''} onClick=${()=>setMode('orbit')}>Orbit</button>
-        <button class=${mapMode==='geo'?'on':''}   onClick=${()=>setMode('geo')}>Map</button>
-      </div>`}
+      <div class="hint" style="margin:0;flex:1;min-width:160px">${canAdd
+        ? 'Tap the map to pin a place. Tap a pin to see who’s there and check in.'
+        : 'Tap a pin to see who’s there and check in.'}</div>
     </div>
 
-    ${mapMode==='geo' ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
+    ${geoOk ? html`<${GeoMap} key=${'geo:'+active.key} system=${active}
         places=${planetsOf(active)} canAdd=${!!canAdd} myPlanetId=${myD?.pi||null}
         liveFriends=${liveFriends} onOpenFriend=${onOpenFriend} live=${live} meLive=${meLive}
         friendsOnPlanet=${p=>friendsOnPlanet(active, p)}
         onOpenPlace=${p=>setSel(p)}
         onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}
         onAddAt=${(lat,lng)=>setForm({ t:'addplanet', lat, lng })} />`
-    : html`<div class="maparea space" ref=${areaRef}>
-      <div class="mapstars"></div>
-      ${w>0 && html`<svg class="map-svg" viewBox=${`0 0 ${w} ${h}`} width=${w} height=${h}>
-        <defs>
-          ${orbits.map(o=>html`<linearGradient key=${'g'+o.i} id=${'orb'+o.i} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color=${o.colors[0]}/>
-            <stop offset="50%" stop-color=${o.colors[1]}/>
-            <stop offset="100%" stop-color=${o.colors[2]}/>
-          </linearGradient>`)}
-        </defs>
-        ${orbits.map(o=>html`<g key=${'orb'+o.i}>
-          ${sel===o.id && html`<circle cx=${cx} cy=${cy} r=${o.R} fill="none" stroke=${o.colors[1]} stroke-width="5" opacity="0.15"/>`}
-          <circle cx=${cx} cy=${cy} r=${o.R} fill="none" stroke=${`url(#orb${o.i})`}
-            stroke-width=${sel===o.id?1.9:1.1} opacity=${sel===o.id?1:0.9} style="transition:stroke-width .2s ease"/>
-        </g>`)}
-      </svg>`}
-      <div class="map-center" style=${`left:${cx}px;top:${cy}px;z-index:3000`}>
-        <div class="map-center-star" style=${`background:radial-gradient(circle at 38% 34%, #fff, ${hueCss(active.hue,72,86)} 45%, ${hueCss(active.hue,26,86)} 100%);box-shadow:0 0 26px ${hueCss(active.hue,60,74,.6)}`}></div>
-        <div class="map-center-label">${active.name.toUpperCase()}</div>
-      </div>
-      ${w>0 && layout.map(L=> L.isAdd
-        ? html`<button key="add" class="planet-zone add" style=${`left:${L.px}px;top:${L.py}px;z-index:${L.zi}`}
-            onClick=${()=>setForm({t:'addplanet'})} aria-label="Add a place">
-            <div class="planet-body" style=${`width:${L.size}px;height:${L.size}px`}><${IcPlus} size=${Math.round(L.size*0.4)}/></div>
-          </button>`
-        : html`<button key=${L.id} class=${'planet-zone'+(sel===L.id?' on':'')}
-            style=${`left:${L.px}px;top:${L.py}px;z-index:${L.zi}`} onClick=${()=>setSel(sel===L.id?null:L.id)}>
-            ${edit && canDeletePlanet(L.planet) && html`<span class="pdel" role="button"
-              onClick=${e=>{ e.stopPropagation(); removePlanet(L.planet); }}><${IcX} size=${11}/></span>`}
-            <div class=${`planet-body ${L.skin}`} style=${`width:${L.size}px;height:${L.size}px`}>
-              <span class="planet-emoji" style=${`font-size:${Math.round(L.size*0.4)}px`}>${L.planet.icon}</span>
-              ${L.cnt>0 && html`<div class="zav">
-                ${L.meHere && html`<${Avatar} p=${me} size=${18}/>`}
-                ${L.faces.slice(0,2).map((x,idx)=>html`<div key=${x.f.id} style=${`margin-left:${(idx===0&&!L.meHere)?0:-7}px`}><${Avatar} p=${x.f} size=${18}/></div>`)}
-              </div>`}
-            </div>
-          </button>`)}
-      ${w>0 && layout.map(L=> labels[L.i] && html`<div key=${'lbl'+L.id} class=${'planet-label'+(sel===L.id?' on':'')}
-          style=${`left:${labels[L.i].x}px;top:${labels[L.i].y}px`}>${L.name}${L.cnt>0?html`<span class="cnt"> · ${L.cnt}</span>`:''}</div>`)}
-    </div>`}
+    : html`<div class="geofail">
+        <div style="font-size:26px">🗺️</div>
+        <div style="font-weight:600;margin-top:6px">This device can't draw the map</div>
+        <div class="hint">Orbit's map needs WebGL, which this browser has switched off or can't do. Your places and check-ins are all still here — the list below works.</div>
+      </div>`}
 
     ${active.kind==='shared' && html`<div style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -467,7 +362,8 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       ${canAdd && html`<button class="btn btn-grad" style="margin-top:12px" onClick=${()=>setForm({t:'addplanet'})}><${IcPlus} size=${15}/> Add your first place</button>`}
     </div>`}
 
-    ${sel && (()=>{ const L=layout.find(x=>x.id===sel); if(!L||L.isAdd) return null; const p=L.planet; const iAmHere=L.meHere;
+    ${sel && (()=>{ const found=planetsOf(active).find(x=>x.id===(sel&&sel.id?sel.id:sel)); if(!found) return null;
+      const L=placeInfo(found); const p=L.planet; const iAmHere=L.meHere;
       return html`<div style="margin-top:14px">
         <${Eyebrow}>${p.icon} ${p.name}<//>
         <div class="stack" style="margin-top:10px">
@@ -655,18 +551,3 @@ export function SystemPeople({ sys, uid, me, friends, profiles, nameOf, actions,
   </div>`;
 }
 
-export const PLANET_SKIN = ['p-purple','p-blue','p-gold','p-green','p-red','p-olive'];
-// [light, mid, deep] per skin — orbit lines use these so a ring matches its planet's colourway
-
-export const SKIN_COLORS = {
-  'p-purple': ['#d9bbff','#b06bff','#6a2fb0'],
-  'p-blue':   ['#a9d3ff','#4dabf7','#245f9e'],
-  'p-gold':   ['#ffe4a1','#f5b544','#a86f1c'],
-  'p-green':  ['#93ffcb','#34d399','#1a7a55'],
-  'p-red':    ['#ffb0a1','#ff6b5d','#a8362c'],
-  'p-olive':  ['#cdf59d','#82c34a','#4a7527'],
-};
-
-export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));   // ~137.5° — spaces planets evenly at any count
-
-export const SIZE_VAR = [1.0, 0.86, 0.98, 0.82, 1.06, 0.9, 0.94, 0.84];  // gentle natural size variety

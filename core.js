@@ -45,7 +45,9 @@ export const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
    by pxFor() onto the edge and looked like it started at 7am. The day is now
    the whole day. HOUR comes down so 24 rows stay scrollable rather than
    becoming a 1250px column. */
-export const HOUR = 40, START = 0, END = 24*60;
+/* HOUR went back to 52 after 40 read as squished — the grid scrolls, so height
+   costs nothing, and the day wraps around now rather than dead-ending. */
+export const HOUR = 52, START = 0, END = 24*60;
 export const CAT = { major:'var(--major)', ge:'var(--ge)', pe:'var(--pe)', nstp:'var(--nstp)' };
 export const CATHEX = { major:'#b06bff', ge:'#2dd4bf', pe:'#34d399', nstp:'#f5b544' };
 export const CATNAME = { major:'Major', ge:'Gen Ed', pe:'PE', nstp:'NSTP' };
