@@ -113,37 +113,112 @@ const Q_METRES_PER_SECOND = 2.5;   // a brisk walk; what we assume you could hav
    to close; with it, 0m. */
 const STALE_PRIOR_S = 45;
 
+/* Degrees per metre. Latitude is constant; longitude narrows towards the poles,
+   so it has to be computed at the latitude we are actually at. */
+const M_PER_DEG_LAT = 111320;
+const mPerDegLng = latDeg => 111320 * Math.cos(latDeg * Math.PI / 180);
+
+/* Nothing a student does moves this fast. A fix implying more is a bad fix, not
+   a teleport — a wifi estimate from the far side of the city, usually. */
+const MAX_PLAUSIBLE_MS = 60;        // 216 km/h
+const OUTLIER_PENALTY  = 5;         // how much to distrust one, rather than drop it
+/* After this many implausible fixes in a row, the implausible thing is our own
+   estimate. Without this the gate deadlocks: every new fix looks like a
+   teleport FROM the stale position, so every one gets discounted and the
+   filter never escapes the place it was wrong about. Measured before the fix:
+   eight consecutive correct fixes left it 3.4km from the truth. */
+const OUTLIER_GIVE_UP  = 3;
+
+/* Process noise while we are modelling motion is much smaller than while we are
+   guessing: if we know your course and speed, the only thing left unexplained
+   is that you changed them. */
+const Q_MOVING = 0.8;
+/* Below this the reported heading is noise — a stationary phone's course
+   wanders through all 360 degrees. */
+const MIN_SPEED_FOR_HEADING = 0.7;  // m/s, about a slow walk
+
 export function makeKalman(){
   let lat = null, lng = null, variance = -1, at = 0;
+  let vSpeed = 0, vHeading = null;    // last believable course, m/s and radians
+  let outlierRun = 0;
   return {
-    /* Returns the filtered position, with the variance expressed back as an
-       accuracy in metres so the UI's existing halo keeps meaning the same thing. */
-    push(nLat, nLng, nAcc, nAt){
-      const acc = Math.max(nAcc || 1, 1);       // a claim of 0m is a lie; floor it
+    /* `motion` is the GPS's own speed and heading. This is not us differencing
+       two positions — it is Doppler off the satellite signal, and it is both
+       more accurate and available a beat sooner. Feeding it in is the closest a
+       browser gets to what a native fused-location provider does with the
+       accelerometer: predict where you have got to, then correct. */
+    push(nLat, nLng, nAcc, nAt, motion){
+      let acc = Math.max(nAcc || 1, 1);       // a claim of 0m is a lie; floor it
       if (variance < 0) {
         lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
-      } else {
-        const dt = Math.max(0, nAt - at) / 1000;
-        if (dt > STALE_PRIOR_S) {
-          lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
-          return { lat, lng, acc: Math.sqrt(variance) };
-        }
-        if (dt > 0) {
-          // been a while: we are less sure where you are, so trust the new fix more.
-          // This is what lets the filter recover after a screen lock instead of
-          // clinging to where you were when the phone went in your pocket.
-          variance += dt * Q_METRES_PER_SECOND * Q_METRES_PER_SECOND;
-          at = nAt;
-        }
-        const K = variance / (variance + acc * acc);
-        lat += K * (nLat - lat);
-        lng += K * (nLng - lng);
-        variance *= (1 - K);
+        this._takeMotion(motion);
+        return { lat, lng, acc: Math.sqrt(variance), snapped:false };
       }
-      return { lat, lng, acc: Math.sqrt(variance) };
+
+      const dt = Math.max(0, nAt - at) / 1000;
+      if (dt > STALE_PRIOR_S) {
+        lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
+        vSpeed = 0; vHeading = null;
+        this._takeMotion(motion);
+        return { lat, lng, acc: Math.sqrt(variance), snapped:false };
+      }
+
+      if (dt > 0) {
+        /* Predict. With a course we carry the estimate forward along it, so a
+           walking dot stops trailing a step behind every fix. Without one we
+           only widen the uncertainty and wait. */
+        if (vHeading != null && vSpeed >= MIN_SPEED_FOR_HEADING) {
+          const d = vSpeed * dt;
+          lat += (d * Math.cos(vHeading)) / M_PER_DEG_LAT;
+          lng += (d * Math.sin(vHeading)) / Math.max(1, mPerDegLng(lat));
+          variance += dt * Q_MOVING * Q_MOVING;
+        } else {
+          variance += dt * Q_METRES_PER_SECOND * Q_METRES_PER_SECOND;
+        }
+        at = nAt;
+      }
+
+      /* Gate the outliers. A fix that would need you to move at 200 km/h is
+         wrong, but dropping it outright risks getting stuck if it turns out to
+         be right, so distrust it instead: inflate its stated error and let it
+         barely move the estimate. Two in a row and the variance has grown
+         enough that the second one lands anyway. */
+      let outlier = false;
+      if (dt > 0.2) {
+        const jump = metresBetween({ lat, lng }, { lat:nLat, lng:nLng });
+        if (jump / dt > MAX_PLAUSIBLE_MS) {
+          outlierRun++;
+          if (outlierRun >= OUTLIER_GIVE_UP) {
+            // the device has said the same implausible thing too many times to
+            // still be the one that is wrong — believe it and start again
+            lat = nLat; lng = nLng; variance = acc * acc; at = nAt;
+            outlierRun = 0; vSpeed = 0; vHeading = null;
+            this._takeMotion(motion);
+            return { lat, lng, acc: Math.sqrt(variance), reacquired:true };
+          }
+          acc *= OUTLIER_PENALTY; outlier = true;
+        } else outlierRun = 0;
+      }
+
+      const K = variance / (variance + acc * acc);
+      lat += K * (nLat - lat);
+      lng += K * (nLng - lng);
+      variance *= (1 - K);
+      if (!outlier) this._takeMotion(motion);
+      return { lat, lng, acc: Math.sqrt(variance), outlier };
     },
-    reset(){ lat = null; lng = null; variance = -1; at = 0; },
+    _takeMotion(m){
+      const sp = m && Number.isFinite(m.speed) && m.speed >= 0 ? m.speed : null;
+      const hd = m && Number.isFinite(m.heading) ? m.heading : null;
+      if (sp == null) { vSpeed = 0; return; }
+      vSpeed = sp;
+      // heading is only meaningful once you are actually going somewhere
+      if (hd != null && sp >= MIN_SPEED_FOR_HEADING) vHeading = hd * Math.PI / 180;
+      else if (sp < MIN_SPEED_FOR_HEADING) vHeading = null;
+    },
+    reset(){ lat = null; lng = null; variance = -1; at = 0; vSpeed = 0; vHeading = null; outlierRun = 0; },
     get ready(){ return variance >= 0; },
+    get velocity(){ return { speed: vSpeed, heading: vHeading }; },
   };
 }
 
@@ -222,6 +297,35 @@ export function metresBetween(a, b) {
   const x = (b.lng - a.lng) * rad * Math.cos(((a.lat + b.lat) / 2) * rad);
   const y = (b.lat - a.lat) * rad;
   return Math.sqrt(x * x + y * y) * R;
+}
+
+/* ============================================================
+   snapToPlace — Orbit's version of the road-geometry layer.
+   ------------------------------------------------------------
+   Half of why Life360 reads as precise is not the fix, it is that the fix gets
+   matched against known geometry: it does not say "somewhere in this 40m
+   circle", it says "at Home". Orbit already has the geometry — every pinned
+   place carries real coordinates.
+
+   The rule is deliberately conservative: snap only when the fix genuinely
+   cannot tell the difference, meaning the place is inside the fix's own error.
+   A 12m fix has to be within 20m of the place; a 200m fix does NOT snap to
+   everything within 200m, because that would start inventing a precision
+   nobody has. Anything past MAX is never snapped.
+   ============================================================ */
+const SNAP_FLOOR_M = 20;    // even a perfect fix gets this much benefit of the doubt
+const SNAP_MAX_M   = 70;    // past this it is a different place, whatever the error says
+
+export function snapToPlace(lat, lng, acc, places) {
+  if (!places || !places.length) return null;
+  const reach = Math.min(Math.max(acc || 0, SNAP_FLOOR_M), SNAP_MAX_M);
+  let best = null;
+  for (const p of places) {
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+    const d = metresBetween({ lat, lng }, { lat: p.lat, lng: p.lng });
+    if (d <= reach && (!best || d < best.d)) best = { place: p, d };
+  }
+  return best;
 }
 
 /* Read a friend's live position off their presence row, or null. Enforces the
@@ -322,7 +426,8 @@ export function useLiveShare({ uid, myPres, setPres }) {
        estimate IS the reading — but it seeds the variance, so the very next
        fix is already weighed against something instead of replacing it. */
     const k = kal.current.push(latitude, longitude, accuracy,
-                               first.p.timestamp || Date.now());
+                               first.p.timestamp || Date.now(),
+                               { speed: first.p.coords.speed, heading: first.p.coords.heading });
     setAcc(k.acc);
     last.current = { at: Date.now(), lat: k.lat, lng: k.lng, acc: k.acc };
     await push(k.lat, k.lng, k.acc, untilIso);
@@ -355,7 +460,8 @@ export function useLiveShare({ uid, myPres, setPres }) {
          — if it happened to be coarse — freeze it. They now run on the
          estimate, which a bad reading can only nudge. */
       const k = kal.current.push(raw.latitude, raw.longitude, raw.accuracy,
-                                 p.timestamp || Date.now());
+                                 p.timestamp || Date.now(),
+                                 { speed: raw.speed, heading: raw.heading });
       const lat = k.lat, lng = k.lng, accuracy = k.acc;
       setAcc(accuracy);
       const now = Date.now();
@@ -421,6 +527,35 @@ export function useLiveShare({ uid, myPres, setPres }) {
       }
     };
   }, [active, uid]);
+
+  /* A screen lock is what actually ends a web location share: the browser
+     suspends the page and the watch stops. Native apps get a background
+     location permission; the web's nearest equivalent is simply asking the
+     screen to stay on while a share is running. It is not a substitute — lock
+     the phone deliberately and it still stops — but it covers the common case
+     of putting the phone down mid-share and it is the only lever there is.
+     Released the moment sharing ends, so it never outlives its reason. */
+  useEffect(() => {
+    if (!active || !('wakeLock' in navigator)) return;
+    let sentinel = null, dead = false;
+    const grab = async () => {
+      try {
+        if (dead || document.hidden || sentinel) return;
+        sentinel = await navigator.wakeLock.request('screen');
+        sentinel.addEventListener('release', () => { sentinel = null; });
+      } catch { /* denied, low battery, or unsupported — not worth telling anyone */ }
+    };
+    grab();
+    // the OS drops it whenever the tab goes away; take it back on return
+    const revisit = () => { if (!document.hidden) grab(); };
+    document.addEventListener('visibilitychange', revisit);
+    return () => {
+      dead = true;
+      document.removeEventListener('visibilitychange', revisit);
+      try { sentinel && sentinel.release(); } catch {}
+      sentinel = null;
+    };
+  }, [active]);
 
   /* Stop exactly when the session runs out, rather than waiting for the next
      GPS tick that may never come if the user is sitting still. */

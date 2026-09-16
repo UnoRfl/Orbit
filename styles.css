@@ -1049,3 +1049,8 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 
 /* a handle someone already has — flagged while it can still be changed */
 .input.bad{border-color:var(--now)}
+
+/* A dot matched to a known place is being drawn ON that place, so it gets a
+   solid edge instead of the fuzzy one that means "somewhere around here". */
+.livedot.snapped .livedot-ring{opacity:1;border-style:solid}
+.livedot.snapped .livedot-l{font-weight:600}

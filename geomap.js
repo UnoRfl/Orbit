@@ -32,7 +32,7 @@
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
-import { COARSE_M, LIVE_DURATIONS, acquireFix, ageLabel, fixError, untilLabel } from './live.js';
+import { COARSE_M, LIVE_DURATIONS, acquireFix, ageLabel, fixError, snapToPlace, untilLabel } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -302,16 +302,23 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     for (const { profile, live, isMe } of all) {
       if (!live) continue;
       const id = profile.id; seen.add(id);
+      /* Matched against the places this system knows about. When a fix lands
+         inside its own error of one, draw the dot ON the place and say so —
+         "at the Library" is both more useful and more honest than a circle
+         that happens to contain the library. */
+      const snap = snapToPlace(live.lat, live.lng, live.acc, placed);
+      const dotLat = snap ? snap.place.lat : live.lat;
+      const dotLng = snap ? snap.place.lng : live.lng;
       let m = liveMarkers.current.get(id);
       if (!m) {
         const el = document.createElement('div');
         el.className = 'livedot';
         el.addEventListener('click', ev => { ev.stopPropagation(); if (!isMe) onOpenFriend && onOpenFriend(id); });
         m = new window.maplibregl.Marker({ element: el, anchor: 'center' });
-        m.setLngLat([live.lng, live.lat]).addTo(map);
+        m.setLngLat([dotLng, dotLat]).addTo(map);
         liveMarkers.current.set(id, m);
       } else {
-        m.setLngLat([live.lng, live.lat]);
+        m.setLngLat([dotLng, dotLat]);
       }
       const el = m.getElement();
       // a fix older than LIVE_FRESH_MS is a last-known position, and says so
@@ -325,11 +332,14 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
           ? `<img class="livedot-av" src="${escapeHtml(profile.avatar_url)}" alt="" referrerpolicy="no-referrer">`
           : `<span class="livedot-av">${escapeHtml(initialsOf(shownName(profile)))}</span>`) +
         `<span class="livedot-l">${isMe ? 'You' : escapeHtml(shownName(profile))}` +
+        (snap ? ` · at ${escapeHtml(snap.place.name)}` : '') +
         (live.fresh ? '' : ` · ${escapeHtml(ageLabel(live.ageMs))}`) +
-        (Number.isFinite(live.acc) && live.acc > COARSE_M ? ` · ~${Math.round(live.acc)}m` : '') +
+        // a snapped dot is being shown at the place, so its own error is no longer the story
+        (!snap && Number.isFinite(live.acc) && live.acc > COARSE_M ? ` · ~${Math.round(live.acc)}m` : '') +
         `</span>`;
       // a fix this coarse is a neighbourhood, not a spot
-      el.classList.toggle('coarse', Number.isFinite(live.acc) && live.acc > COARSE_M);
+      el.classList.toggle('coarse', !snap && Number.isFinite(live.acc) && live.acc > COARSE_M);
+      el.classList.toggle('snapped', !!snap);
     }
 
     for (const [id, m] of liveMarkers.current) {
