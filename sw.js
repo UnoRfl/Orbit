@@ -103,7 +103,13 @@ self.addEventListener('fetch', e => {
   );
 });
 
-self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
+/* A service worker's scope is already origin-bound, so in practice only Orbit's
+   own pages can post here — but "in practice" is what the check is for, and
+   skipWaiting() hands whatever posted it a new worker. Cheap to be explicit. */
+self.addEventListener('message', e => {
+  if (e.origin && e.origin !== self.location.origin) return;
+  if (e.data === 'skipWaiting') self.skipWaiting();
+});
 
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch {}

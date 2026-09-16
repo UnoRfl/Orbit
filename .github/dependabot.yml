@@ -9,6 +9,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Wait a week before offering a freshly published release. A compromised
+    # version is live and unreported for hours to days; there is no reason to
+    # be first to it, and none of these actions move fast enough to care.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       prefix: ci
