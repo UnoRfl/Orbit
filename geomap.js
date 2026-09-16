@@ -32,7 +32,7 @@
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
-import { COARSE_M, LIVE_DURATIONS, ageLabel, untilLabel } from './live.js';
+import { COARSE_M, LIVE_DURATIONS, acquireFix, ageLabel, fixError, untilLabel } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
@@ -391,48 +391,26 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     return () => { try { map.off('click', onClick); } catch {} };
   }, [status, dropping, canAdd, onAddAt, onPlaceAt]);
 
-  /* Locate me. getCurrentPosition with a generous maximumAge is the wrong tool
-     here: the browser answers instantly with the wifi/ISP estimate it already
-     had — possibly half an hour old — so the camera confidently flies to a spot
-     that can be a suburb off, and does it again every time you press the
-     button. Sample instead, move the camera each time the fix gets tighter, and
-     stop as soon as it is genuinely good. Still camera-only; nothing is
-     uploaded. */
-  const locId = useRef(null);
+  /* Locate me. Same two-phase acquisition the live share uses: ask for a sharp
+     fresh fix, and if that window closes with nothing, take the coarse or
+     slightly stale one rather than saying we failed. A laptop has no GPS, so
+     insisting on a fresh high-accuracy reading here meant the button just
+     reported an error on any desktop. */
   const [locating, setLocating] = useState(false);
-  useEffect(() => () => { try { locId.current != null && navigator.geolocation.clearWatch(locId.current); } catch {} }, []);
+  const locBusy = useRef(false);
 
-  function locate(){
+  async function locate(){
     if (!navigator.geolocation) { ui.toast('This browser has no location support'); return; }
-    if (locId.current != null) return;                    // a burst is already running
-    let best = null, done = false;
-    const stopBurst = () => {
-      if (done) return; done = true;
-      clearTimeout(timer);
-      try { if (locId.current != null) navigator.geolocation.clearWatch(locId.current); } catch {}
-      locId.current = null; setLocating(false);
-    };
-    const timer = setTimeout(() => { if (!best) ui.toast("Couldn't get a location fix"); stopBurst(); }, 10000);
-    setLocating(true);
-    locId.current = navigator.geolocation.watchPosition(
-      pos => {
-        if (best && pos.coords.accuracy >= best.coords.accuracy) return;
-        best = pos;
-        const map = mapRef.current;
-        if (map) map.flyTo({
-          center: [pos.coords.longitude, pos.coords.latitude],
-          // don't pretend a 900m estimate is a doorstep — frame it as the area it is
-          zoom: pos.coords.accuracy > COARSE_M ? 13.5 : 16.5,
-        });
-        if (pos.coords.accuracy <= 25) stopBurst();
-      },
-      e => {
-        if (best) return;
-        ui.toast(e && e.code === 1 ? 'Location is blocked for Orbit' : "Couldn't get a location fix");
-        stopBurst();
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    if (locBusy.current) return;
+    locBusy.current = true; setLocating(true);
+    const r = await acquireFix({ goodEnoughM: 25 });
+    locBusy.current = false; setLocating(false);
+    if (!r.ok) { ui.toast(fixError(r.e)); return; }
+    const map = mapRef.current; if (!map) return;
+    const { latitude, longitude, accuracy } = r.p.coords;
+    // don't pretend a 900m estimate is a doorstep — frame it as the area it is
+    map.flyTo({ center: [longitude, latitude], zoom: accuracy > COARSE_M ? 13.5 : 16.5 });
+    if (accuracy > COARSE_M) ui.toast(`Rough fix — about ${Math.round(accuracy)}m`);
   }
 
   if (status === 'failed') return html`<div class="geofail">

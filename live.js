@@ -52,7 +52,7 @@ const MIN_MOVE_M  = 12;
 /* How long to shop around for a good first fix, and the accuracy at which we
    stop waiting. 25m is roughly a decent GPS lock; a laptop on wifi will never
    reach it and simply uses its best effort within the window. */
-const ACQUIRE_MS    = 7000;
+const ACQUIRE_MS    = 11000;   // a cold GPS lock indoors needs longer than 7s
 const GOOD_ENOUGH_M = 25;
 /* Beyond this the position is a neighbourhood, not a place, and the UI says so
    rather than drawing a confident dot. */
@@ -145,6 +145,74 @@ export function makeKalman(){
     reset(){ lat = null; lng = null; variance = -1; at = 0; },
     get ready(){ return variance >= 0; },
   };
+}
+
+/* ============================================================
+   acquireFix — getting the FIRST position, as opposed to following one.
+   ------------------------------------------------------------
+   These are different problems and they were being solved the same way, which
+   is what started returning "Couldn't get a location fix".
+
+   The ongoing watch asks for maximumAge 0 on purpose: a cached reading handed
+   back as though it were new is what made the dot sit still while you walked.
+   Demanding that of the FIRST fix too was a mistake. enableHighAccuracy with
+   maximumAge 0 tells the device "GPS, right now, nothing else" — and a laptop
+   has no GPS at all, while a phone indoors routinely needs 15-45s for a cold
+   lock. Seven seconds later we gave up and said we could not find you, when
+   the device had a perfectly usable network fix sitting there the whole time.
+
+   So: try for a sharp fresh fix, and if that window closes empty, take the
+   coarse or slightly stale one rather than failing. That is safe now in a way
+   it was not before — the Kalman filter weighs a fix by its accuracy, so a
+   1200m answer barely moves the dot instead of teleporting it.
+   ============================================================ */
+export function acquireFix({ goodEnoughM = GOOD_ENOUGH_M, sharpMs = ACQUIRE_MS, fallbackMs = 8000 } = {}) {
+  return new Promise(res => {
+    if (!navigator.geolocation) { res({ ok:false, e:{ code:2, message:'no geolocation' } }); return; }
+    let best = null, done = false, id = null, lastErr = null;
+    const finish = out => {
+      if (done) return; done = true;
+      try { if (id != null) navigator.geolocation.clearWatch(id); } catch {}
+      clearTimeout(timer); res(out);
+    };
+
+    /* Phase 2. Only runs if the sharp attempt produced nothing at all — any
+       fix, however coarse or however old, beats telling someone we failed. */
+    const fallback = () => {
+      navigator.geolocation.getCurrentPosition(
+        p => finish({ ok:true, p, coarse:true }),
+        e => finish({ ok:false, e: lastErr || e }),
+        { enableHighAccuracy:false, timeout: fallbackMs, maximumAge: 5 * 60 * 1000 }
+      );
+    };
+
+    const timer = setTimeout(() => {
+      if (best) finish({ ok:true, p:best });
+      else fallback();
+    }, sharpMs);
+
+    id = navigator.geolocation.watchPosition(
+      p => {
+        if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+        if (best.coords.accuracy <= goodEnoughM) finish({ ok:true, p:best });
+      },
+      e => {
+        lastErr = e;
+        // permission is final; nothing in phase 2 will change it
+        if (e && e.code === 1) { finish({ ok:false, e }); return; }
+        if (!best) { try { if (id != null) navigator.geolocation.clearWatch(id); } catch {} clearTimeout(timer); fallback(); }
+      },
+      { enableHighAccuracy: true, timeout: sharpMs, maximumAge: 0 }
+    );
+  });
+}
+
+/* Say which of the three things went wrong, because the fix is different for
+   each one and "couldn't get a location fix" tells nobody anything. */
+export function fixError(e) {
+  if (e && e.code === 1) return 'Location is blocked for Orbit — allow it in your browser settings';
+  if (e && e.code === 2) return "Your device couldn't work out where it is — check that location services are on";
+  return "Couldn't get a fix in time — GPS is slow indoors. Try again near a window or outside";
 }
 
 /* metres between two coordinates — equirectangular is plenty at these distances
@@ -246,33 +314,8 @@ export function useLiveShare({ uid, myPres, setPres }) {
     const mins = Math.min(LIVE_MAX_MIN, Math.max(1, minutes | 0));
     const untilIso = new Date(Date.now() + mins * 60000).toISOString();
 
-    /* Don't commit the FIRST fix. Devices answer immediately with whatever they
-       already have — usually a cell-tower or wifi estimate good to hundreds of
-       metres — and then sharpen to real GPS over the next few seconds. Taking
-       fix #1 is why a share can open a suburb away from where you are.
-       So sample briefly and keep the best, stopping early once it is good
-       enough that waiting longer would not help. */
-    const first = await new Promise(res => {
-      let best = null, done = false, id = null;
-      const finish = out => { if (done) return; done = true;
-        try { if (id != null) navigator.geolocation.clearWatch(id); } catch {}
-        clearTimeout(timer); res(out); };
-      const timer = setTimeout(() => finish(best ? { ok:true, p:best } : { ok:false, e:{ code:3 } }), ACQUIRE_MS);
-      id = navigator.geolocation.watchPosition(
-        p => {
-          if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
-          if (best.coords.accuracy <= GOOD_ENOUGH_M) finish({ ok:true, p:best });
-        },
-        e => { if (!best) finish({ ok:false, e }); },
-        { enableHighAccuracy: true, timeout: ACQUIRE_MS, maximumAge: 0 }
-      );
-    });
-    if (!first.ok) {
-      setErr(first.e && first.e.code === 1
-        ? 'Location is blocked for Orbit — allow it in your browser settings'
-        : "Couldn't get a location fix");
-      return;
-    }
+    const first = await acquireFix();
+    if (!first.ok) { setErr(fixError(first.e)); return; }
     const { latitude, longitude, accuracy } = first.p.coords;
     /* Feed the acquire burst's best fix through the filter rather than
        publishing it raw. On its own this changes little — with one reading the
