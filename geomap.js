@@ -189,9 +189,13 @@ function pinEl(place, hue, count){
   const el = document.createElement('div');
   el.className = 'geopin';
   el.style.setProperty('--ph', hueCss(hue));
-  el.innerHTML = `<span class="geopin-i">${place.icon || '📍'}</span>` +
+  /* Everything visual lives one level in, because MapLibre drives the root
+     element's transform and anything of ours on it fights that. */
+  el.innerHTML = `<div class="geopin-in">` +
+                 `<span class="geopin-i">${place.icon || '📍'}</span>` +
                  (count > 0 ? `<span class="geopin-n">${count > 9 ? '9+' : count}</span>` : '') +
-                 `<span class="geopin-l">${escapeHtml(place.name)}</span>`;
+                 `<span class="geopin-l">${escapeHtml(place.name)}</span>` +
+                 `</div>`;
   return el;
 }
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
