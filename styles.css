@@ -20,6 +20,14 @@ button{font-family:inherit;color:inherit}
 input,select,textarea{font-family:inherit}
 ::-webkit-scrollbar{width:0;height:0}
 *{scrollbar-width:none}
+@media (hover:hover) and (pointer:fine){
+  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px;
+    border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26);background-clip:content-box}
+}
 
 #waves{position:fixed;inset:0;z-index:0;pointer-events:none}
 #glow{position:fixed;left:0;top:0;width:560px;height:560px;z-index:0;pointer-events:none;opacity:0;
@@ -146,30 +154,35 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .hr{position:absolute;right:6px;transform:translateY(-6px);font-size:9.5px;color:var(--faint);font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
 .track{position:relative;border-left:1px solid var(--line);
   background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour) - 1px),var(--line) calc(var(--hour) - 1px),var(--line) var(--hour))}
+/* Traffic: how many people are booked in this hour, across every schedule
+   Orbit has loaded. Sits behind the blocks, never in front of them — and
+   because it steps opacity at every hour mark, the blocks above it are
+   opaque (mixed over --panel, not over transparent). A translucent block
+   let the step through and sliced a 7:00–8:30 class in two at 8:00. */
+.heat{position:absolute;left:0;right:0;background:var(--ge);pointer-events:auto;z-index:0}
+.cls,.evt{z-index:1}
+/* Midnight, 06:00, 12:00, 18:00 read brighter, so a 24-hour column is still
+   scannable at a glance instead of 25 identical grey numbers. */
+.hr.major{color:var(--ink);opacity:.62;font-weight:600}
 .track.wknd{background-color:rgba(255,255,255,.015)}
 .track.today{background-color:rgba(255,93,143,.028)}
 .cls{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
+  background:color-mix(in srgb,var(--c) 13%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
 .cls::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);border-radius:8px 0 0 8px}
 .cname{font-weight:600;font-size:10.5px;line-height:1.15;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .cmeta{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ctime{font-size:9px;color:var(--c);font-weight:600;margin-top:auto;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .evt{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14));border:1px dashed rgba(255,255,255,.4)}
+  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14)),var(--panel);border:1px dashed rgba(255,255,255,.4)}
 .evt .ctime{color:#e7d9f5}
 .nowline{position:absolute;left:0;right:0;height:2px;z-index:7;pointer-events:none;background:var(--now);box-shadow:0 0 8px rgba(255,93,143,.8)}
 .nowline::before{content:"";position:absolute;left:-2px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--now);box-shadow:0 0 10px rgba(255,93,143,.9)}
-
-/* map */
-.maparea{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;overflow:hidden;isolation:isolate;
-  background:radial-gradient(700px 400px at 30% -10%, rgba(176,107,255,.10), transparent 60%), var(--panel)}
 .mapgrid{position:absolute;inset:0;opacity:.6;
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
 .zone{position:absolute;transform:translate(-50%,-50%);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;
   padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:76px;transition:border-color .15s ease,background .15s ease}
 .zone.on{background:rgba(45,212,191,.14);border-color:var(--ge)}
 .zname{font-size:10px;color:var(--ink);font-weight:600;font-family:'Space Grotesk',sans-serif;white-space:nowrap}
-.zav{display:flex;margin-top:2px;min-height:22px;align-items:center}
 .zav .avatar{border:1.5px solid var(--panel)}
 .quiet{font-size:9.5px;color:var(--faint)}
 
@@ -282,18 +295,13 @@ a{color:var(--ge)}
 @keyframes twinkle{to{opacity:.32}}
 
 .map-orbit{position:absolute;border-radius:50%;border:1px dashed rgba(255,255,255,.045);pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%)}
-.map-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:7px;z-index:2}
 .map-center-star{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 40% 40%, #fff8d6, #f5b544 45%, #b45309 100%);
   box-shadow:0 0 22px rgba(245,181,68,.55), 0 0 44px rgba(245,181,68,.25);position:relative}
 .map-center-star::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(245,181,68,.25);animation:sun-pulse 3.6s ease-in-out infinite}
 @keyframes sun-pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.4);opacity:0}}
 .map-center-label{font-family:'Space Grotesk',sans-serif;font-size:8px;letter-spacing:.34em;color:rgba(255,255,255,.45);font-weight:600}
-
-.planet-zone{position:absolute;transform:translate(-50%,-50%);background:none;border:none;cursor:pointer;padding:0;line-height:0;transition:transform .18s ease}
-.planet-zone:hover{transform:translate(-50%,-50%) scale(1.08)}
 .planet-zone.on{transform:translate(-50%,-50%) scale(1.1)}
 .planet-body{width:50px;height:50px;border-radius:50%;position:relative;transition:box-shadow .2s ease}
-.planet-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .planet-zone.on .planet-body{box-shadow:0 0 0 2px rgba(255,255,255,.4), 0 0 32px currentColor}
 
 .planet-body.p-purple{background:radial-gradient(circle at 32% 28%, #e6c5ff, #b06bff 45%, #4b1976 100%);color:#b06bff;box-shadow:0 0 22px rgba(176,107,255,.35)}
@@ -306,12 +314,7 @@ a{color:var(--ge)}
 .planet-body.ring::after{content:'';position:absolute;left:-14px;right:-14px;top:50%;height:65%;
   transform:translateY(-50%) rotate(-22deg);border-radius:50%;
   border:2px solid rgba(255,255,255,.35);border-left-color:transparent;border-right-color:transparent;pointer-events:none}
-.planet-zone .zav{position:absolute;top:-6px;right:-8px;display:flex}
 .planet-zone .zav .avatar{border:2px solid #0b0714}
-.map-svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
-.planet-label{position:absolute;transform:translate(-50%,-50%);z-index:6000;pointer-events:none;
-  font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;color:#fff;letter-spacing:.03em;white-space:nowrap;
-  text-shadow:0 1px 3px rgba(0,0,0,.95), 0 0 7px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.9)}
 .planet-label .cnt{color:var(--ge);font-weight:700}
 .planet-label.on{text-shadow:0 0 10px var(--major), 0 1px 3px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.9)}
 .planet-zone .zname{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;color:#fff;letter-spacing:.06em;
@@ -412,8 +415,6 @@ a{color:var(--ge)}
 /* dashed "add a place" planet inside a system */
 .planet-zone.add .planet-body{background:rgba(255,255,255,.03);border:1.5px dashed var(--line-strong);box-shadow:none;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .planet-zone.add:hover .planet-body{border-color:var(--major);color:var(--major)}
-.planet-zone .pdel{position:absolute;top:-7px;left:-9px;width:20px;height:20px;border-radius:50%;background:#2a1620;border:1px solid rgba(255,93,143,.55);
-  color:#ffb1c8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:7}
 
 /* emoji picker */
 .emojigrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:8px}
@@ -467,7 +468,7 @@ button.actcard:hover{border-color:color-mix(in srgb, var(--ac,#b06bff) 62%, tran
 .actopt.on .nm{color:var(--ink)}
 
 /* ============ boot checklist ============ */
-@keyframes spin{to{transform:rotate(360deg)}}
+
 .bootsteps{display:flex;flex-direction:column;gap:7px;align-items:flex-start;margin-top:16px;min-width:200px}
 .bootstep{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;
   letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.38)}
@@ -717,3 +718,357 @@ button.logrow:hover .rowname{color:#fff}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ================================================================
+   LIQUID GLASS · SMOOTH MORPH · CHAT DEPTH
+   ----------------------------------------------------------------
+   One place for the material and the motion. Everything here keys
+   off <html data-perf> (0 full · 1 phones/mid · 2 low-end), which
+   index.html stamps before first paint and main.js can step down at
+   runtime, so a weak device never renders the expensive version for
+   even one frame.
+
+   The rule that keeps this fast: backdrop-filter is charged by AREA.
+   Small chrome (nav, chat header, composer, menus, toasts) really
+   blurs. Big surfaces and anything that repeats down a list — cards,
+   rows, bubbles — get the *look* of glass from a gradient tint and a
+   specular rim only, which costs nothing at all.
+   ================================================================ */
+:root{
+  /* material */
+  --glass-blur:20px;
+  --glass-sat:155%;
+  --glass-base:rgba(24,18,32,.58);          /* what sits under the blur   */
+  --glass-tint:rgba(255,255,255,.055);      /* top-down sheen             */
+  --glass-line:rgba(255,255,255,.11);       /* body edge                  */
+  --glass-rim:rgba(255,255,255,.32);        /* lit corner of the rim      */
+  --glass-rim-dim:rgba(255,255,255,.05);
+  --glass-hi:rgba(255,255,255,.14);         /* inner top highlight        */
+  --glass-lo:rgba(0,0,0,.26);               /* inner bottom shade         */
+  --glass-cast:0 14px 40px -18px rgba(0,0,0,.75);
+
+  /* motion */
+  --ease-morph:cubic-bezier(.22,1,.36,1);   /* settles, never overshoots  */
+  --ease-snap:cubic-bezier(.34,1.32,.52,1); /* a little bounce on entry   */
+  --t-fast:.15s; --t-mid:.28s; --t-slow:.44s;
+  --morph-blur:7px;                         /* focus-pull on screen entry */
+  --press:.975;                             /* tap-down scale             */
+}
+/* Phones blur less and skip the focus-pull; the entry still reads as a morph
+   because the scale + travel curve is what carries it, not the blur. */
+html[data-perf="1"]{ --glass-blur:13px; --glass-sat:132%; --morph-blur:0px; --t-slow:.38s }
+html[data-perf="2"]{ --glass-blur:8px;  --glass-sat:115%; --morph-blur:0px; --t-slow:.3s;
+                     --glass-cast:0 8px 22px -14px rgba(0,0,0,.7) }
+
+/* No backdrop-filter support, or the OS asked for less transparency:
+   fall back to the solid panel. Same shape, same rim, no sampling. */
+html[data-noglass] .glass,
+html[data-noglass] .glass-lg{ background-color:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none }
+@media (prefers-reduced-transparency: reduce){
+  .glass,.glass-lg{ background-color:var(--panel)!important;
+    backdrop-filter:none!important;-webkit-backdrop-filter:none!important }
+}
+
+/* ---------- the material ---------- */
+.glass,.glass-lg,.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  position:relative;
+  background-color:var(--glass-base);
+  background-image:linear-gradient(180deg,var(--glass-tint),rgba(255,255,255,.014) 44%,rgba(255,255,255,0) 76%);
+  border:1px solid var(--glass-line);
+  box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--glass-cast);
+}
+.glass{ backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+/* Large surfaces only sample the backdrop where the GPU can afford the area. */
+html[data-perf="0"] .glass-lg{
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+html:not([data-perf="0"]) .glass-lg{ background-color:var(--panel2);
+  background-color:color-mix(in srgb, var(--panel2) 92%, transparent) }
+/* .glass-lite never blurs — for anything that repeats down a list. */
+.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  background-color:var(--panel);
+  background-color:color-mix(in srgb, var(--panel) 90%, transparent);
+  box-shadow:inset 0 1px 0 var(--glass-hi) }
+.convrow.on{ background-color:rgba(176,107,255,.14);
+  background-color:color-mix(in srgb, var(--major) 15%, transparent);border-color:var(--major) }
+
+/* A rim is absolutely positioned, so inside a SCROLLING box it scrolls away
+   with the content. Those surfaces keep the inset highlight (which is painted
+   against the border box and stays put) and skip the rim. */
+.sheet::before,.chatovercard::before{ display:none }
+
+/* The refracted rim: a 1px gradient border, bright where the light would
+   catch a bevel and fading away around the curve. Masked so it paints the
+   edge only. This is what actually sells "glass" — not the blur. */
+.glass::before,.glass-lg::before,.glass-lite::before,
+.card::before,.cardrow::before,.convrow::before,.authcard::before,.set-card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:0;
+  background:linear-gradient(146deg,var(--glass-rim),var(--glass-rim-dim) 30%,
+             rgba(255,255,255,0) 58%,var(--glass-rim-dim) 76%,rgba(255,255,255,.18));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+
+/* ---------- smooth morph: one motion language on everything touchable ---------- */
+.btn,.pill,.iconbtn,.xbtn,.cbtn,.csend,.cardrow,.convrow,.theme-tile,.authtab,.navbtn,.lookswatch,.ghosticon{
+  transition:transform var(--t-fast) var(--ease-morph),
+             background-color var(--t-mid) var(--ease-morph),
+             border-color var(--t-mid) var(--ease-morph),
+             box-shadow var(--t-mid) var(--ease-morph),
+             color var(--t-mid) var(--ease-morph);
+}
+.btn:active,.pill:active,.iconbtn:active,.xbtn:active,.cbtn:active,.csend:not(:disabled):active,
+.cardrow:active,.convrow:active,.theme-tile:active,.authtab:active,.lookswatch:active{ transform:scale(var(--press)) }
+.navbtn:active{ transform:scale(.94) }
+/* lift on hover, but only where there is a real cursor */
+@media (hover:hover) and (pointer:fine){
+  .cardrow:hover,.convrow:hover{ transform:translateY(-1px) }
+}
+
+@keyframes morphIn{
+  from{ opacity:0;transform:translate3d(0,16px,0) scale(.968);filter:blur(var(--morph-blur)) }
+  to  { opacity:1;transform:none;filter:blur(0) }
+}
+@keyframes morphSheet{
+  from{ opacity:0;transform:translate3d(0,26px,0) scale(.975) }
+  to  { opacity:1;transform:none }
+}
+@keyframes morphPop{
+  from{ opacity:0;transform:scale(.94) translate3d(0,6px,0) }
+  to  { opacity:1;transform:none }
+}
+
+/* screens change by morphing instead of cutting */
+.content{ animation:morphIn var(--t-slow) var(--ease-morph) }
+.sheet{ animation:morphSheet var(--t-slow) var(--ease-morph) }
+.chatmenu,.chatpop,.toast{ animation:morphPop var(--t-mid) var(--ease-snap) }
+.chatpane{ animation:morphIn var(--t-mid) var(--ease-morph) }
+
+/* ---------- where the material goes ---------- */
+.navin{ background:var(--glass-base);border-top:1px solid var(--glass-line) }
+.sheet{ background-color:var(--glass-base) }
+.toast{ background-color:rgba(36,29,46,.72) }
+.chathead,.composer{ background-color:rgba(24,18,32,.62) }
+.chatmenu,.chatpop{ background-color:rgba(31,23,40,.74) }
+
+/* The nav's morphing selection — one pill that travels between tabs instead
+   of five that blink on and off. --navn = tab count, --navi = active index,
+   both set by shell.js, so the travel is a single transform transition. */
+.navin{ position:relative }
+.navink{
+  position:absolute;left:8px;top:8px;z-index:0;pointer-events:none;
+  width:calc((100% - 16px) / var(--navn,5));
+  height:calc(100% - 16px - env(safe-area-inset-bottom));
+  border-radius:13px;
+  background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.028));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17), 0 4px 14px -8px var(--major);
+  transform:translate3d(calc(var(--navi,0) * 100%),0,0);
+  transition:transform var(--t-slow) var(--ease-morph);
+}
+.navbtn{ z-index:1 }
+
+/* ================================================================
+   CHAT — the shallow-screen illusion
+   ----------------------------------------------------------------
+   Flat elements, but the two bubble columns are hinged on their
+   anchored edge and turned a few degrees toward the middle under a
+   long perspective. Because the perspective origin belongs to the
+   pane and not to the scroller, the angle a bubble presents changes
+   as it travels past the centre line — which is what reads as a
+   screen bending away at its edges rather than a static skew. A
+   faint edge shade does the rest: a curved surface catches less
+   light where it turns away from you.
+
+   Deliberately small (~3°). Chat only — nothing else in Orbit tilts.
+   ================================================================ */
+.chat3d .msgs{
+  perspective:var(--ch-persp,820px);
+  perspective-origin:50% 44%;
+  transform-style:preserve-3d;
+}
+.chat3d .bubcol{
+  transform-origin:left center;
+  transform:rotateY(var(--ch-tilt,3.6deg)) translateZ(var(--ch-depth,-6px));
+  transition:transform var(--t-mid) var(--ease-morph);
+}
+.chat3d .msgrow.me .bubcol{
+  transform-origin:right center;
+  transform:rotateY(calc(var(--ch-tilt,3.6deg) * -1)) translateZ(var(--ch-depth,-6px));
+}
+/* the surface turning away from the light at the left and right edges */
+.chat3d .chatbody::after{
+  content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    linear-gradient(90deg, rgba(3,1,7,.30), rgba(3,1,7,0) 15%, rgba(3,1,7,0) 85%, rgba(3,1,7,.30)),
+    radial-gradient(125% 96% at 50% 46%, rgba(3,1,7,0) 56%, rgba(3,1,7,.20));
+}
+/* Phones tilt less and sit closer, so the foreshortening stays gentle on a
+   narrow column; the weakest tier drops the 3D entirely rather than paying
+   for a composited layer per bubble while the list scrolls. */
+html[data-perf="1"] .chat3d .msgs{ --ch-persp:900px }
+html[data-perf="1"] .chat3d .bubcol{ --ch-tilt:3deg;--ch-depth:-4px }
+html[data-perf="2"] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-perf="2"] .chat3d .bubcol,
+html[data-perf="2"] .chat3d .msgrow.me .bubcol{ transform:none }
+html[data-perf="2"] .chat3d .chatbody::after{ display:none }
+html[data-rm] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-rm] .chat3d .bubcol,
+html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
+
+/* glass bubbles — tint + rim only, never a blur: this repeats per message */
+.bub.them{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 70%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 6px 16px -12px rgba(0,0,0,.9);
+}
+.bub.me{ box-shadow:inset 0 1px 0 rgba(255,255,255,.24), 0 6px 18px -12px rgba(0,0,0,.85) }
+.cfield{ background-color:var(--panel2);
+         background-color:color-mix(in srgb, var(--panel2) 82%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+         transition:border-color var(--t-mid) var(--ease-morph),box-shadow var(--t-mid) var(--ease-morph) }
+.cfield:focus-within{ border-color:color-mix(in srgb, var(--chacc) 55%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 3px color-mix(in srgb, var(--chacc) 13%, transparent) }
+
+/* ---------- desktop: the nav is a column, so the ink slides down ---------- */
+@media (min-width:900px){
+  .navin{ background:var(--glass-base) }
+  /* the side rail stacks with a 2px gap, so the ink's height and its travel
+     both have to allow for the gutters or it drifts off the last tab */
+  .navink{
+    width:calc(100% - 16px);
+    height:calc((100% - 16px - (var(--navn,5) - 1) * 2px) / var(--navn,5));
+    transform:translate3d(0,calc(var(--navi,0) * (100% + 2px)),0);
+    border-radius:11px;
+  }
+  .navbtn.on{ background:none }          /* the travelling ink is the highlight now */
+  .chatpane{ background-color:var(--panel);
+             background-color:color-mix(in srgb, var(--panel) 88%, transparent) }
+}
+.theme-tile.locked{opacity:.42;cursor:not-allowed;filter:grayscale(.7)}
+.theme-tile.locked:active{transform:none}
+
+/* ============ real map (geomap.js) ============ */
+.geowrap{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;
+  overflow:hidden;isolation:isolate;background:var(--canvas)}
+/* MapLibre stamps .maplibregl-map on this element and its own stylesheet —
+   injected into <head> AFTER this file — sets `.maplibregl-map{position:relative}`.
+   At equal specificity the later rule won, `inset:0` stopped applying and the
+   container collapsed to 0 height, so the map rendered into MapLibre's fallback
+   300px canvas and nothing was visible. Two classes deep so we win regardless
+   of load order, plus explicit size so it cannot collapse again. */
+.geowrap .geomap{position:absolute;inset:0;width:100%;height:100%}
+.geoload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;background:var(--canvas)}
+.geofail{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  width:100%;aspect-ratio:1/1.05;border:1px dashed var(--line-strong);border-radius:18px;padding:20px;color:var(--muted)}
+/* MapLibre ships a light chrome; bring it into the theme */
+.geowrap .maplibregl-ctrl-attrib{background:rgba(15,10,22,.72)!important;color:var(--faint)!important;font-size:9px}
+.geowrap .maplibregl-ctrl-attrib a{color:var(--muted)!important}
+.geowrap .maplibregl-ctrl-group{background:var(--panel);border:1px solid var(--line);box-shadow:none}
+.geowrap .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+.geowrap .maplibregl-ctrl-group button span{filter:invert(1) opacity(.7)}
+
+/* MapLibre positions a marker by writing `transform` onto the element you hand
+   it, and it rewrites that on every frame of a pan or zoom. This element had a
+   transform AND a transition on the same property, so each of those rewrites
+   got animated instead of applied — the pins slid along behind the map and
+   ended up wherever the animation had got to. Never transform or transition a
+   marker root; do it on something inside. */
+.geopin{position:relative;cursor:pointer}
+.geopin-in{display:flex;flex-direction:column;align-items:center;position:relative;
+  transform:translateY(4px);transition:transform var(--t-fast) var(--ease-morph)}
+.geopin:hover .geopin-in{transform:translateY(1px)}
+/* Belt and braces: whatever anyone adds later, the map owns this transform. */
+.maplibregl-marker{transition:none!important}
+.geopin-i{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50% 50% 50% 4px;
+  transform:rotate(-45deg);font-size:15px;
+  background:radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--ph,var(--major)) 62%, transparent), rgba(18,12,26,.96));
+  border:1.5px solid color-mix(in srgb, var(--ph,var(--major)) 78%, transparent);
+  box-shadow:0 0 16px -3px color-mix(in srgb, var(--ph,var(--major)) 85%, transparent), 0 4px 10px -4px rgba(0,0,0,.9)}
+.geopin-i>*{transform:rotate(45deg)}
+.geopin.me .geopin-i{border-color:var(--ge);box-shadow:0 0 18px -2px var(--ge)}
+.geopin-n{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:var(--now);
+  color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;
+  border:1.5px solid var(--canvas)}
+.geopin-l{margin-top:3px;font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+  background:rgba(12,8,18,.78);border-radius:999px;padding:2px 7px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+
+.geoctl{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;gap:7px}
+.geobtn{width:38px;height:38px;border-radius:11px;background:var(--panel);border:1px solid var(--line-strong);
+  color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px -8px rgba(0,0,0,.9)}
+/* Locate me samples for a few seconds instead of answering instantly with a
+   stale guess, so the button has to say it is working. */
+.geobtn.busy{color:var(--ge);border-color:var(--ge);animation:geoseek 1.1s ease-in-out infinite}
+@keyframes geoseek{0%,100%{opacity:1}50%{opacity:.45}}
+:root[data-rm="1"] .geobtn.busy{animation:none;opacity:.7}
+.geohint{position:absolute;left:10px;right:10px;top:10px;z-index:3;background:rgba(20,14,28,.88);
+  border:1px solid var(--line-strong);border-radius:11px;padding:8px 11px;font-size:12px;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;text-align:center}
+.geotray{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(12,8,18,.92) 34%)}
+.mapmode button.on{background:rgba(176,107,255,.16);color:var(--ink)}
+
+/* ============ live location (live.js · geomap.js) ============ */
+.livebox{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.liverow{display:flex;align-items:center;gap:10px}
+.livepulse{width:11px;height:11px;border-radius:50%;background:var(--ge);flex:none;
+  box-shadow:0 0 0 0 color-mix(in srgb, var(--ge) 60%, transparent);animation:livepulse 2s ease-out infinite}
+@keyframes livepulse{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ge) 55%, transparent)}
+  70%{box-shadow:0 0 0 9px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+
+/* a friend broadcasting live, drawn on the map */
+.livedot{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.livedot-ring{position:absolute;top:-5px;left:50%;width:44px;height:44px;margin-left:-22px;border-radius:50%;
+  border:2px solid var(--ge);opacity:.55;animation:livering 2.4s ease-out infinite;pointer-events:none}
+@keyframes livering{0%{transform:scale(.62);opacity:.7}70%{transform:scale(1.12);opacity:0}100%{opacity:0}}
+.livedot-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:#0f0a16;object-fit:cover;
+  background:linear-gradient(135deg,var(--pa,#b06bff),var(--pb,#2dd4bf));
+  border:2px solid var(--canvas);box-shadow:0 0 14px -2px color-mix(in srgb, var(--ge) 70%, transparent)}
+/* Out of flow on purpose. This marker is anchored 'center', which centres the
+   element's whole box on the coordinate — and with the name label in the box,
+   that box was avatar + label, so the avatar floated a good 9px ABOVE where the
+   person actually was. Absolute means the box is just the avatar, and the
+   avatar lands on the fix. */
+.livedot-l{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+  background:rgba(12,8,18,.82);border-radius:999px;padding:2px 7px;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+/* a last-known position, not a live one — stop the pulse and say so */
+.livedot.stale{opacity:.62}
+.livedot.stale .livedot-ring{display:none}
+.livedot.stale .livedot-av{box-shadow:none;filter:grayscale(.45)}
+
+/* live-share control, sitting on the map beside "locate me" */
+.geoctl{flex-wrap:wrap;max-width:calc(100% - 20px)}
+.geobtn.live{width:auto;padding:0 13px;gap:7px;font-size:12px;font-weight:600;font-family:'Space Grotesk',sans-serif;
+  letter-spacing:.02em;white-space:nowrap}
+.geobtn.live.on{border-color:var(--ge);color:var(--ge);
+  background:linear-gradient(180deg,color-mix(in srgb, var(--ge) 18%, transparent),var(--panel))}
+.geodot{width:8px;height:8px;border-radius:50%;background:var(--ge);flex:none;
+  animation:livepulse 2s ease-out infinite}
+.geolive{position:absolute;left:10px;right:10px;bottom:58px;z-index:4;
+  background:rgba(20,14,28,.94);border:1px solid var(--line-strong);border-radius:14px;padding:12px 13px;
+  box-shadow:0 18px 46px -18px rgba(0,0,0,.9);animation:morphPop var(--t-mid) var(--ease-snap)}
+
+/* your own live dot — distinct from a friend's so you can find yourself */
+.livedot.me .livedot-av{border-color:var(--ge);
+  box-shadow:0 0 0 2px var(--canvas), 0 0 18px -1px var(--ge)}
+.livedot.me .livedot-ring{border-color:var(--ge);opacity:.75}
+.livedot.me .livedot-l{background:var(--ge);color:#0f0a16;font-weight:700}
+
+/* a fix too coarse to be a "spot" — softened so it reads as an area, not a pin */
+.livedot.coarse .livedot-av{border-style:dashed;box-shadow:none}
+.livedot.coarse .livedot-ring{display:none}
+.livedot.coarse .livedot-l{background:rgba(12,8,18,.72);font-weight:600}
+
+/* a handle someone already has — flagged while it can still be changed */
+.input.bad{border-color:var(--now)}
+
+/* A dot matched to a known place is being drawn ON that place, so it gets a
+   solid edge instead of the fuzzy one that means "somewhere around here". */
+.livedot.snapped .livedot-ring{opacity:1;border-style:solid}
+.livedot.snapped .livedot-l{font-weight:600}

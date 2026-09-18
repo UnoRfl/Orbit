@@ -1,7 +1,6 @@
-/* Orbit — auto-split module. Part of the Orbit single-page app.
-   See ARCHITECTURE.md for how the pieces fit together. */
-import { Fragment, h, html, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACTIVITY_CATALOG, ACT_KINDS, BADGE_DEFS, CAT, CATHEX, DAYS, HOUR, I, IcEye, IcEyeOff, IcPin, IcX, KINDS, SOCIALS, badgesOf, cleanHandle, cleanSocial, flairOf, fmt, hashStr, initialsOf, nowInfo, pxFor, sb, shownName } from './core.js';
+/* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
+import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, PRONOUN_PRESETS, pxFor, sb, shownName, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = p?.accent1 || '#b06bff', a2 = p?.accent2 || '#2dd4bf';
@@ -130,7 +129,7 @@ export const Eyebrow = ({color='var(--major)', children}) => html`<div class="ey
 export function Sheet({ open, onClose, accent='var(--major)', children }) {
   if (!open) return null;
   return html`<div class="sheetback" onClick=${onClose}>
-    <div class="sheet" onClick=${e=>e.stopPropagation()}>
+    <div class="sheet glass-lg" onClick=${e=>e.stopPropagation()}>
       <div class="sheetbar" style=${`background:linear-gradient(90deg,${accent},transparent 72%)`}></div>
       ${children}
     </div></div>`;
@@ -257,36 +256,97 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
   myClasses.forEach(c=>counts[c.day]++);
   myEvents.forEach(e=>{ if(e.day>=0 && e.day<=5) counts[e.day]++; });
 
-  // jump the viewport to "today, around now" on mount
+  /* Traffic. Every schedule Orbit has loaded — yours and your friends' — binned
+     by hour, so the grid shows when people are actually busy instead of making
+     you read six columns and guess. Built per hour rather than per half hour,
+     and only non-empty hours are drawn, so a quiet week costs almost no DOM.
+     Skipped entirely on the lowest device tier, which is already dropping
+     effects to hold framerate. */
+  const heat = useMemo(() => {
+    if (perfTier() >= 2) return null;
+    const grid = new Map();               // "day:hour" -> people busy
+    const bump = (day, s, e) => {
+      if (day < 0 || day > 5) return;
+      for (let h = Math.floor(s/60); h < Math.ceil(e/60); h++) {
+        if (h < START/60 || h >= END/60) continue;
+        const k = day + ':' + h;
+        grid.set(k, (grid.get(k) || 0) + 1);
+      }
+    };
+    for (const list of Object.values(classesByOwner || {}))
+      for (const c of (list || [])) bump(c.day, c.start_min, c.end_min);
+    for (const e of (events || [])) bump(e.day, e.start_min, e.end_min);
+    let peak = 0; for (const v of grid.values()) peak = Math.max(peak, v);
+    return peak > 1 ? { grid, peak } : null;   // one person busy is not traffic
+  }, [classesByOwner, events]);
+
+  /* The day is drawn three times, stacked, and the viewport lives in the middle
+     copy. Scroll far enough either way and we silently jump back a day's worth
+     of pixels — the pixels under the cursor are identical, so it reads as one
+     continuous loop rather than a column that dead-ends at midnight. 3am is
+     then just below 11pm, the way it actually is. */
+  const dayH = rows * HOUR;
+  const COPIES = 3;
+
   useEffect(() => {
     const el = scRef.current; if (!el) return;
     const t = nowInfo();
-    el.scrollTop = Math.max(0, pxFor(t.min) - Math.min(el.clientHeight||420, 420)*0.35);
+    // middle copy, positioned at "now"
+    el.scrollTop = dayH + Math.max(0, pxFor(t.min) - Math.min(el.clientHeight||420, 420)*0.35);
     const hd = el.querySelector('.hcell.today');
     if (hd) el.scrollLeft = Math.max(0, hd.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - 48);
   }, [ownerId]);
+
+  useEffect(() => {
+    const el = scRef.current; if (!el) return;
+    /* Remember the exact offset we jumped to rather than setting a "skip the
+       next event" flag. A flag gets swallowed by whichever scroll event arrives
+       first, which during a fast flick is somebody else's — and then a real
+       wrap gets skipped and the grid dead-ends after all. */
+    let expected = -1;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      if (expected >= 0 && Math.abs(y - expected) < 1.5) { expected = -1; return; }
+      if (y < dayH * 0.5)       { expected = y + dayH; el.scrollTop = expected; }
+      else if (y > dayH * 1.5)  { expected = y - dayH; el.scrollTop = expected; }
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [dayH]);
 
   return html`<div class="board"><div class="gridscroll" ref=${scRef}><div class="sgrid">
     <div class="htime"></div>
     ${DAYS.map((d,i)=>html`<div key=${d} class=${'hcell'+(i===nd.day?' today':'')}>
       <div class="dow" style=${i===nd.day?'color:var(--now)':''}>${d}</div>
       <div class="cnt">${counts[i]||'—'}</div></div>`)}
-    <div class="taxis" style=${`height:${rows*HOUR}px`}>
-      ${Array.from({length:rows+1}).map((_,hh)=>html`<div key=${hh} class="hr" style=${`top:${hh*HOUR}px`}>${fmt((7+hh)*60)}</div>`)}
+    <div class="taxis" style=${`height:${COPIES*dayH}px`}>
+      ${Array.from({length:COPIES*rows}).map((_,i)=>{
+        const hh = i % rows;
+        return html`<div key=${i} class=${'hr'+((START/60+hh)%6===0?' major':'')}
+          style=${`top:${i*HOUR}px`}>${fmt(START+hh*60)}</div>`;
+      })}
     </div>
-    ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${rows*HOUR}px`}>
-      ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
+    ${DAYS.map((_,di)=>html`<div key=${di} class=${'track'+(di===5?' wknd':'')+(di===nd.day?' today':'')} style=${`height:${COPIES*dayH}px`}>
+      ${Array.from({length:COPIES}).map((_,cp)=>{ const off = cp*dayH; return html`<${Fragment} key=${'c'+cp}>
+      ${heat && Array.from({length:(END-START)/60}).map((_,hh)=>{
+        const n = heat.grid.get(di + ':' + (START/60+hh)) || 0;
+        if (!n) return null;
+        return html`<div key=${'h'+hh} class="heat" title=${n + (n===1?' person':' people') + ' booked at ' + fmt(START+hh*60)}
+          style=${`top:${off+hh*HOUR}px;height:${HOUR}px;opacity:${(0.10 + 0.52*(n/heat.peak)).toFixed(3)}`}></div>`;
+      })}
+      ${myClasses.filter(c=>c.day===di).map(c=>html`<div key=${c.id} class="cls" style=${`--c:${CAT[c.cat]||CAT.major};top:${off+pxFor(c.start_min)}px;height:${pxFor(c.end_min)-pxFor(c.start_min)-3}px`}
           onClick=${()=>onPick && onPick({type:'class', row:c})}>
         <span class="cname">${c.name}</span>
         ${!compact && html`<span class="cmeta">${c.meta}</span>`}
         <span class="ctime">${fmt(c.start_min)}–${fmt(c.end_min)}</span>
       </div>`)}
-      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
+      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${off+pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
           onClick=${()=>onPick && onPick({type:'event', row:e})}>
         <span class="cname">${e.emoji||KINDS[e.kind]?.emoji||'✨'} ${e.title}</span>
         <span class="ctime">${fmt(e.start_min)}–${fmt(e.end_min)}</span>
       </div>`)}
-      ${di===nd.day && nd.min>=START && nd.min<=END && html`<div class="nowline" style=${`top:${pxFor(nd.min)}px`}></div>`}
+      ${di===nd.day && html`<div class="nowline" style=${`top:${off+pxFor(nd.min)}px`}></div>`}
+      <//>`; })}
     </div>`)}
   </div></div></div>`;
 }
@@ -404,12 +464,53 @@ export function PwInput({ value, onInput, placeholder, autocomplete, show, setSh
 
 export function AuthScreen() {
   const [mode, setMode] = useState('in');
-  const [f, setF] = useState({ name:'', handle:'', course:'', school:'', email:'', password:'', confirm:'' });
+  const [f, setF] = useState({ name:'', handle:'', course:'', school:'', email:'', password:'' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [show, setShow] = useState(false);
+  const [more, setMore] = useState(false);       // course + school, folded away
+  const [touchedHandle, setTouchedHandle] = useState(false);
+  const [handleState, setHandleState] = useState(null);   // null | 'checking' | 'free' | 'taken'
   const set = k => e => setF(v=>({ ...v, [k]: k==='handle' ? cleanHandle(e.target.value) : e.target.value }));
+
+  /* Nobody wants to invent a username. Derive one from the name as they type,
+     and stop the moment they edit it themselves. */
+  useEffect(() => {
+    if (mode !== 'up' || touchedHandle) return;
+    const base = cleanHandle(f.name.replace(/\s+/g, ''));
+    setF(v => (v.handle === base ? v : { ...v, handle: base }));
+  }, [f.name, mode, touchedHandle]);
+
+  /* Tell them the handle is taken while they can still change it, instead of
+     after they have filled in the whole form and pressed the button. */
+  useEffect(() => {
+    if (mode !== 'up' || f.handle.length < 3) { setHandleState(null); return; }
+    let dead = false;
+    setHandleState('checking');
+    const t = setTimeout(async () => {
+      try {
+        /* An RPC, not a table read: whoever is filling this in is not signed in
+           yet, and anon has no read on the profile directory by design. The
+           function answers this one question and nothing else. */
+        const { data, error } = await sb.rpc('handle_available', { p_handle: f.handle });
+        if (dead) return;
+        setHandleState(error ? null : (data === false ? 'taken' : 'free'));
+      } catch { if (!dead) setHandleState(null); }
+    }, 450);
+    return () => { dead = true; clearTimeout(t); };
+  }, [f.handle, mode]);
+
+  /* Checked as they type so the button can say why it is disabled, rather than
+     the form failing after a round trip. */
+  const issues = [];
+  if (mode === 'up') {
+    if (!f.name.trim()) issues.push('your name');
+    if (f.handle.length < 3) issues.push('a handle of at least 3 characters');
+    if (handleState === 'taken') issues.push('a handle nobody has taken');
+    if (!/.+@.+\..+/.test(f.email.trim())) issues.push('a valid email');
+    if (f.password.length < 6) issues.push('a password of at least 6 characters');
+  }
 
   const friendly = m => {
     if (!m) return 'Something went wrong. Try again.';
@@ -429,7 +530,6 @@ export function AuthScreen() {
         if (!f.name.trim()) throw new Error('Add your name.');
         if (f.handle.length<3) throw new Error('Handle needs 3–20 letters/numbers/underscores.');
         if (f.password.length<6) throw new Error('Password needs at least 6 characters.');
-        if (f.password!==f.confirm) throw new Error("Passwords don't match — check the confirm field.");
         const { data, error } = await sb.auth.signUp({
           email:f.email.trim(), password:f.password,
           options:{ data:{ display_name:f.name.trim(), handle:f.handle, course:f.course.trim(), school:f.school.trim() } }
@@ -439,7 +539,10 @@ export function AuthScreen() {
           // best effort — needs the school column; ignored if it's not there yet
           await sb.from('profiles').update({ school:f.school.trim() }).eq('id', data.session.user.id);
         }
-        if (!data.session) setOk('Account created — but email confirmation is still ON in Supabase, so check your inbox for a confirm link. (To make sign-ups instant: Supabase → Authentication → Providers → Email → turn off "Confirm email".)');
+        /* This used to print Supabase dashboard instructions at whoever was
+           signing up, which meant nothing to a student. Tell them what to do;
+           the setup note belongs in the README. */
+        if (!data.session) setOk('Account created. Check your email for a confirmation link, then come back and sign in.');
       } else {
         const { error } = await sb.auth.signInWithPassword({ email:f.email.trim(), password:f.password });
         if (error) throw error;
@@ -473,33 +576,42 @@ export function AuthScreen() {
         <div class="flabel">Your name</div>
         <input class="input" value=${f.name} onInput=${set('name')} placeholder="Your full name" autocomplete="name"/>
         <div class="flabel">Handle · how friends find you</div>
-        <input class="input" value=${f.handle} onInput=${set('handle')} placeholder="yourhandle" autocapitalize="none" autocomplete="username"/>
-        <div class="formrow">
-          <div>
-            <div class="flabel">Course · optional</div>
-            <input class="input" value=${f.course} onInput=${set('course')} placeholder="BSIT · 1st Yr"/>
-          </div>
-          <div>
-            <div class="flabel">School · optional</div>
-            <input class="input" value=${f.school} onInput=${set('school')} placeholder="Your school"/>
-          </div>
-        </div>
+        <input class=${'input'+(handleState==='taken'?' bad':'')} value=${f.handle}
+          onInput=${e=>{ setTouchedHandle(true); set('handle')(e); }}
+          placeholder="yourhandle" autocapitalize="none" autocomplete="username"/>
+        <div class="small" style="margin-top:4px;min-height:15px">${
+          handleState==='taken' ? html`<span style="color:var(--now)">@${f.handle} is taken — try another</span>`
+          : handleState==='free' ? html`<span style="color:var(--ge)">@${f.handle} is free</span>`
+          : handleState==='checking' ? 'checking…'
+          : (!touchedHandle && f.handle) ? html`<span>from your name — tap to change</span>` : ''}</div>
+        ${more
+          ? html`<div class="formrow">
+              <div>
+                <div class="flabel">Course</div>
+                <input class="input" value=${f.course} onInput=${set('course')} placeholder="BSIT · 1st Yr"/>
+              </div>
+              <div>
+                <div class="flabel">School</div>
+                <input class="input" value=${f.school} onInput=${set('school')} placeholder="Your school"/>
+              </div>
+            </div>`
+          : html`<button class="btn" style="margin-top:10px;width:100%;padding:9px;font-size:12px"
+              onClick=${()=>setMore(true)}>+ Add course & school (optional)</button>`}
       <//>`}
       <div class="flabel">Email</div>
       <input class="input" type="email" value=${f.email} onInput=${set('email')} placeholder="you@email.com" autocomplete="email" inputmode="email"/>
       <div class="flabel">Password</div>
       <${PwInput} value=${f.password} onInput=${set('password')} placeholder="at least 6 characters"
         autocomplete=${mode==='up'?'new-password':'current-password'} show=${show} setShow=${setShow} onEnter=${mode==='in'?go:null}/>
-      ${mode==='up' && html`<${Fragment}>
-        <div class="flabel">Confirm password</div>
-        <${PwInput} value=${f.confirm} onInput=${set('confirm')} placeholder="type it again"
-          autocomplete="new-password" show=${show} setShow=${setShow} onEnter=${go}/>
-      <//>`}
+
       ${err && html`<div class="errbox">${err}</div>`}
       ${ok && html`<div class="okbox">${ok}</div>`}
-      <button class="btn btn-grad btn-block" style="margin-top:16px;padding:13px" disabled=${busy} onClick=${go}>
+      <button class="btn btn-grad btn-block" style="margin-top:16px;padding:13px"
+        disabled=${busy || (mode==='up' && issues.length>0)} onClick=${go}>
         ${busy ? 'One sec…' : (mode==='up' ? 'Create my account' : 'Sign in')}
       </button>
+      ${mode==='up' && !busy && issues.length>0 && html`<div class="small" style="margin-top:7px;text-align:center">
+        Still need ${issues[0]}${issues.length>1 ? ` · +${issues.length-1} more` : ''}</div>`}
       <div class="authdiv">or</div>
       <button class="btn btn-block btn-google" disabled=${busy} onClick=${google}>
         <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -514,3 +626,354 @@ export function AuthScreen() {
 /* ============================================================
    MAIN SHELL — data layer + realtime + screens
    ============================================================ */
+
+export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, addClass, delClass, onPick, onImport }) {
+  const [editing, setEditing] = useState(false);
+  const [p, setP] = useState(()=>seedForm(me));
+  const [adjust, setAdjust] = useState(null);            // 'avatar' | 'cover'
+  const [hobbyIn, setHobbyIn] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [linkPick, setLinkPick] = useState(null);
+  const [linkIn, setLinkIn] = useState('');
+  const [nc, setNc] = useState({ name:'', meta:'', cat:'major', day:0, start:7*60, end:8*60+30 });
+  const mine = classesBy[uid]||[];
+  const times = []; for(let m=7*60; m<=19*60; m+=30) times.push(m);
+  useEffect(()=>{ if(!editing) setP(seedForm(me)); }, [me]);
+
+  const togHobby = h => setP(v=>{ const has=v.hobbies.includes(h);
+    if(!has && v.hobbies.length>=10) return v;
+    return { ...v, hobbies: has ? v.hobbies.filter(x=>x!==h) : [...v.hobbies, h] }; });
+  const addHobby = () => { const t=hobbyIn.trim().slice(0,24); if(t) togHobby(t); setHobbyIn(''); };
+  const addLink = () => { const u = cleanSocial(linkIn); if (!linkPick || !u) return;
+    setP(v=>{ const rest = v.links.filter(x=>x.k!==linkPick);
+      if (rest.length>=5) return v;
+      return { ...v, links:[...rest, { k:linkPick, u }] }; });
+    setLinkIn(''); setLinkPick(null); };
+  const badUrl = u => u && !/^https:\/\/.+/i.test(u);
+
+  async function submitClass() {
+    if (!nc.name.trim()) return;
+    if (nc.end<=nc.start) { ui.toast('End time must be after start time.'); return; }
+    const ok = await addClass({ name:nc.name.trim(), meta:nc.meta.trim(), cat:nc.cat, day:nc.day, start_min:nc.start, end_min:nc.end });
+    if (ok) setNc(v=>({ ...v, name:'', meta:'' }));
+  }
+
+  async function save() {
+    if (p.handle.length<3){ ui.toast('Handle needs at least 3 characters.'); return; }
+    if (badUrl(p.avatarUrl.trim()) || badUrl(p.coverUrl.trim())){ ui.toast('Image links must start with https://'); return; }
+    setSaving(true);
+    const ok = await saveProfile({
+      display_name:p.name.trim()||me?.display_name, handle:p.handle, course:p.course.trim(), school:p.school.trim(),
+      accent1:p.acc[0], accent2:p.acc[1],
+      avatar_url:p.avatarUrl.trim()||null, avatar_pos:p.avatarPos,
+      cover_url:p.coverUrl.trim()||null, cover_pos:p.coverPos,
+      bio:p.bio.trim()||null, pronouns:p.pronouns.trim()||null,
+      hobbies:p.hobbies, links:p.links, show_full_name:p.showFull,
+    });
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  // while editing, the header is a live preview of the form
+  const pv = editing ? { ...me, display_name:p.name.trim()||me?.display_name, handle:p.handle||me?.handle,
+      accent1:p.acc[0], accent2:p.acc[1], avatar_url:p.avatarUrl.trim()||null, avatar_pos:p.avatarPos,
+      cover_url:p.coverUrl.trim()||null, cover_pos:p.coverPos, bio:p.bio, pronouns:p.pronouns,
+      hobbies:p.hobbies, links:p.links, show_full_name:p.showFull } : me;
+  const d0 = myPres?.sharing && !myPres?.ghost ? decodePlace(myPres?.zone) : null;
+
+  return html`<div>
+    <${CoverImg} p=${pv}/>
+    <div class="profhead">
+      <div class="profav"><${Avatar} p=${pv} size=${76}/></div>
+      <div style="flex:1"></div>
+      <button class="btn" style="padding:9px 13px;flex:none;margin-bottom:10px"
+        onClick=${()=>{ if(editing) setEditing(false); else { setP(seedForm(me)); setEditing(true); } }}>${editing?'Close':'Edit profile'}</button>
+    </div>
+    <div class="profbody">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <${NameFx} p=${pv}/><${BadgeChips} p=${pv}/>
+      </div>
+      <div class="rowsub" style="margin-top:2px">@${pv?.handle}${pv?.course?` · ${pv.course}`:''}${pv?.school?` · ${pv.school}`:''}</div>
+      ${pv?.pronouns && html`<div class="chiprow" style="margin-top:8px"><span class="idchip">💫 <b>${pv.pronouns}</b></span></div>`}
+      ${pv?.bio && html`<div class="biotext">${pv.bio}</div>`}
+      ${Array.isArray(pv?.hobbies) && pv.hobbies.length>0 && html`<div class="chiprow">${pv.hobbies.map(hb=>html`<span key=${hb} class="idchip">${hb}</span>`)}</div>`}
+    </div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+      ${(()=>{ const a = actOf(myPres); return a
+        ? html`<${ActivityCard} act=${a} mine onClear=${()=>setPres({ activity:null })} onEdit=${()=>setStatusOpen(true)}/>`
+        : html`<button class="setactbtn" onClick=${()=>setStatusOpen(true)}><span style="font-size:14px">✨</span> Set a status — what are you on right now?</button>`; })()}
+      ${Array.isArray(pv?.links) && pv.links.length>0 && html`<${LinkChips} links=${pv.links}/>`}
+    </div>
+
+    ${d0 && d0.place && html`<div class="card" style="margin-top:16px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px;flex:none">${d0.emoji}</span>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:600">Checked in · ${d0.place}</div>
+        <div class="rowsub">${systemPhrase(d0.system,'me')} — friends can see this</div>
+      </div>
+      <button class="btn" style="flex:none;padding:8px 12px" onClick=${()=>setPres({ zone:null })}>Leave</button>
+    </div>`}
+
+    ${editing && html`<div class="card" style="margin-top:16px">
+      <div class="set-eyebrow" style="margin-bottom:2px">Photos</div>
+      <div class="flabel">Profile photo · paste a link</div>
+      <div style="display:flex;gap:8px">
+        <input class="input" value=${p.avatarUrl} onInput=${e=>setP(v=>({...v,avatarUrl:e.target.value}))} placeholder="https://…" autocapitalize="none"/>
+        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!p.avatarUrl.trim()} onClick=${()=>setAdjust('avatar')}>Frame</button>
+      </div>
+      <div class="flabel">Cover · link (GIFs work)</div>
+      <div style="display:flex;gap:8px">
+        <input class="input" value=${p.coverUrl} onInput=${e=>setP(v=>({...v,coverUrl:e.target.value}))} placeholder="https://… still image or GIF" autocapitalize="none"/>
+        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!p.coverUrl.trim()} onClick=${()=>setAdjust('cover')}>Frame</button>
+      </div>
+      <div class="small" style="margin-top:8px">Any https image link works — Imgur, GIPHY, Tenor… Orbit keeps only the link, never the file, so it costs zero storage. If a picture won't load, that site blocks embedding — re-upload it to imgur.com and link that instead.</div>
+
+      <div class="set-eyebrow" style="margin:18px 0 2px">Identity</div>
+      <div class="profgrid">
+        <div><div class="flabel">Name</div>
+          <input class="input" value=${p.name} onInput=${e=>setP(v=>({...v,name:e.target.value}))}/></div>
+        <div><div class="flabel">Handle</div>
+          <input class="input" value=${p.handle} onInput=${e=>setP(v=>({...v,handle:cleanHandle(e.target.value)}))} autocapitalize="none"/></div>
+        <div><div class="flabel">Course</div>
+          <input class="input" value=${p.course} onInput=${e=>setP(v=>({...v,course:e.target.value}))} placeholder="BSIT · 1st Yr"/></div>
+        <div><div class="flabel">School</div>
+          <input class="input" value=${p.school} onInput=${e=>setP(v=>({...v,school:e.target.value}))} placeholder="Your school / university"/></div>
+      </div>
+      <${Toggle} label="Show my full name" accent="var(--ge)"
+        hint=${p.showFull ? 'Friends see your name everywhere.' : 'Friends see only @'+(p.handle||'handle')+' — your name stays private.'}
+        on=${p.showFull} onClick=${()=>setP(v=>({...v,showFull:!v.showFull}))}/>
+
+      <div class="flabel">Pronouns · optional</div>
+      <div class="pillrow">
+        ${PRONOUN_PRESETS.map(pr=>html`<button key=${pr} class=${'pill'+(p.pronouns===pr?' on':'')} onClick=${()=>setP(v=>({...v,pronouns:v.pronouns===pr?'':pr}))}>${pr}</button>`)}
+      </div>
+      <input class="input" style="margin-top:8px" maxlength="40" value=${p.pronouns} onInput=${e=>setP(v=>({...v,pronouns:e.target.value}))} placeholder="or type your own — anything goes"/>
+
+      <div class="flabel">About you · ${200-p.bio.length} left</div>
+      <textarea class="input" rows="3" maxlength="200" value=${p.bio} onInput=${e=>setP(v=>({...v,bio:e.target.value}))} placeholder="A short bio — what you're about, what you're grinding on…"></textarea>
+
+      <div class="flabel">Hobbies · ${p.hobbies.length}/10</div>
+      <div class="pillrow">
+        ${[...new Set([...HOBBY_PRESETS, ...p.hobbies])].map(h=>html`<button key=${h} class=${'pill'+(p.hobbies.includes(h)?' on':'')} onClick=${()=>togHobby(h)}>${h}</button>`)}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input class="input" maxlength="24" value=${hobbyIn} onInput=${e=>setHobbyIn(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')addHobby()}} placeholder="add your own — 🎣 Fishing"/>
+        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!hobbyIn.trim()||p.hobbies.length>=10} onClick=${addHobby}><${IcPlus} size=${14}/></button>
+      </div>
+
+      <div class="set-eyebrow" style="margin:18px 0 2px">Connections · ${p.links.length}/5</div>
+      <div class="hint" style="margin:0 0 8px">Pick a platform, drop your handle — Orbit builds the link itself, so only real profiles on known apps can show up. Discord copies to clipboard instead of linking.</div>
+      ${p.links.length>0 && html`<div class="linkrow" style="margin-bottom:10px">
+        ${p.links.map(l=>{ const s = SOCIALS[l.k]; if (!s) return null;
+          return html`<button key=${l.k} class="linkchip" title="Remove" onClick=${()=>setP(v=>({ ...v, links:v.links.filter(x=>x.k!==l.k) }))}>
+            <span class="ltile" style=${`background:linear-gradient(135deg,${s.c[0]},${s.c[1]})`}><${s.Ic} size=${13}/></span>
+            <span class="lmeta"><span class="lname" style=${`color:${s.tc||s.c[0]}`}>${s.name}</span><span class="lhandle">@${l.u} ✕</span></span>
+          </button>`; })}
+      </div>`}
+      <div class="pillrow">
+        ${Object.entries(SOCIALS).map(([k,s])=>html`<button key=${k} class=${'pill'+(linkPick===k?' on':'')} style="padding:6px 10px;display:inline-flex;align-items:center;gap:6px"
+          onClick=${()=>setLinkPick(linkPick===k?null:k)}>
+          <span class="ltile" style=${`width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,${s.c[0]},${s.c[1]})`}><${s.Ic} size=${11}/></span>${s.name}</button>`)}
+      </div>
+      ${linkPick && html`<div style="display:flex;gap:8px;margin-top:8px">
+        <input class="input" maxlength="30" value=${linkIn} onInput=${e=>setLinkIn(e.target.value)} autocapitalize="none"
+          placeholder=${'your '+(SOCIALS[linkPick]?.name||'')+' handle'} onKeyDown=${e=>{ if(e.key==='Enter') addLink(); }}/>
+        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!cleanSocial(linkIn)} onClick=${addLink}><${IcPlus} size=${14}/></button>
+      </div>`}
+
+      <div class="flabel">Bubble colors</div>
+      <div class="pillrow">
+        ${ACCENTS.map((a,i)=>html`<button key=${i} class="pill" style=${`padding:4px;${p.acc[0]===a[0]&&p.acc[1]===a[1]?'border-color:var(--major)':''}`}
+          onClick=${()=>setP(v=>({...v,acc:a}))} aria-label="Color option">
+          <span style=${`width:26px;height:26px;border-radius:50%;background:linear-gradient(140deg,${a[0]},${a[1]});display:block`}></span>
+        </button>`)}
+        <span class="pill" style="padding:4px 8px;display:inline-flex;gap:6px;align-items:center">
+          <input class="cinput" type="color" value=${p.acc[0]} onInput=${e=>setP(v=>({...v,acc:[e.target.value,v.acc[1]]}))} aria-label="Custom color A"/>
+          <input class="cinput" type="color" value=${p.acc[1]} onInput=${e=>setP(v=>({...v,acc:[v.acc[0],e.target.value]}))} aria-label="Custom color B"/>
+        </span>
+      </div>
+
+      <button class="btn btn-grad btn-block" style="margin-top:16px" disabled=${saving} onClick=${save}>${saving?'Saving…':'Save profile'}</button>
+    </div>`}
+
+    <div style="margin-top:20px"><${Eyebrow}>Your week<//></div>
+    <div style="margin-top:12px">
+      <${Grid} ownerId=${uid} classesByOwner=${classesBy} events=${events} onPick=${onPick}/>
+    </div>
+    <div class="small" style="margin-top:10px">Solid blocks are classes · dashed blocks are plans</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:22px;gap:8px;flex-wrap:wrap">
+      <${Eyebrow} color="var(--ge)">Classes · ${mine.length}<//>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${onImport}>
+          <${IcUpload} size=${14}/> Import file</button>
+        <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${()=>setAdding(!adding)}>
+          ${adding ? 'Close' : html`<${Fragment}><${IcPlus} size=${14}/> Add class<//>`}</button>
+      </div>
+    </div>
+
+    ${adding && html`<div class="card" style="margin-top:12px">
+      <div class="addgrid">
+        <div class="f-wide"><div class="flabel">Class name</div>
+          <input class="input" value=${nc.name} onInput=${e=>setNc(v=>({...v,name:e.target.value}))} placeholder="Fundamentals of Programming"/></div>
+        <div class="f-wide"><div class="flabel">Room / note · optional</div>
+          <input class="input" value=${nc.meta} onInput=${e=>setNc(v=>({...v,meta:e.target.value}))} placeholder="Lab · Rm 201"/></div>
+        <div><div class="flabel">Type</div>
+          <select class="input" value=${nc.cat} onChange=${e=>setNc(v=>({...v,cat:e.target.value}))}>
+            ${Object.entries(CATNAME).map(([k,n])=>html`<option key=${k} value=${k}>${n}</option>`)}
+          </select></div>
+        <div><div class="flabel">Day</div>
+          <select class="input" value=${nc.day} onChange=${e=>setNc(v=>({...v,day:+e.target.value}))}>
+            ${DAYS.map((d,i)=>html`<option key=${d} value=${i}>${d}</option>`)}
+          </select></div>
+        <div><div class="flabel">Starts</div>
+          <select class="input" value=${nc.start} onChange=${e=>setNc(v=>({...v,start:+e.target.value}))}>
+            ${times.slice(0,-1).map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
+          </select></div>
+        <div><div class="flabel">Ends</div>
+          <select class="input" value=${nc.end} onChange=${e=>setNc(v=>({...v,end:+e.target.value}))}>
+            ${times.slice(1).map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
+          </select></div>
+      </div>
+      <button class="btn btn-grad btn-block" style="margin-top:14px" onClick=${submitClass} disabled=${!nc.name.trim()}>Add to schedule</button>
+      <div class="small" style="margin-top:10px">Repeats weekly. If a class meets twice a week, add it once per day — or just import a schedule file.</div>
+    </div>`}
+
+    <div class="classlist" style="margin-top:12px">
+      ${!mine.length && html`<div class="small">No classes yet — add them by hand or import a schedule file so friends can see when you're free.</div>`}
+      ${[...mine].sort((a,b)=>a.day-b.day||a.start_min-b.start_min).map(c=>html`
+        <div key=${c.id} class="cardrow" style="cursor:default">
+          <span style=${`width:9px;height:9px;border-radius:3px;background:${CATHEX[c.cat]};box-shadow:0 0 0 3px ${CATHEX[c.cat]}33;flex:none`}></span>
+          <div style="min-width:0;flex:1">
+            <div class="rowname" style="font-size:12.5px">${c.name}</div>
+            <div class="rowsub">${DAYS[c.day]} · ${fmt(c.start_min)}–${fmt(c.end_min)}${c.meta?` · ${c.meta}`:''}</div>
+          </div>
+          <button class="btn" style="padding:8px 11px;flex:none" onClick=${()=>delClass(c.id)} aria-label="Delete class"><${IcTrash} size=${14}/></button>
+        </div>`)}
+    </div>
+
+    <button class="btn btn-block" style="margin-top:26px;color:var(--muted)" onClick=${()=>sb.auth.signOut()}>
+      <${IcOut} size=${15}/> Sign out</button>
+    <div class="small" style="text-align:center;margin-top:14px;opacity:.7">Orbit · built by Uno</div>
+
+    <${Sheet} open=${statusOpen} onClose=${()=>setStatusOpen(false)} accent="var(--major)">
+      ${statusOpen && html`<${SetStatusSheet} current=${actOf(myPres)} onClose=${()=>setStatusOpen(false)}
+        onSet=${a=>{ setPres({ activity:a }); setStatusOpen(false); }} />`}
+    <//>
+    <${Sheet} open=${!!adjust} onClose=${()=>setAdjust(null)} accent="var(--ge)">
+      ${adjust && html`<${ImageAdjust}
+        url=${adjust==='avatar' ? p.avatarUrl.trim() : p.coverUrl.trim()}
+        round=${adjust==='avatar'} aspect=${adjust==='avatar' ? '1 / 1' : '5 / 2'}
+        pos=${adjust==='avatar' ? p.avatarPos : p.coverPos}
+        onChange=${np=>setP(v=> adjust==='avatar' ? { ...v, avatarPos:np } : { ...v, coverPos:np })}
+        onDone=${()=>setAdjust(null)} />`}
+    <//>
+  </div>`;
+}
+
+/* ============================================================
+   CHAT — DMs + system group chats
+   Link-only media (no file storage), 90-day retention, founder
+   moderation view, per-chat looks (theme / font / background).
+   ============================================================ */
+
+export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUnsend, onReport, canModRemove, onImg, onImgLoad, onOpenSender }) {
+  const cls = 'bub ' + (mine?'me':'them') + (cont?' cont':'');
+  return html`<div class=${'msgrow'+(mine?' me':'')+(cont?'':' gap')}>
+    ${!mine && group && html`<div class="msgav">${!cont && html`<button style="background:none;border:none;padding:0;cursor:pointer" onClick=${onOpenSender}><${Avatar} p=${p||{}} size=${24}/></button>`}</div>`}
+    <div class="bubcol" style=${`min-width:0;display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:min(340px,78%)`}>
+      ${!mine && group && !cont && html`<div class="msgname">${p?fname(p):'…'}</div>`}
+      ${m.deleted
+        ? html`<div class=${cls+' gone'}>message unsent</div>`
+        : m.kind==='text'
+        ? html`<div class=${cls} onClick=${onSel}><${RichText} text=${m.body}/></div>`
+        : html`<div class=${cls+' pic'} onClick=${onSel}>
+            ${bad
+              ? html`<div class="imgfail">🖼️ link didn't load</div>`
+              : html`<img class="bubimg" src=${m.body} loading="lazy" referrerpolicy="no-referrer" alt="shared media"
+                  onError=${onBad} onLoad=${()=>onImgLoad&&onImgLoad()} onClick=${e=>{ e.stopPropagation(); onImg(m.body); }}/>`}
+          </div>`}
+      ${selOn && html`<div class="msgacts">
+        <span>${clockOf(m.created_at)}</span>
+        ${!m.deleted && m.kind==='text' && html`<button onClick=${()=>{ try{ navigator.clipboard.writeText(m.body); }catch{} onSel(); }}>Copy</button>`}
+        ${!m.deleted && (mine || canModRemove) && html`<button style="color:#ff9db8" onClick=${onUnsend}>${mine?'Unsend':'Remove'}</button>`}
+        ${!mine && !m.deleted && html`<button onClick=${onReport}>Report</button>`}
+      </div>`}
+    </div>
+  </div>`;
+}
+
+export function RichText({ text }) {
+  const parts = String(text).split(/(https?:\/\/[^\s]+)/g);
+  return html`${parts.map((p,i)=> i%2
+    ? html`<a key=${i} href=${p} target="_blank" rel="noopener noreferrer">${p}</a>`
+    : p)}`;
+}
+
+export function CoverImg({ p }) {
+  const cp = (p?.cover_pos && typeof p.cover_pos==='object') ? p.cover_pos : {};
+  return html`<div class="profcover" style=${`--pa:${p?.accent1||'#b06bff'};--pb:${p?.accent2||'#2dd4bf'}`}>
+    ${!p?.cover_url && html`<div class="mapstars"></div>`}
+    ${p?.cover_url && html`<img class="cimg" src=${p.cover_url} alt="" referrerpolicy="no-referrer"
+      style=${`--cx:${cp.x||0}%;--cy:${cp.y||0}%;--cz:${cp.z||1}`} onError=${e=>{e.target.style.display='none'}}/>`}
+  </div>`;
+}
+
+// drag to pan, slide to zoom — WYSIWYG with how Avatar/CoverImg render
+
+export function ImageAdjust({ url, round=false, aspect='1 / 1', pos, onChange, onDone }) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const lim = z => (Math.max(1,z)-1)*50 + 14;
+  const clampP = (v,z) => Math.max(-lim(z), Math.min(lim(z), v));
+  const down = e => { const el=ref.current; if(!el) return; e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch{}
+    const r = el.getBoundingClientRect();
+    drag.current = { x:e.clientX, y:e.clientY, px:pos.x||0, py:pos.y||0, w:r.width||1, h:r.height||1 }; };
+  const move = e => { const d=drag.current; if(!d) return; const z=pos.z||1;
+    onChange({ z, x:clampP(d.px + (e.clientX-d.x)/d.w*100, z), y:clampP(d.py + (e.clientY-d.y)/d.h*100, z) }); };
+  const up = () => { drag.current=null; };
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">Frame your ${round?'photo':'cover'}</div>
+      <button class="xbtn" onClick=${onDone}><${IcX} size=${16}/></button></div>
+    <div class="hint" style="margin-top:-8px;margin-bottom:12px">Drag to move · slide to zoom. ${round?'The circle is exactly what friends see.':'The whole frame is exactly what friends see.'}</div>
+    <div class="adjframe" ref=${ref} style=${`aspect-ratio:${aspect};${round?'max-width:320px;margin:0 auto':''}`}
+      onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>
+      <img src=${url} alt="" referrerpolicy="no-referrer" draggable=${false}
+        style=${`--cx:${pos.x||0}%;--cy:${pos.y||0}%;--cz:${pos.z||1}`}/>
+      <div class=${'adjmask'+(round?' round':'')}></div>
+    </div>
+    <div class="flabel">Zoom</div>
+    <input class="slider" type="range" min="100" max="300" value=${Math.round((pos.z||1)*100)}
+      onInput=${e=>{ const z=+e.target.value/100; onChange({ z, x:clampP(pos.x||0,z), y:clampP(pos.y||0,z) }); }}/>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" style="flex:1" onClick=${()=>onChange({ x:0, y:0, z:1 })}>Reset</button>
+      <button class="btn btn-grad" style="flex:1" onClick=${onDone}>Done</button>
+    </div>
+    <div class="small" style="margin-top:10px">Framing is saved as three numbers on your profile — the image itself is never copied or edited.</div>
+  </div>`;
+}
+
+export function Toggle({ on, onClick, label, hint, accent }) {
+  return html`<div class="set-row">
+    <div class="set-row-l">
+      <div class="set-label">${label}</div>
+      ${hint && html`<div class="set-hint">${hint}</div>`}
+    </div>
+    <button class=${'tgl'+(on?' on':'')} aria-label=${label} aria-pressed=${on}
+      style=${on&&accent?`background:${accent}`:''} onClick=${onClick}><span></span></button>
+  </div>`;
+}
+
+export const seedForm = me => ({
+  name: me?.display_name||'', handle: me?.handle||'', course: me?.course||'', school: me?.school||'',
+  acc: [me?.accent1||'#b06bff', me?.accent2||'#2dd4bf'],
+  bio: me?.bio||'', pronouns: me?.pronouns||'',
+  hobbies: Array.isArray(me?.hobbies) ? me.hobbies.slice(0,10) : [],
+  links: Array.isArray(me?.links) ? me.links.slice(0,5) : [],
+  showFull: me?.show_full_name!==false,
+  avatarUrl: me?.avatar_url||'', avatarPos: (me?.avatar_pos&&typeof me.avatar_pos==='object')?me.avatar_pos:{x:0,y:0,z:1},
+  coverUrl: me?.cover_url||'', coverPos: (me?.cover_pos&&typeof me.cover_pos==='object')?me.cover_pos:{x:0,y:0,z:1},
+});

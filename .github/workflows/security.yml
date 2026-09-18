@@ -1,0 +1,198 @@
+# Orbit's security pipeline.
+#
+# Orbit is a no-build static site: the files in this repo ARE what runs in
+# people's browsers, and a push to main is a deploy. There is no staging step to
+# catch a mistake, so the checks have to live here.
+#
+# Every third-party action is pinned to a full commit SHA rather than a tag,
+# because a tag is a mutable pointer the action's owner can move. Pinning to a
+# tag means trusting that account forever; pinning to a SHA means trusting the
+# code that was reviewed. The version each SHA corresponds to is in the comment
+# beside it so Dependabot can still offer upgrades.
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Sundays 03:12 UTC. A repo that only scans on push stops being scanned the
+    # moment it stops changing, which is exactly when a new CVE lands on it.
+    - cron: '12 3 * * 0'
+  workflow_dispatch:
+
+# Read-only by default. Any job that needs more says so itself, so a compromised
+# step in an unrelated job cannot write to the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write      # to upload the SARIF results
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4
+        with:
+          languages: javascript-typescript
+          # No bundler, no transpile — CodeQL reads the sources as shipped.
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4
+        with:
+          category: /language:javascript-typescript
+
+  csp:
+    name: CSP integrity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # index.html's CSP names the SHA-256 of each inline script instead of
+      # allowing 'unsafe-inline'. Edit an inline script without regenerating the
+      # policy and the browser refuses to run it — a white screen for everyone,
+      # with no warning, because a meta-tag CSP cannot be report-only. This is
+      # the warning.
+      - run: python tools/csp.py --check
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0          # gitleaks walks history, not just the tip
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  workflows:
+    name: Workflow hardening (zizmor)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # Audits these workflow files themselves for the CI-specific holes —
+      # script injection through ${{ }} interpolation, over-broad permissions,
+      # unpinned actions, credential persistence.
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482  # v0.6.4
+        with:
+          advanced-security: true
+
+  ai-review:
+    # Anthropic's own reviewer: Claude reads the diff and reasons about it,
+    # which catches the class of bug a pattern matcher cannot — an auth check
+    # that is present but wrong, a policy that reads right and denies nothing.
+    #
+    # It needs CLAUDE_API_KEY, which is metered API billing and NOT covered by a
+    # Claude subscription. Orbit stays free, so the job is wired up and inert:
+    # with no secret set it skips every step and costs nothing. Add the secret
+    # and it starts reviewing pull requests.
+    name: Claude security review (inert without CLAUDE_API_KEY)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write        # to leave the findings as review comments
+    env:
+      HAS_KEY: ${{ secrets.CLAUDE_API_KEY != '' }}
+    steps:
+      - if: env.HAS_KEY == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - if: env.HAS_KEY == 'true'
+        uses: anthropics/claude-code-security-review@0c6a49f1fa56a1d472575da86a94dbc1edb78eda
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+      - if: env.HAS_KEY != 'true'
+        run: echo "No CLAUDE_API_KEY set - skipping the AI review. This is expected."
+
+  secrets-shape:
+    # gitleaks catches known secret formats. This catches the one that would
+    # actually end Orbit: a Supabase service_role key, which bypasses every RLS
+    # policy in the database. The publishable key in core.js is meant to be
+    # public and is explicitly allowed.
+    name: No secret keys committed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Refuse a real secret key anywhere in the tree
+        run: |
+          # Match key SHAPES, not the words. The first attempt grepped for
+          # "service_role" and tripped on core.js's own comment telling you not
+          # to put one there — a check that fails on prose is a check people
+          # learn to ignore.
+          #
+          #   sb_secret_...  new-style Supabase secret key
+          #   eyJ........    a JWT, which is what the legacy service_role key is
+          #
+          # The publishable key (sb_publishable_) is meant to ship and is not
+          # matched. sql/ is excluded: it discusses roles by name on purpose.
+          if grep -rInE --exclude-dir=.git --exclude-dir=sql                -e 'sb_secret_[A-Za-z0-9_-]{8,}'                -e 'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{8,}' . ; then
+            echo "::error::That looks like a real secret key. A Supabase service_role key bypasses every RLS policy - rotate it immediately."
+            exit 1
+          fi
+          echo "No secret-shaped key present."
+
+  dast:
+    name: ZAP baseline against the live site
+    runs-on: ubuntu-latest
+    # Passive only — ZAP baseline crawls and inspects responses, it does not
+    # attack. Safe to point at production, which is the only environment there
+    # is. Not run on pull_request: a fork PR must never reach this.
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25  # v0.15.0
+        with:
+          target: https://unorfl.github.io/Orbit/
+          rules_file_name: .github/zap-rules.tsv
+          cmd_options: '-a -T 5'
+          # Findings come back as a build artifact. Filing an issue per run
+          # needs issues:write, and this job should not be able to write
+          # anything to the repo.
+          allow_issue_writing: false
+          fail_action: false
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5
+        if: always()
+        with:
+          name: zap-baseline-report
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json
+          if-no-files-found: ignore
+          retention-days: 30
