@@ -155,7 +155,10 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .track{position:relative;border-left:1px solid var(--line);
   background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour) - 1px),var(--line) calc(var(--hour) - 1px),var(--line) var(--hour))}
 /* Traffic: how many people are booked in this hour, across every schedule
-   Orbit has loaded. Sits behind the blocks, never in front of them. */
+   Orbit has loaded. Sits behind the blocks, never in front of them — and
+   because it steps opacity at every hour mark, the blocks above it are
+   opaque (mixed over --panel, not over transparent). A translucent block
+   let the step through and sliced a 7:00–8:30 class in two at 8:00. */
 .heat{position:absolute;left:0;right:0;background:var(--ge);pointer-events:auto;z-index:0}
 .cls,.evt{z-index:1}
 /* Midnight, 06:00, 12:00, 18:00 read brighter, so a 24-hour column is still
@@ -164,13 +167,13 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .track.wknd{background-color:rgba(255,255,255,.015)}
 .track.today{background-color:rgba(255,93,143,.028)}
 .cls{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
+  background:color-mix(in srgb,var(--c) 13%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
 .cls::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);border-radius:8px 0 0 8px}
 .cname{font-weight:600;font-size:10.5px;line-height:1.15;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .cmeta{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ctime{font-size:9px;color:var(--c);font-weight:600;margin-top:auto;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .evt{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14));border:1px dashed rgba(255,255,255,.4)}
+  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14)),var(--panel);border:1px dashed rgba(255,255,255,.4)}
 .evt .ctime{color:#e7d9f5}
 .nowline{position:absolute;left:0;right:0;height:2px;z-index:7;pointer-events:none;background:var(--now);box-shadow:0 0 8px rgba(255,93,143,.8)}
 .nowline::before{content:"";position:absolute;left:-2px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--now);box-shadow:0 0 10px rgba(255,93,143,.9)}
