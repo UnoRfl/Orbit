@@ -1300,21 +1300,116 @@ a.lvcard:hover{border-color:var(--line-strong)}
 .linkbtn{background:none;border:none;padding:0;color:var(--major);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .spin{width:26px;height:26px;border-radius:50%;border:2.5px solid rgba(255,255,255,.18);border-top-color:#fff;animation:spin .8s linear infinite}
 
-/* ---- Orbit+ aura ---- */
+/* ---- Orbit+ auras ----
+   Three layers per avatar (components.js Avatar): .aura-g a flat glow behind,
+   .aura-b a back layer that may be tilted in 3D, and .aura-f a front layer
+   drawn OVER the face — that split is how a ring passes behind the avatar and
+   then in front of it. Everything is sized off --as (the avatar size), so an
+   aura reads the same at 24px in chat and 96px in the studio. */
 .aura{position:relative;flex:none;width:var(--as);height:var(--as);border-radius:50%;isolation:isolate}
 .aura>.avatar{position:relative;z-index:1}
-.aura-fx{position:absolute;pointer-events:none;border-radius:50%;z-index:0}
-.aura-halo .aura-fx{inset:calc(var(--as) * -.12);background:conic-gradient(from 0deg,var(--aa),transparent 30%,var(--ab) 55%,transparent 80%,var(--aa));
+.aura-g,.aura-b,.aura-f{position:absolute;pointer-events:none;display:none;border-radius:50%}
+.aura-g{inset:calc(var(--as) * -.2);z-index:0}
+.aura-b{z-index:0}
+.aura-f{z-index:2}
+.aura-g::before,.aura-g::after,.aura-b::before,.aura-b::after,.aura-f::before,.aura-f::after{content:"";position:absolute;border-radius:50%}
+@keyframes aurabreath{50%{transform:scale(1.07);opacity:.72}}
+@keyframes twinkle2{to{opacity:.45}}
+
+/* Nebula — two gas clouds swirling in opposite directions */
+.aura-nebula .aura-g{display:block;inset:calc(var(--as) * -.3)}
+.aura-nebula .aura-g::before{inset:0;background:conic-gradient(from 0deg,var(--aa),transparent 26%,var(--ab) 50%,transparent 74%,var(--aa));
+  filter:blur(calc(var(--as) * .09));animation:spin 7s linear infinite}
+.aura-nebula .aura-g::after{inset:12%;background:conic-gradient(from 180deg,transparent,color-mix(in srgb,var(--ab) 70%,#fff) 18%,transparent 38%,color-mix(in srgb,var(--aa) 70%,#fff) 64%,transparent 84%);
+  filter:blur(calc(var(--as) * .045));mix-blend-mode:screen;animation:spin 11s linear infinite reverse}
+.aura-nebula .aura-b{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--ab) 75%,transparent),0 0 calc(var(--as) * .28) color-mix(in srgb,var(--aa) 55%,transparent)}
+
+/* Ringworld — a banded planetary ring, tilted, passing behind and in front */
+.aura-orbit .aura-g{display:block;inset:calc(var(--as) * -.1);background:radial-gradient(closest-side,color-mix(in srgb,var(--ab) 50%,transparent),transparent 80%);animation:aurabreath 4.5s ease-in-out infinite}
+.aura-orbit .aura-b,.aura-orbit .aura-f{display:block;left:50%;top:50%;width:calc(var(--as) * 1.95);height:calc(var(--as) * 1.95);
+  margin:calc(var(--as) * -.975) 0 0 calc(var(--as) * -.975);transform:rotate(-20deg) rotateX(74deg);
+  background:radial-gradient(closest-side,transparent 59%,color-mix(in srgb,var(--aa) 55%,transparent) 61%,transparent 65%,
+    color-mix(in srgb,var(--ab) 85%,transparent) 69%,rgba(255,255,255,.9) 73%,color-mix(in srgb,var(--ab) 75%,transparent) 77%,
+    transparent 80%,color-mix(in srgb,var(--aa) 50%,transparent) 86%,transparent 91%)}
+.aura-orbit .aura-f{clip-path:inset(50% 0 0 0)}
+.aura-orbit .aura-b::after,.aura-orbit .aura-f::after{inset:0;background:conic-gradient(from 0deg,transparent 0 68%,color-mix(in srgb,var(--ab) 55%,transparent) 88%,#fff 97.5%,transparent 100%);
+  -webkit-mask:radial-gradient(closest-side,transparent 62%,#000 67%,#000 83%,transparent 88%);mask:radial-gradient(closest-side,transparent 62%,#000 67%,#000 83%,transparent 88%);
+  animation:spin 3.4s linear infinite}
+
+/* Eclipse — you are the moon; a corona of rays burns around your edge */
+.aura-corona .aura-g{display:block;inset:calc(var(--as) * -.36)}
+.aura-corona .aura-g::before{inset:0;background:repeating-conic-gradient(from 0deg,rgba(255,246,220,.95) 0 1.3deg,transparent 1.3deg 6.5deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 50%,#000 55%,rgba(0,0,0,.35) 74%,transparent 100%);mask:radial-gradient(closest-side,transparent 50%,#000 55%,rgba(0,0,0,.35) 74%,transparent 100%);
+  animation:spin 70s linear infinite}
+.aura-corona .aura-g::after{inset:9%;background:repeating-conic-gradient(from 3deg,color-mix(in srgb,var(--aa) 65%,#fff) 0 2deg,transparent 2deg 10deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 58%,#000 63%,transparent 97%);mask:radial-gradient(closest-side,transparent 58%,#000 63%,transparent 97%);
+  opacity:.8;animation:spin 100s linear infinite reverse}
+.aura-corona .aura-b{display:block;inset:calc(var(--as) * -.06);
+  box-shadow:0 0 0 2px #fff8e1,0 0 calc(var(--as) * .12) 2px #ffe7a0,0 0 calc(var(--as) * .38) color-mix(in srgb,var(--aa) 60%,#ffb347);
+  animation:flare 3.4s ease-in-out infinite}
+@keyframes flare{50%{box-shadow:0 0 0 2.5px #fff,0 0 calc(var(--as) * .2) 3px #ffe7a0,0 0 calc(var(--as) * .55) color-mix(in srgb,var(--aa) 75%,#ffb347)}}
+.aura-corona .aura-f{display:block;inset:calc(var(--as) * -.08)}
+.aura-corona .aura-f::after{top:4%;right:10%;width:calc(var(--as) * .18);height:calc(var(--as) * .18);
+  background:radial-gradient(circle,#fff 0 18%,rgba(255,236,170,.8) 32%,transparent 70%);animation:twinkle2 1.8s ease-in-out infinite alternate}
+
+/* Aurora — curtains of light rippling round in a ring */
+.aura-aurora .aura-g{display:block;inset:calc(var(--as) * -.3)}
+.aura-aurora .aura-g::before,.aura-aurora .aura-g::after{inset:0;
+  background:conic-gradient(from 0deg,#34d399,#22d3ee,#a78bfa,#f472b6,#a3e635,#34d399);
+  -webkit-mask:radial-gradient(closest-side,transparent 48%,#000 60%,transparent 94%),repeating-conic-gradient(#000 0 5deg,rgba(0,0,0,.22) 5deg 13deg);
+  -webkit-mask-composite:source-in;
+  mask:radial-gradient(closest-side,transparent 48%,#000 60%,transparent 94%),repeating-conic-gradient(#000 0 5deg,rgba(0,0,0,.22) 5deg 13deg);
+  mask-composite:intersect;filter:blur(calc(var(--as) * .03));animation:spin 10s linear infinite,aurorahue 6s ease-in-out infinite alternate}
+.aura-aurora .aura-g::after{inset:11%;opacity:.7;animation:spin 14s linear infinite reverse,aurorahue 5s ease-in-out infinite alternate-reverse}
+@keyframes aurorahue{to{filter:blur(calc(var(--as) * .03)) hue-rotate(80deg)}}
+.aura-aurora .aura-b{display:block;inset:calc(var(--as) * -.04);box-shadow:0 0 calc(var(--as) * .2) rgba(52,211,153,.45)}
+
+/* Singularity — a black hole's accretion disk, with the photon ring glowing */
+.aura-singularity .aura-g{display:block;inset:calc(var(--as) * -.12);
+  box-shadow:0 0 0 2px rgba(255,214,160,.95),0 0 calc(var(--as) * .16) rgba(255,150,60,.85),inset 0 0 calc(var(--as) * .08) rgba(255,180,90,.7);
+  animation:aurabreath 3s ease-in-out infinite}
+.aura-singularity .aura-b,.aura-singularity .aura-f{display:block;left:50%;top:50%;width:calc(var(--as) * 2.2);height:calc(var(--as) * 2.2);
+  margin:calc(var(--as) * -1.1) 0 0 calc(var(--as) * -1.1);transform:rotate(14deg) rotateX(78deg);
+  background:radial-gradient(closest-side,transparent 47%,rgba(255,140,60,.9) 53%,#fff4da 59%,rgba(255,176,90,.95) 65%,rgba(220,70,40,.6) 78%,rgba(120,20,60,.25) 88%,transparent 96%)}
+.aura-singularity .aura-f{clip-path:inset(50% 0 0 0)}
+.aura-singularity .aura-b::after,.aura-singularity .aura-f::after{inset:0;background:repeating-conic-gradient(rgba(255,255,255,.55) 0 2.5deg,transparent 2.5deg 17deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 50%,#000 56%,#000 76%,transparent 90%);mask:radial-gradient(closest-side,transparent 50%,#000 56%,#000 76%,transparent 90%);
+  animation:spin 2.2s linear infinite}
+
+/* Stardust — sparks in orbit at two speeds, twinkling */
+.aura-stardust .aura-g{display:block;inset:calc(var(--as) * -.32)}
+.aura-stardust .aura-g::before,.aura-stardust .aura-g::after{inset:0;filter:drop-shadow(0 0 2px #fff)}
+.aura-stardust .aura-g::before{background:radial-gradient(circle at 50% 4%,#fff 0 2%,transparent 3.4%),radial-gradient(circle at 93% 40%,var(--ab) 0 1.8%,transparent 3.2%),
+  radial-gradient(circle at 74% 90%,#fff 0 1.5%,transparent 2.9%),radial-gradient(circle at 17% 84%,var(--aa) 0 2%,transparent 3.4%),
+  radial-gradient(circle at 5% 42%,#fff 0 1.3%,transparent 2.6%),radial-gradient(circle at 30% 9%,var(--ab) 0 1.2%,transparent 2.5%);
+  animation:spin 9s linear infinite,twinkle2 1.7s ease-in-out infinite alternate}
+.aura-stardust .aura-g::after{inset:13%;background:radial-gradient(circle at 80% 12%,#fff 0 2.2%,transparent 3.6%),radial-gradient(circle at 12% 30%,var(--aa) 0 2%,transparent 3.4%),
+  radial-gradient(circle at 60% 96%,var(--ab) 0 2%,transparent 3.4%),radial-gradient(circle at 96% 70%,#fff 0 1.6%,transparent 3%);
+  animation:spin 5.5s linear infinite reverse,twinkle2 1.2s ease-in-out infinite alternate-reverse}
+.aura-stardust .aura-b{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 calc(var(--as) * .22) color-mix(in srgb,var(--ab) 45%,transparent)}
+
+/* Supernova — shockwaves rolling outward from a blazing rim */
+.aura-supernova .aura-g{display:block;inset:0}
+.aura-supernova .aura-g::before,.aura-supernova .aura-g::after{inset:0;border:2px solid var(--ab);
+  box-shadow:0 0 10px var(--aa),inset 0 0 8px var(--aa);animation:shock 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+.aura-supernova .aura-g::after{border-color:var(--aa);box-shadow:0 0 10px var(--ab),inset 0 0 8px var(--ab);animation-delay:1.2s}
+@keyframes shock{0%{transform:scale(.96);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.aura-supernova .aura-b{display:block;inset:calc(var(--as) * -.09);
+  background:radial-gradient(closest-side,transparent 72%,rgba(255,255,255,.95) 78%,color-mix(in srgb,var(--ab) 80%,transparent) 86%,transparent 100%);
+  animation:aurabreath 1.3s ease-in-out infinite}
+
+/* Halo + Comet (the originals) */
+.aura-halo .aura-b{display:block;inset:calc(var(--as) * -.12);background:conic-gradient(from 0deg,var(--aa),transparent 30%,var(--ab) 55%,transparent 80%,var(--aa));
   -webkit-mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 92%,transparent 100%);mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 92%,transparent 100%);
   animation:spin 6s linear infinite;filter:saturate(1.4)}
-.aura-pulse .aura-fx{inset:0;animation:aurapulse 2.4s ease-out infinite}
-@keyframes aurapulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--aa) 70%,transparent),0 0 calc(var(--as)*.3) color-mix(in srgb,var(--ab) 45%,transparent)}
-  100%{box-shadow:0 0 0 calc(var(--as)*.16) transparent,0 0 calc(var(--as)*.3) color-mix(in srgb,var(--ab) 25%,transparent)}}
-.aura-orbit .aura-fx{inset:calc(var(--as) * -.14);border:1px dashed color-mix(in srgb,var(--aa) 55%,transparent);animation:spin 5s linear infinite}
-.aura-orbit .aura-fx::after{content:"";position:absolute;top:calc(var(--as) * -.04);left:50%;width:calc(var(--as) * .2);height:calc(var(--as) * .2);min-width:5px;min-height:5px;
-  margin-left:calc(var(--as) * -.1);border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,var(--ab) 60%);box-shadow:0 0 8px var(--ab)}
-.aura-comet .aura-fx{inset:calc(var(--as) * -.1);background:conic-gradient(from 0deg,transparent 0 62%,color-mix(in srgb,var(--ab) 40%,transparent) 80%,#fff 99%,transparent 100%);
-  -webkit-mask:radial-gradient(closest-side,transparent 80%,#000 83%,#000 96%,transparent 100%);mask:radial-gradient(closest-side,transparent 80%,#000 83%,#000 96%,transparent 100%);animation:spin 2.6s linear infinite}
+.aura-comet .aura-b{display:block;inset:calc(var(--as) * -.12);background:conic-gradient(from 0deg,transparent 0 60%,color-mix(in srgb,var(--ab) 40%,transparent) 80%,#fff 99%,transparent 100%);
+  -webkit-mask:radial-gradient(closest-side,transparent 78%,#000 82%,#000 96%,transparent 100%);mask:radial-gradient(closest-side,transparent 78%,#000 82%,#000 96%,transparent 100%);animation:spin 2.4s linear infinite}
+.aura-comet .aura-g{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 calc(var(--as) * .2) color-mix(in srgb,var(--ab) 40%,transparent)}
+
+/* small avatars (chat bubbles, lists) keep the look but drop the costly layers */
+.aura-sm .aura-g::after,.aura-sm .aura-b::after,.aura-sm .aura-f::after{display:none}
+.aura-sm .aura-g::before{filter:none}
+.aura-sm.aura-nebula .aura-g::before{filter:blur(2px)}
 
 /* ---- story rail ---- */
 .story-hit{background:none;border:none;padding:0;cursor:pointer;display:block}
@@ -1587,11 +1682,115 @@ a.lvcard:hover{border-color:var(--line-strong)}
 .mc-switch.on i{transform:translateX(18px)}
 .mc-switch:disabled{opacity:.5;cursor:not-allowed}
 
-/* ---- the quiet versions ---- */
-html[data-perf="2"] .aura-fx,html[data-rm] .aura-fx,
-html[data-perf="2"] .sring-moon,html[data-rm] .sring-moon,
-html[data-rm] .mc-dot.pulse,html[data-rm] .streak.risk .glyph,
-html[data-rm] .mc-tile.skel{animation:none}
-html[data-perf="2"] .aura-orbit .aura-fx,html[data-rm] .aura-orbit .aura-fx{animation:none}
-html[data-perf="2"] .aura-pulse .aura-fx,html[data-rm] .aura-pulse .aura-fx{box-shadow:0 0 calc(var(--as)*.28) color-mix(in srgb,var(--ab) 45%,transparent)}
+/* (aura quiet rules moved to the Orbit+ v2 block below) */
+html[data-perf="2"] .sring-moon,html[data-rm] .sring-moon,html[data-rm] .mc-dot.pulse,html[data-rm] .streak.risk .glyph,html[data-rm] .mc-tile.skel{animation:none}
+
 @media (max-width:420px){ .topbar .iconbtn{width:38px;height:38px} .topbar>div:last-child{gap:6px !important} .brand-eyebrow{letter-spacing:.14em;font-size:10px;white-space:nowrap} }
+
+/* ---- Orbit+ name effects ---- */
+.nfx{position:relative;display:inline-block;max-width:100%}
+.nfx-neon{color:#fff;text-shadow:0 0 3px var(--na),0 0 9px var(--na),0 0 20px var(--nb);animation:neonflick 5s infinite}
+@keyframes neonflick{0%,17%,21%,61%,64%,100%{opacity:1}19%,62.5%{opacity:.5}}
+.nfx-holo,.nfx-rainbow{-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:ngslide 3.4s linear infinite}
+.nfx-holo{background-image:linear-gradient(110deg,#fff 0%,#c9a7ff 16%,#7df9ff 30%,#fff 44%,#ffd6f5 58%,#a6f4c5 72%,#fff 86%);background-size:250% 100%;
+  filter:drop-shadow(0 0 6px rgba(201,167,255,.35))}
+.nfx-rainbow{background-image:linear-gradient(90deg,#ff5d8f,#f5b544,#a3e635,#2dd4bf,#4dabf7,#b06bff,#ff5d8f);background-size:200% 100%}
+.nfx-glitch{color:#fff}
+.nfx-glitch::before,.nfx-glitch::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;overflow:hidden;white-space:nowrap;pointer-events:none;mix-blend-mode:screen}
+.nfx-glitch::before{color:#ff2bd6;clip-path:inset(0 0 55% 0);animation:glitchA 2.6s steps(1) infinite}
+.nfx-glitch::after{color:#22e5ff;clip-path:inset(50% 0 0 0);animation:glitchB 2.2s steps(1) infinite}
+@keyframes glitchA{0%,88%{transform:translate(-1px,0)}90%{transform:translate(-4px,-1px);clip-path:inset(10% 0 60% 0)}94%{transform:translate(3px,1px);clip-path:inset(40% 0 20% 0)}}
+@keyframes glitchB{0%,84%{transform:translate(1px,0)}87%{transform:translate(4px,1px);clip-path:inset(60% 0 5% 0)}93%{transform:translate(-3px,0);clip-path:inset(20% 0 50% 0)}}
+
+/* ---- Orbit+ profile (cover) effects ---- */
+.coverfx{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.coverfx i{position:absolute;display:block}
+.cfx-stars i{inset:-20% -40%;background:
+  radial-gradient(1.4px 1.4px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.8px 1.8px at 55% 35%,#fff,transparent),
+  radial-gradient(1px 1px at 70% 80%,#fff,transparent),radial-gradient(1.2px 1.2px at 85% 25%,#fff,transparent),radial-gradient(1px 1px at 45% 90%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 20% 55%,#fff,transparent),radial-gradient(1px 1px at 95% 60%,#fff,transparent);
+  background-size:180px 120px;animation:stardrift 40s linear infinite,twinkle2 2.4s ease-in-out infinite alternate}
+.cfx-stars i:nth-child(2){background-size:260px 170px;opacity:.6;animation-duration:70s,3.1s}
+.cfx-stars i:nth-child(3){background-size:120px 90px;opacity:.35;animation-duration:26s,1.8s}
+@keyframes stardrift{to{transform:translateX(-180px)}}
+.cfx-aurora i{left:-30%;right:-30%;height:70%;top:-10%;filter:blur(18px);opacity:.55;border-radius:50%;
+  background:linear-gradient(90deg,transparent,#34d399 25%,#22d3ee 45%,#a78bfa 65%,transparent);animation:auroraband 9s ease-in-out infinite alternate}
+.cfx-aurora i:nth-child(2){top:20%;opacity:.4;animation-duration:12s;animation-direction:alternate-reverse;background:linear-gradient(90deg,transparent,#a3e635 30%,#34d399 50%,#f472b6 75%,transparent)}
+.cfx-aurora i:nth-child(3){display:none}
+@keyframes auroraband{0%{transform:translateX(-12%) skewX(-18deg) scaleY(.8)}100%{transform:translateX(12%) skewX(14deg) scaleY(1.15)}}
+.cfx-meteors i{top:-30%;width:2px;height:90px;border-radius:2px;background:linear-gradient(0deg,#fff,rgba(255,255,255,0));
+  transform:rotate(-35deg);opacity:0;animation:meteorfall 3.6s linear infinite;filter:drop-shadow(0 0 4px var(--pb))}
+.cfx-meteors i:nth-child(1){left:30%}
+.cfx-meteors i:nth-child(2){left:65%;animation-delay:1.2s;height:60px}
+.cfx-meteors i:nth-child(3){left:90%;animation-delay:2.4s;height:110px}
+@keyframes meteorfall{0%{opacity:0;translate:0 0}8%{opacity:1}40%{opacity:1}55%,100%{opacity:0;translate:-220px 320px}}
+.cfx-nebula i{width:70%;aspect-ratio:1;border-radius:50%;filter:blur(30px);opacity:.55;mix-blend-mode:screen}
+.cfx-nebula i:nth-child(1){left:-10%;top:-40%;background:var(--pa);animation:neb1 14s ease-in-out infinite alternate}
+.cfx-nebula i:nth-child(2){right:-15%;bottom:-50%;background:var(--pb);animation:neb2 17s ease-in-out infinite alternate}
+.cfx-nebula i:nth-child(3){left:35%;top:10%;width:40%;background:#ff5d8f;opacity:.3;animation:neb1 11s ease-in-out infinite alternate-reverse}
+@keyframes neb1{to{transform:translate(30%,20%) scale(1.2)}}
+@keyframes neb2{to{transform:translate(-25%,-15%) scale(.9)}}
+
+/* ---- evolving Orbit+ badge ---- */
+.plustier{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap;color:#0f0a16;vertical-align:1px}
+.plustier.t-moon{background:linear-gradient(90deg,#e5e7eb,#9ca3af)}
+.plustier.t-comet{background:linear-gradient(90deg,#7df9ff,#2dd4bf)}
+.plustier.t-planet{background:linear-gradient(90deg,#c9a7ff,#8f5bff);color:#fff}
+.plustier.t-star{background:linear-gradient(90deg,#ffe28a,#f5b544)}
+.plustier.t-nova{background:linear-gradient(90deg,#ff4f81,#ffb347,#ff4f81);background-size:200% 100%;color:#fff;animation:ngslide 3s linear infinite;box-shadow:0 0 10px rgba(255,79,129,.45)}
+
+/* ---- Orbit+ studio ---- */
+.studio{border-radius:18px;border:1px solid color-mix(in srgb,var(--major) 35%,transparent);background:var(--panel);overflow:hidden;margin-bottom:14px}
+.studio-stage{position:relative;min-height:236px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:18px 16px 14px;gap:6px;overflow:hidden}
+.studio-stage>.profcover{position:absolute;inset:0;aspect-ratio:auto;height:100%;border:none;border-radius:0}
+.studio-nebula{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(10,6,18,.05),rgba(10,6,18,.2) 45%,var(--panel) 96%)}
+.studio-av,.studio-name,.studio-chips,.studio-note{position:relative;z-index:2}
+.studio-av{margin-bottom:12px}
+.studio-name{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;color:#fff;letter-spacing:-.01em;text-align:center;max-width:100%}
+.studio-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:18px}
+.studio-note{font-size:11px;color:var(--muted)}
+.studio-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 12px 0}
+.studio-tab{flex:none;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.studio-tab.on{color:#fff;border-color:transparent;background:linear-gradient(90deg,color-mix(in srgb,#c9a7ff 40%,transparent),color-mix(in srgb,#7df9ff 30%,transparent))}
+.studio>.btn{width:calc(100% - 24px);margin:12px 12px 0}
+.studio>.small{padding:0 12px}
+.stiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;padding:12px 12px 0}
+.stiles.wide{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+.stile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);cursor:pointer;min-width:0}
+.stile b{font-size:11.5px;font-weight:700}
+.stile.on{border-color:var(--major);background:color-mix(in srgb,var(--major) 13%,transparent);color:#fff}
+.stile-art{min-height:70px;width:100%;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:#fff;overflow:visible}
+.stile-cover{width:100%}
+.stile-cover .profcover{aspect-ratio:auto;height:64px;border-radius:10px}
+.stile-fx{width:54px;height:54px;border-radius:17px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--major),var(--ge))}
+.fxi-meteor,.fxm-hearts{background:linear-gradient(135deg,#ff5d8f,#f5b544)}
+.fxi-bloom,.fxm-confetti{background:linear-gradient(135deg,#f5b544,#b06bff)}
+.fxm-stars{background:linear-gradient(135deg,#7df9ff,#b06bff)}
+.fxi-warp,.fxm-warp{background:linear-gradient(135deg,#1f1b3a,#4dabf7);box-shadow:0 0 16px rgba(77,171,247,.4)}
+.tierbox{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:14px;margin-bottom:14px}
+.tierline{display:flex;justify-content:space-between;gap:4px;position:relative}
+.tierline::before{content:"";position:absolute;left:8%;right:8%;top:11px;height:2px;background:var(--line-strong)}
+.tierstep{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0;opacity:.45}
+.tierstep .plustier{width:24px;height:24px;padding:0;justify-content:center}
+.tierstep b{font-size:10.5px;color:var(--ink)}
+.tierstep em{font-style:normal;font-size:9.5px;color:var(--faint)}
+.tierstep.got{opacity:1}
+.tierstep.cur .plustier{box-shadow:0 0 0 2px var(--canvas),0 0 0 3.5px #fff}
+
+/* ---- message effects ---- */
+.fxlayer{position:fixed;inset:0;width:100vw;height:100vh;z-index:260;pointer-events:none}
+.fxgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 10px 10px}
+.fxbtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);font-size:11px;font-weight:600;cursor:pointer}
+.fxbtn span{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--major),var(--ge))}
+.fxbtn.fx-confetti span{background:linear-gradient(135deg,#f5b544,#b06bff)}
+.fxbtn.fx-hearts span{background:linear-gradient(135deg,#ff5d8f,#f5b544)}
+.fxbtn.fx-stars span{background:linear-gradient(135deg,#7df9ff,#b06bff)}
+.fxbtn.fx-warp span{background:linear-gradient(135deg,#1f1b3a,#4dabf7)}
+.bub.hasfx{position:relative;padding-right:26px}
+.fxtag{position:absolute;right:6px;bottom:6px;background:none;border:none;padding:0;cursor:pointer;color:inherit;opacity:.75;display:flex}
+
+/* ---- the quiet versions (auras, name + cover effects) ---- */
+html[data-perf="2"] .aura *,html[data-perf="2"] .aura *::before,html[data-perf="2"] .aura *::after,
+html[data-rm] .aura *,html[data-rm] .aura *::before,html[data-rm] .aura *::after,
+html[data-perf="2"] .coverfx i,html[data-rm] .coverfx i,
+html[data-rm] .nfx,html[data-rm] .nfx::before,html[data-rm] .nfx::after,html[data-rm] .plustier{animation:none !important}

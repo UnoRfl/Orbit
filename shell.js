@@ -821,8 +821,9 @@ export function Shell({ session }) {
         : 'Could not open the chat');
     }
   }
-  async function sendMsg(sel, { kind, body }, peerId=null) {
+  async function sendMsg(sel, { kind, body, fx=null }, peerId=null) {
     const row = { sender:uid, kind, body, [sel.scope==='dm' ? 'thread_id' : 'system_id']: sel.ref };
+    if (fx) row.fx = fx;                                  // Orbit+; the DB drops it for anyone else
     const { data, error } = await sb.from('messages').insert(row).select().single();
     if (error) {
       const m = error.message||'';

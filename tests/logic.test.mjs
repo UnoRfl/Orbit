@@ -183,3 +183,24 @@ test('find a time intersects everyone, skips Sunday, starts from now today', () 
   const mid = comps.groupWindows(['me'], classesBy, [], { minLen: 30, from: 480, to: 1080, days: 1, now: { day: 0, min: 700 } });
   assert.deepEqual(mid.map(x => [x.s, x.e]), [[705, 1080]], 'today starts at the next quarter hour, not at 8AM');
 });
+
+test('Orbit+ v2: badge tiers grow with months, effects only render while Plus is live', () => {
+  const now = Date.parse('2026-09-24T00:00:00Z'), ahead = new Date(now + 864e5 * 30).toISOString();
+  const at = days => ({ plus_until: ahead, plus_since: new Date(now - days * 864e5).toISOString() });
+  assert.equal(core.plusTier(at(3), now).key, 'moon');
+  assert.equal(core.plusTier(at(40), now).key, 'comet');
+  assert.equal(core.plusTier(at(100), now).key, 'planet');
+  assert.equal(core.plusTier(at(200), now).key, 'star');
+  assert.equal(core.plusTier(at(400), now).key, 'nova');
+  assert.equal(core.plusTier(at(400), now).next, null);
+  assert.equal(core.plusTier({ plus_until: null, plus_since: null }, now), null);
+  const live = { plus_until: new Date(Date.now() + 864e5).toISOString(), flair: { nfx: 'glitch', cfx: 'meteors', efx: 'warp', aura: 'singularity' } };
+  assert.equal(core.nameFxOf(live), 'glitch');
+  assert.equal(core.coverFxOf(live), 'meteors');
+  assert.equal(core.entranceOf(live), 'warp');
+  assert.equal(core.auraOf(live), 'singularity');
+  const lapsed = { ...live, plus_until: null };
+  assert.equal(core.nameFxOf(lapsed), null);
+  assert.equal(core.coverFxOf(lapsed), null);
+  assert.equal(core.entranceOf({ ...live, flair: { efx: '__proto__' } }), null, 'only known keys');
+});

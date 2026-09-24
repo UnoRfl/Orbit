@@ -44,7 +44,8 @@ Keep that split in mind and most bug reports point themselves at a file.
 | `chat.js` | Chat tab — threads, messages, media/emoji, typing, streaks, send later | `ChatsScreen`, `ChatView`, `MediaPop`, `LaterPane` |
 | `media.js` | 24-hour photos/videos: camera, on-device re-encode + trim, upload to the `ephemeral` bucket, viewing | `MediaComposer`, `Camera`, `SnapBubble`, `publishMedia`, `transcodeVideo` |
 | `stories.js` | Stories: rail rings, full-screen viewer, reactions/replies, seen-by | `StoryViewer`, `StoryRing`, `groupStories` |
-| `plus.js` | Orbit+ page — perks, redeem a code, aura picker | `PlusPage`, `PERKS` |
+| `plus.js` | Orbit+ studio — try on auras, name/profile/entrance/message effects; tier ladder; redeem a code | `PlusPage`, `PERKS` |
+| `fx.js` | Full-screen particle effects (message effects, profile entrances); scales with device tier, off for reduced motion | `playFx` |
 | `ads.js` | Ad slots and the staff Ads manager | `AdCard`, `AdsManager`, `pickAd` |
 | `settings.js` | Settings tab — theme, background, account email/password | `Settings` |
 | `staff.js` | Mission Control — live dashboard, reports (with story evidence), members, content, Orbit+ codes, ads, banner + kill switches, badges, log | `StaffPanel`, `ReportSheet` |
@@ -86,6 +87,7 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | Story won't post / snap won't send | `media.js` (`mediaError` says why) | `media_before_insert` trigger; Controls → kill switches |
 | A story or snap didn't disappear | nothing to fix in the app — RLS hides it at 24h | Mission Control → Background jobs → Media sweep; `ephemeral-sweep` function logs |
 | Story rings / viewer wrong | `stories.js` | `shell.js` (`loadStories`, `orbit-media` channel) |
+| An aura / name / cover effect doesn't show | `core.js` (`auraOf`, `nameFxOf`, `coverFxOf` — all require live Plus) | `styles.css` Orbit+ blocks; `data-perf=2` stills them |
 | Orbit+ didn't unlock after a code | `plus.js` | `redeem_code` RPC; `profiles_view.plus_until` |
 | Send later never arrived | `chat.js` (`LaterPane`) | `scheduled_messages.failed` column; cron `orbit-scheduled-msgs` |
 | Ads not showing | `ads.js` | the viewer is Orbit+? ad inactive / outside dates? Controls → Ads switch |

@@ -132,14 +132,63 @@ export const roleOf = p => badgesOf(p).includes('founder') ? 'founder'
    actually grants anything that matters (scheduled messages check it in RLS);
    everything gated here is cosmetic. */
 export const isPlus = p => !!p?.plus_until && Date.parse(p.plus_until) > Date.now();
-// the aura is picked in Orbit+ and stored in flair, but only drawn while Plus is live
+// Everything below is picked in Orbit+, stored in `flair`, and only DRAWN
+// while Plus is live — a lapsed member keeps their choices for when they return.
 export const AURAS = {
-  orbit:  { name:'Orbit',  blurb:'a moon circles your avatar' },
-  halo:   { name:'Halo',   blurb:'a slow rotating light ring' },
-  pulse:  { name:'Pulse',  blurb:'a soft heartbeat glow' },
-  comet:  { name:'Comet',  blurb:'a comet chases its tail around you' },
+  nebula:     { name:'Nebula',      blurb:'two gas clouds swirling around you' },
+  orbit:      { name:'Ringworld',   blurb:'a tilted planetary ring that passes behind and in front of you' },
+  corona:     { name:'Eclipse',     blurb:'you are the moon; a solar corona burns around your edge' },
+  aurora:     { name:'Aurora',      blurb:'northern-light curtains rippling in a ring' },
+  singularity:{ name:'Singularity', blurb:'a black hole’s glowing accretion disk' },
+  stardust:   { name:'Stardust',    blurb:'sparks drifting in orbit at different speeds' },
+  supernova:  { name:'Supernova',   blurb:'shockwaves rolling out from you' },
+  halo:       { name:'Halo',        blurb:'a slow rotating light ring' },
+  comet:      { name:'Comet',       blurb:'a comet chasing its tail around you' },
 };
 export const auraOf = p => { const a = flairOf(p).aura; return isPlus(p) && Object.hasOwn(AURAS, a) ? a : null; };
+export const NAME_PLUS = {
+  neon:    { name:'Neon',    blurb:'a buzzing tube-light glow' },
+  holo:    { name:'Holo',    blurb:'a holographic foil sheen' },
+  glitch:  { name:'Glitch',  blurb:'RGB split that twitches' },
+  rainbow: { name:'Prism',   blurb:'the full spectrum, flowing' },
+};
+export const COVER_FX = {
+  stars:   { name:'Starfield',     blurb:'twinkling stars drift across your cover' },
+  aurora:  { name:'Aurora',        blurb:'light curtains over your cover' },
+  meteors: { name:'Meteor shower', blurb:'meteors streak across it' },
+  nebula:  { name:'Nebula',        blurb:'slow clouds of your colours' },
+};
+export const ENTRANCES = {
+  warp:   { name:'Warp in',     blurb:'hyperspace streaks when someone opens your profile' },
+  meteor: { name:'Meteor rain', blurb:'a meteor shower greets them' },
+  bloom:  { name:'Supernova',   blurb:'a burst of light from the centre' },
+};
+export const MSG_FX = {
+  confetti: { name:'Confetti', g:'party' },
+  stars:    { name:'Stardust', g:'spark' },
+  hearts:   { name:'Hearts',   g:'heart' },
+  warp:     { name:'Warp',     g:'rocket' },
+};
+const plusPick = (p, key, table) => { const v = flairOf(p)[key]; return isPlus(p) && Object.hasOwn(table, v) ? v : null; };
+export const nameFxOf  = p => plusPick(p, 'nfx', NAME_PLUS);
+export const coverFxOf = p => plusPick(p, 'cfx', COVER_FX);
+export const entranceOf = p => plusPick(p, 'efx', ENTRANCES);
+// the badge grows the longer you stay (resets if Plus lapses), like Nitro's boost badge
+export const PLUS_TIERS = [
+  { m:0,  key:'moon',   name:'Moon',      g:'moon'   },
+  { m:1,  key:'comet',  name:'Comet',     g:'comet'  },
+  { m:3,  key:'planet', name:'Planet',    g:'planet' },
+  { m:6,  key:'star',   name:'Star',      g:'star'   },
+  { m:12, key:'nova',   name:'Supernova', g:'burst'  },
+];
+export const plusMonths = (p, now = Date.now()) => p?.plus_since ? Math.max(0, (now - Date.parse(p.plus_since)) / (30.44 * 864e5)) : 0;
+export const plusTier = (p, now = Date.now()) => {
+  if (!isPlus(p)) return null;
+  const m = plusMonths(p, now); let t = PLUS_TIERS[0];
+  for (const x of PLUS_TIERS) if (m >= x.m) t = x;
+  const i = PLUS_TIERS.indexOf(t), nx = PLUS_TIERS[i + 1] || null;
+  return { ...t, months: m, next: nx, toNext: nx ? Math.max(0, nx.m - m) : 0 };
+};
 
 /* ---------- 24-hour media ----------
    Photos and videos live in the private `ephemeral` bucket for 24 hours and

@@ -4,7 +4,8 @@ import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, Glyph, Sym, IcBack, IcCh
 import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
 import { MediaComposer, SnapBubble } from './media.js';
 import { AdCard } from './ads.js';
-import { isPlus } from './core.js';
+import { isPlus, MSG_FX } from './core.js';
+import { playFx } from './fx.js';
 
 export function ChatsScreen({ kit }) {
   const { uid, me, threads, reads, ov, sel, setSel, systems, profiles, nameOf, blocks, openDm, ensureProfiles, friends, db, isFounder, streaks={}, ads, onPlus } = kit;
@@ -112,6 +113,16 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const rows = bucket.rows;
   useEffect(()=>{ loadMsgs(sel); }, [key]);
   useEffect(()=>{ const ids = rows.filter(m=>m.kind==='media' && !m.deleted).map(m=>m.body); if (ids.length && ensureMedia) ensureMedia(ids); }, [rows.length, key]);
+  // a message effect plays once, when it arrives live (or you send it) with the chat open
+  const fxSeen = useRef(null);
+  useEffect(()=>{
+    if (!bucket.loaded) return;
+    if (fxSeen.current === null) { fxSeen.current = new Set(rows.map(m=>m.id)); return; }
+    for (const m of rows) if (!fxSeen.current.has(m.id)) {
+      fxSeen.current.add(m.id);
+      if (m.fx && !m.deleted && Date.now() - Date.parse(m.created_at) < 20000) playFx(m.fx);
+    }
+  }, [rows.length, bucket.loaded]);
   const myQueue = scheduled.filter(q => (isDm ? q.thread_id===sel.ref : q.system_id===sel.ref));
 
   // mark read on open / new messages / returning to the tab
@@ -142,12 +153,12 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const taRef = useRef(null);
   const grow = () => { const el=taRef.current; if(!el) return; el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,110)+'px'; };
   const canSend = text.trim().length>0 && text.length<=2000;
-  const doSend = async (kind='text', body=null) => {
+  const doSend = async (kind='text', body=null, fx=null) => {
     const payload = kind==='text' ? text.trim() : body;
     if (!payload) return;
     if (kind==='text') { setText(''); requestAnimationFrame(grow); }
     setPane(null); stick.current = true;
-    const ok = await sendMsg(sel, { kind, body:payload }, peerId);
+    const ok = await sendMsg(sel, { kind, body:payload, fx }, peerId);
     // a failed send used to eat the draft; put it back so it can be retried
     if (!ok && kind==='text') setText(t => t || payload);
     taRef.current?.focus();
@@ -229,7 +240,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
         <img src=${bg} alt="" referrerpolicy="no-referrer" draggable=${false} onError=${e=>{ e.target.style.display='none'; }}/></div>`}
       ${bgGrad && html`<div class="chatbg" style=${`background:${bgGrad}`}></div>`}
       <div class="msgs" ref=${boxRef} onScroll=${onScroll}
-        onClick=${()=>setPane(p=>(p==='emoji'||p==='media'||p==='menu')?null:p)}>
+        onClick=${()=>setPane(p=>(p==='emoji'||p==='media'||p==='menu'||p==='fx')?null:p)}>
       ${bucket.hasMore && html`<button class="pill" style="align-self:center;margin-bottom:10px;flex:none" onClick=${()=>loadMsgs(sel, rows[0]?.created_at)}>↑ Load earlier</button>`}
       ${!bucket.loaded && html`<div class="small" style="align-self:center;padding:24px 0">Loading…</div>`}
       ${bucket.loaded && !rows.length && html`<div class="chatzero">
@@ -245,6 +256,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
             onUnsend=${()=>{ unsendMsg(it.m); setSelMsg(null); }}
             onReport=${()=>{ setSelMsg(null); setPane('report:'+it.m.id); }}
             canModRemove=${isFounder} onImg=${u=>setLightbox(u)} onImgLoad=${onMedia}
+            onFx=${fx=>playFx(fx)}
             renderMedia=${m=>html`<${SnapBubble} m=${m} mine=${m.sender===uid} row=${mediaRows[m.body]} onLoad=${onMedia} onOpenOnce=${openOnce}/>`}
             onOpenSender=${()=>{ if(!mod) onOpenFriend(it.m.sender); }} />`)}
       ${seen && html`<div class="seen">Seen</div>`}
@@ -277,9 +289,16 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
           onInput=${e=>{ setText(e.target.value); grow(); pingTyping(); }}
           onKeyDown=${e=>{ if (e.key==='Enter' && !e.shiftKey && window.innerWidth>=900) { e.preventDefault(); if (canSend) doSend(); } }}></textarea>
       </div>
+      ${canSend && html`<button class="cbtn" aria-label="Send with an effect" title=${plus ? 'Send with an effect' : 'Message effects · Orbit+'} onClick=${()=> plus ? setPane(pane==='fx'?null:'fx') : onPlus && onPlus()}><${Glyph} k="spark" size=${18}/></button>`}
       ${canSend && flags.scheduled!==false && html`<button class="cbtn" aria-label="Send later" title=${plus ? 'Send later' : 'Send later · Orbit+'} onClick=${()=> plus ? setPane('later') : onPlus && onPlus()}><${Glyph} k="clock" size=${18}/></button>`}
       <button class="csend" disabled=${!canSend} onClick=${()=>doSend()} aria-label="Send"><${IcSend} size=${16}/></button>
       ${pane==='emoji' && html`<${EmojiPop} onPick=${em=>{ setText(t=>t+em); requestAnimationFrame(grow); }} onClose=${()=>{ setPane(null); taRef.current?.focus(); }}/>`}
+      ${pane==='fx' && html`<div class="chatpop glass fxpop">
+        <div class="poptabs"><span class="small" style="padding:0 4px">Send with an effect</span>
+          <button style="margin-left:auto" onClick=${()=>setPane(null)} aria-label="Close"><${IcX} size=${13}/></button></div>
+        <div class="fxgrid">${Object.entries(MSG_FX).map(([k,f])=>html`<button key=${k} class=${'fxbtn fx-'+k}
+          onClick=${()=>doSend('text', null, k)}><span><${Glyph} k=${f.g} size=${20}/></span>${f.name}</button>`)}</div>
+      </div>`}
       ${pane==='media' && html`<${MediaPop} onSend=${(kind,u)=>doSend(kind,u)} onClose=${()=>setPane(null)}/>`}
     </div>`}
 

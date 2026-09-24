@@ -1,6 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
-import { html, useState } from './lib.js';
-import { actOf, ago, DAYS, Glyph, GlyphTile, Sym, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { html, useEffect, useState } from './lib.js';
+import { playFx } from './fx.js';
+import { entranceOf, actOf, ago, DAYS, Glyph, GlyphTile, Sym, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
 import { LiveConnections, LiveLine } from './connect.js';
 import { StoryRing } from './stories.js';
 import { AdCard } from './ads.js';
@@ -187,6 +188,8 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
    ============================================================ */
 
 export function FriendDash({ f, uid, classesBy, events, presence, onBack, onPoke, onPing, onPlan, onPick, onReport, onMessage }) {
+  // an Orbit+ member's entrance plays once each time their profile opens
+  useEffect(()=>{ const e = entranceOf(f); if (e) playFx(e==='meteor' ? 'meteor' : e==='bloom' ? 'bloom' : 'warp', { ms:1800 }); }, [f.id]);
   const st = statusOf(f.id, classesBy, events);
   const pres = presence[f.id];
   const hereD = presencePlace(pres);

@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
 import { DISCORD_ID, LiveConnections, discordAvatar, lanyard, lastError } from './connect.js';
-import { auraOf, ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { auraOf, nameFxOf, coverFxOf, plusTier, ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -10,7 +10,10 @@ export function Avatar({ p, size=44, badge=null, ring=null }) {
      the avatar so it reads the same at 24px in a chat and 68px on a profile.
      Pure CSS, and stilled at data-perf 2 / reduced motion in styles.css. */
   const aura = size >= 22 ? auraOf(p) : null;
-  const core = aura ? html`<div class=${'aura aura-'+aura} style=${`--as:${size}px;--aa:${a1};--ab:${a2}`}>${face}<i class="aura-fx" aria-hidden="true"></i></div>` : face;
+  // three layers: a flat glow behind, a (possibly 3D-tilted) back layer, and a
+  // front layer — so a ring can pass BEHIND the avatar and then in front of it
+  const core = aura ? html`<div class=${'aura aura-'+aura+(size < 34 ? ' aura-sm' : '')} style=${`--as:${size}px;--aa:${a1};--ab:${a2}`}>
+    <i class="aura-g" aria-hidden="true"></i><i class="aura-b" aria-hidden="true"></i>${face}<i class="aura-f" aria-hidden="true"></i></div>` : face;
   if (ring) return html`<div class="avwrap">
     <div class=${'ring'+(ring==='live'?' live':'')} style=${ring==='live' ? `background:conic-gradient(from 0deg, ${a1}, ${a2}, ${a1})` : 'background:rgba(255,255,255,.12)'}><div>${core}</div></div>
     ${badge}</div>`;
@@ -35,7 +38,10 @@ export function NameFx({ p, text, style='' }) {
   const fl = flairOf(p);
   const label = text ?? shownName(p);
   const grad = Array.isArray(fl.ng) && fl.ng.length===2 && fl.ng.every(c=>safeColor(c)) ? fl.ng : null;
-  const nameEl = grad
+  const nfx = nameFxOf(p);
+  const nameEl = nfx
+    ? html`<span class=${'nfx nfx-'+nfx} data-t=${label} style=${`--na:${grad?grad[0]:safeColor(p?.accent1,'#b06bff')};--nb:${grad?grad[1]:safeColor(p?.accent2,'#2dd4bf')};${style}`}>${label}</span>`
+    : grad
     ? html`<span class=${'ngrad'+(fl.anim?' shine':'')} style=${`background-image:linear-gradient(90deg,${grad[0]},${grad[1]},${grad[0]});${style}`}>${label}</span>`
     : html`<span style=${style}>${label}</span>`;
   if (!fl.sig) return nameEl;
@@ -45,8 +51,9 @@ export function NameFx({ p, text, style='' }) {
 // badge chips next to a name — defined in badge_defs, granted server-side only
 export function BadgeChips({ p }) {
   const b = badgesOf(p).map(k=>BADGE_DEFS[k]).filter(Boolean);
-  if (!b.length) return null;
-  return html`<${Fragment}>${b.map(d=>html`<span key=${d.label} class="badgechip" title=${d.blurb||''} style=${d.color?`color:${d.color};border-color:color-mix(in srgb, ${d.color} 45%, transparent)`:''}><${Sym} v=${d.icon} size=${11}/>${d.label}</span>`)}<//>`;
+  const t = plusTier(p);
+  if (!b.length && !t) return null;
+  return html`<${Fragment}>${t && html`<span class=${'plustier t-'+t.key} title=${`Orbit+ ${t.name} · ${Math.floor(t.months)} month${Math.floor(t.months)===1?'':'s'}`}><${Glyph} k=${t.g} size=${11}/>${t.name}</span>`}${b.map(d=>html`<span key=${d.label} class="badgechip" title=${d.blurb||''} style=${d.color?`color:${d.color};border-color:color-mix(in srgb, ${d.color} 45%, transparent)`:''}><${Sym} v=${d.icon} size=${11}/>${d.label}</span>`)}<//>`;
 }
 
 export function TileGlyph({ e, size=40 }) {
@@ -1020,7 +1027,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
    moderation view, per-chat looks (theme / font / background).
    ============================================================ */
 
-export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUnsend, onReport, canModRemove, onImg, onImgLoad, onOpenSender, renderMedia }) {
+export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUnsend, onReport, canModRemove, onImg, onImgLoad, onOpenSender, renderMedia, onFx }) {
   const cls = 'bub ' + (mine?'me':'them') + (cont?' cont':'');
   return html`<div class=${'msgrow'+(mine?' me':'')+(cont?'':' gap')}>
     ${!mine && group && html`<div class="msgav">${!cont && html`<button style="background:none;border:none;padding:0;cursor:pointer" onClick=${onOpenSender}><${Avatar} p=${p||{}} size=${24}/></button>`}</div>`}
@@ -1029,7 +1036,7 @@ export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUn
       ${m.deleted
         ? html`<div class=${cls+' gone'}>message unsent</div>`
         : m.kind==='text'
-        ? html`<div class=${cls} onClick=${onSel}><${RichText} text=${m.body}/></div>`
+        ? html`<div class=${cls+(m.fx?' hasfx':'')} onClick=${onSel}><${RichText} text=${m.body}/>${m.fx && html`<button class="fxtag" aria-label="Replay effect" onClick=${e=>{ e.stopPropagation(); onFx && onFx(m.fx); }}><${Glyph} k="spark" size=${11}/></button>`}</div>`
         : m.kind==='media'
         ? html`<div class=${cls+' pic snapbub'} onClick=${onSel}>${renderMedia ? renderMedia(m) : 'snap'}</div>`
         : html`<div class=${cls+' pic'} onClick=${onSel}>
@@ -1060,6 +1067,7 @@ export function CoverImg({ p }) {
     ${!p?.cover_url && html`<div class="mapstars"></div>`}
     ${p?.cover_url && html`<img class="cimg" src=${p.cover_url} alt="" referrerpolicy="no-referrer"
       style=${posVars(p.cover_pos)} onError=${e=>{e.target.style.display='none'}}/>`}
+    ${coverFxOf(p) && html`<div class=${'coverfx cfx-'+coverFxOf(p)} aria-hidden="true"><i></i><i></i><i></i></div>`}
   </div>`;
 }
 

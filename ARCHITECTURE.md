@@ -26,7 +26,8 @@ Orbit/
 ├── chat.js           Chat (snaps, streaks, send later)
 ├── media.js          24h photos/videos: camera, on-device re-encode, upload, SnapBubble
 ├── stories.js        Stories rail rings, full-screen viewer, seen-by
-├── plus.js           Orbit+ page, perks, redeem codes, aura picker
+├── plus.js           Orbit+ studio: try-on for auras + effects, tier ladder, redeem codes
+├── fx.js             Full-screen particle effects (message effects, profile entrances)
 ├── ads.js            Ad slots (home / chats / stories) + the staff Ads manager
 ├── settings.js       Settings
 ├── staff.js          Mission Control: dashboard, reports, members, content, Orbit+, ads, controls
