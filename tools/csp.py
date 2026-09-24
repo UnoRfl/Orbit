@@ -33,7 +33,10 @@ STATIC = [
     # htm builds elements with style="..." attributes all over the app, and
     # style-src governs style ATTRIBUTES too. Style injection is a far smaller
     # prize than script injection, so this is the one place unsafe-inline stays.
-    ("style-src", "'self' 'unsafe-inline' https://fonts.googleapis.com"),
+    # cdnjs serves MapLibre's stylesheet. Leaving it out (2026-09-16 to -24)
+    # blocked that file, so .maplibregl-marker lost `position:absolute` and
+    # every pin was laid out in normal flow and slid about whenever the map zoomed.
+    ("style-src", "'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com"),
     ("font-src", "'self' data: https://fonts.gstatic.com"),
     # Avatars, covers and chat backgrounds are URLs people paste themselves, so
     # this cannot be an allowlist of hosts. https: still rules out http: and

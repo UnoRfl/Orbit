@@ -940,12 +940,25 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
    got animated instead of applied — the pins slid along behind the map and
    ended up wherever the animation had got to. Never transform or transition a
    marker root; do it on something inside. */
-.geopin{position:relative;cursor:pointer}
+.geopin{cursor:pointer}
 .geopin-in{display:flex;flex-direction:column;align-items:center;position:relative;
-  transform:translateY(4px);transition:transform var(--t-fast) var(--ease-morph)}
-.geopin:hover .geopin-in{transform:translateY(1px)}
+  transform:translateY(-7px);transition:transform var(--t-fast) var(--ease-morph)}
+/* The marker is anchored 'bottom', so its layout box must end exactly at the
+   pin's tip. The head is a 34px square turned 45deg, whose point hangs ~7px
+   below the square's own box — hence the -7px — and the label is taken out of
+   flow, or the anchor lands on the label and the tip points ~16px north of
+   the real spot. */
+.geopin:hover .geopin-in{transform:translateY(-10px)}
 /* Belt and braces: whatever anyone adds later, the map owns this transform. */
 .maplibregl-marker{transition:none!important}
+/* Backstop for MapLibre's own stylesheet. If that file ever fails to load
+   (it was blocked by the CSP for a week), markers fall back to normal flow and
+   the per-frame translate is applied on top of their flow offset — pins drift
+   off their spot on every zoom. Two classes deep so load order can't undo it,
+   and nothing here may set `position` on a marker root. */
+.geowrap .maplibregl-marker{position:absolute;top:0;left:0;will-change:transform}
+.geowrap .maplibregl-canvas{position:absolute;left:0;top:0}
+.geowrap .maplibregl-canvas-container{position:absolute;inset:0}
 .geopin-i{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50% 50% 50% 4px;
   transform:rotate(-45deg);font-size:15px;
   background:radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--ph,var(--major)) 62%, transparent), rgba(18,12,26,.96));
@@ -956,7 +969,7 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .geopin-n{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:var(--now);
   color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;
   border:1.5px solid var(--canvas)}
-.geopin-l{margin-top:3px;font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+.geopin-l{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
   background:rgba(12,8,18,.78);border-radius:999px;padding:2px 7px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
 
 .geoctl{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;gap:7px}
@@ -987,7 +1000,7 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 }
 
 /* a friend broadcasting live, drawn on the map */
-.livedot{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.livedot{display:flex;flex-direction:column;align-items:center;cursor:pointer}
 .livedot-ring{position:absolute;top:-5px;left:50%;width:44px;height:44px;margin-left:-22px;border-radius:50%;
   border:2px solid var(--ge);opacity:.55;animation:livering 2.4s ease-out infinite;pointer-events:none}
 @keyframes livering{0%{transform:scale(.62);opacity:.7}70%{transform:scale(1.12);opacity:0}100%{opacity:0}}
