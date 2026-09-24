@@ -348,7 +348,7 @@ export function LookPane({ isDm, look, onSave, onClose }) {
         : html`
       <div class="sheethead" style="margin-bottom:8px">
         <div class="sheettitle" style="font-size:16px">Personalize this chat</div>
-        <button class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
+        <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
       </div>
       <div class="flabel">Theme · ${th.name}</div>
       <div class="chiprow">${Object.entries(CHAT_THEMES).map(([id,t])=>html`<button key=${id}
@@ -389,7 +389,7 @@ export function ReportMsgPane({ m, onSend, onClose }) {
     <div class="chatovercard">
       <div class="sheethead" style="margin-bottom:8px">
         <div class="sheettitle" style="font-size:16px">Report message</div>
-        <button class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
+        <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
       </div>
       <div class="modsnip" style="margin-top:0">${m.kind==='text' ? `“${m.body.slice(0,140)}”` : `[${m.kind}] ${m.body.slice(0,120)}`}</div>
       <div class="stack" style="margin-top:10px">${REASONS.map(x=>html`<button key=${x} class="cardrow"
@@ -410,7 +410,7 @@ export function FriendPickPop({ friends, onPick, onClose }) {
     <div class="chatovercard" style="max-width:440px">
       <div class="sheethead" style="margin-bottom:10px">
         <div class="sheettitle" style="font-size:16px">New message</div>
-        <button class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
+        <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
       </div>
       <input class="input" style="margin:0 0 10px" placeholder="Search friends" value=${q} onInput=${e=>setQ(e.target.value)}/>
       <div class="stack" style="max-height:300px;overflow-y:auto">

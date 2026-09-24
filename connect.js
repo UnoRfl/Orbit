@@ -150,6 +150,7 @@ function LiveCard({ it }) {
   const timed = !!(it.start && it.end);
   useTick(timed || !!it.start, timed ? 1000 : 30e3);
   const c = HUE[it.kind] || '#8b7bff';
+  // Lanyard can lag a track change by up to a poll, so never run past the song's own length
   const pct = timed ? Math.min(100, Math.max(0, (Date.now() - it.start) / (it.end - it.start) * 100)) : 0;
   const open = it.kind === 'spotify' && it.track ? `https://open.spotify.com/track/${it.track}` : null;
   const inner = html`
@@ -161,7 +162,7 @@ function LiveCard({ it }) {
       ${it.sub && html`<div class="lvsub">${it.kind === 'spotify' ? `by ${it.sub}` : it.sub}</div>`}
       ${it.line && html`<div class="lvsub">${it.line}</div>`}
       ${timed ? html`<div class="lvbar"><i style=${`width:${pct}%;background:${c}`}></i></div>
-        <div class="lvtime"><span>${mmss((Date.now() - it.start) / 1000)}</span><span>${mmss((it.end - it.start) / 1000)}</span></div>`
+        <div class="lvtime"><span>${mmss(Math.min(Date.now() - it.start, it.end - it.start) / 1000)}</span><span>${mmss((it.end - it.start) / 1000)}</span></div>`
         : it.start ? html`<div class="lvsub lvfor"><${Glyph} k="bolt" size=${11}/> for ${since(it.start)}</div>` : ''}
     </div>`;
   return open ? html`<a class="lvcard" href=${open} target="_blank" rel="noopener noreferrer">${inner}</a>` : html`<div class="lvcard">${inner}</div>`;

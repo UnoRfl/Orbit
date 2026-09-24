@@ -35,7 +35,11 @@ Keep that split in mind and most bug reports point themselves at a file.
 | `components.js` | **Shared** UI reused across tabs | `Avatar`, `Sheet`, `Grid`, `AuthScreen`, `You` (profile view), `Bubble`, `Toggle` |
 | `shell.js` | **Data hub** + navigation/layout. Loads Supabase, runs realtime, routes tabs | `Shell`, `ConfirmHost` |
 | `home.js` | Home tab — who's free, friend dashboard, friends sheet | `Home`, `FriendDash`, `FriendsSheet` |
-| `map.js` | Map tab — galaxy/systems/planets, add system & planet, sharing | `MapScreen`, `SystemPeople`, `NewSystemForm` |
+| `glyphs.js` | Orbit's symbol set. Symbols are stored by key (`'coffee'`); legacy emoji map via `toGlyph` | `Glyph`, `GlyphTile`, `Sym`, `*_SET` |
+| `connect.js` | Live linked accounts — Discord presence via Lanyard (Spotify, games, status), GitHub | `LiveConnections`, `LiveLine`, `lanyard`, `github` |
+| `map.js` | Map tab — overview (galaxy) and a system's real map, add system & place, sharing | `MapScreen`, `SystemPeople`, `NewSystemForm` |
+| `galaxy.js` | The interactive galaxy on the Map tab (rAF-driven; no CSS transitions on nodes) | `Galaxy` |
+| `updates.js` | Updates panel behind the top-bar button, unread per device | `UpdatesPanel`, `PublishUpdate` |
 | `plans.js` | Plans tab — events, invites, pings, **schedule import** | `Plans`, `Creator`, `ImportSheet`, `parseScheduleFile` |
 | `chat.js` | Chat tab — threads, messages, media/emoji, typing | `ChatsScreen`, `ChatView`, `MediaPop` |
 | `settings.js` | Settings tab — theme, background, account email/password | `Settings` |
@@ -60,7 +64,10 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | "Who's free" list wrong | `home.js` | `shell.js` (the data) |
 | Planet in wrong spot / can't add planet or system | `map.js` | `core.js` (`decodePlace`, hue helpers) |
 | System sharing / members / permissions | `map.js` (`SystemPeople`) | `shell.js` (`systems`, `system_members`) |
-| Imported schedule has wrong times / classes | `plans.js` (`parseScheduleFile`) | `core.js` (`toMin`, `fmt`, `nowInfo`) |
+| Imported schedule has wrong times / classes | `plans.js` (`parseScheduleFile`) | `core.js` (`toMin`, `fmt`, `nowInfo`); `replace_classes` RPC |
+| A plan shows on the wrong day / overnight plan wrong | `core.js` (`evSpan`, `evPieces`, `whenLabel`) | `plans.js` (`WhenPicker`); `events.starts_at/ends_at` |
+| Spotify / game status missing on a profile | `connect.js` | the person joined discord.gg/lanyard? CSP `connect-src` in `tools/csp.py` |
+| An icon shows as a word or a dot | `glyphs.js` (`GLYPHS`, the emoji map) | the stored value (`systems.glyph`, `planets.icon`, …) |
 | Schedule grid looks off / blocks overlap | `components.js` (`Grid`) | `core.js` (`HOUR/START/END`), `styles.css` |
 | Event / invite / ping not working | `plans.js` | `shell.js` (`events`, `pings`, `notifications`) |
 | Messages won't send / receive | `chat.js` (`ChatView`) | `shell.js` (`orbit-chat`, `messages`, `dm_threads`) |
@@ -113,6 +120,11 @@ in the repo).
 ---
 
 ## 6. Invariants (things that must stay true)
+
+- **No emoji as symbols.** Anything that isn't someone's own words uses `glyphs.js`; emoji are for chat.
+- **Plans are dated.** Compare plans through `evSpan`/`evPieces`, never `e.day`.
+- **New external host?** Add it to the right directive in `tools/csp.py` (style-src too, for stylesheets), then `python tools/csp.py --write`.
+- **Tests:** `node --import ./tests/setup.mjs --test tests/logic.test.mjs` — CI runs it on every push.
 
 - **No build step.** Files load natively as ES modules. Every file imports what it uses from
   the layer below; imports point downward only — never make `core.js` import a tab file.

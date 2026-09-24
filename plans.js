@@ -237,8 +237,8 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">${sys ? 'New cosmic event' : 'New plan'}</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
-    ${sys && html`<div class="hint" style="margin-top:-8px;margin-bottom:8px">For the ${sys.glyph} ${sys.name} system — members get the invite, and accepting drops it straight onto their schedule.</div>`}
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+    ${sys && html`<div class="hint" style="margin-top:-8px;margin-bottom:8px">For the ${sys.name} system — members get the invite, and accepting drops it straight onto their schedule.</div>`}
 
     <div style="display:flex;gap:8px">
       ${Object.entries(KINDS).map(([k,K])=>html`<button key=${k}
@@ -331,7 +331,7 @@ export function Inbox({ uid, pings, notifs=[], events=[], sysInvites=[], profile
     <div class="sheethead"><div class="sheettitle">Signals</div>
       <div style="display:flex;gap:8px;align-items:center">
         ${rows.length>0 && html`<button class="btn" style="padding:7px 11px;font-size:11.5px" onClick=${onClear}>Clear all</button>`}
-        <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button>
+        <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button>
       </div></div>
     ${!rows.length && html`<div class="small" style="text-align:center;padding:18px 0">No signals yet. Pokes, invites, and cosmic events land here — and sweep themselves out after 7 days.</div>`}
     <div class="stack">
@@ -441,7 +441,7 @@ export function ImportSheet({ onClose, onImport }) {
   }
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Import schedule</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin:0 0 14px">Send your registration form to Claude and ask for an <b>Orbit schedule file</b>. Upload the .json it gives you and your whole week fills itself in.</div>
     <input ref=${fileRef} type="file" accept=".json,.txt,application/json,text/plain" style="display:none" onChange=${pickFile}/>
     <button class="btn btn-grad btn-block" onClick=${()=>fileRef.current && fileRef.current.click()}>

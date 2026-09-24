@@ -64,8 +64,8 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
             <div class="rowsub">${nameOf(mem.invited_by)} invited you to this system</div>
           </div>
           <div style="display:flex;gap:6px;flex:none">
-            <button class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>onSysInvite(sys,true)}><${IcCheck} size=${13}/></button>
-            <button class="btn" style="padding:7px 10px" onClick=${()=>onSysInvite(sys,false)}><${IcX} size=${13}/></button>
+            <button aria-label="Accept" class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>onSysInvite(sys,true)}><${IcCheck} size=${13}/></button>
+            <button aria-label="Decline" class="btn" style="padding:7px 10px" onClick=${()=>onSysInvite(sys,false)}><${IcX} size=${13}/></button>
           </div>
         </div>`)}
         ${myInvites.map(e=>{ const K=KINDS[e.kind]||KINDS.hangout; return html`<div key=${e.id} class="cardrow" style="cursor:default">
@@ -75,8 +75,8 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
             <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
           </div>
           <div style="display:flex;gap:6px;flex:none">
-            <button class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>onRespond(e.id,'accepted')}><${IcCheck} size=${13}/></button>
-            <button class="btn" style="padding:7px 10px" onClick=${()=>onRespond(e.id,'declined')}><${IcX} size=${13}/></button>
+            <button aria-label="Accept" class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>onRespond(e.id,'accepted')}><${IcCheck} size=${13}/></button>
+            <button aria-label="Decline" class="btn" style="padding:7px 10px" onClick=${()=>onRespond(e.id,'declined')}><${IcX} size=${13}/></button>
           </div>
         </div>`;})}
       </div>
@@ -276,12 +276,12 @@ export function FriendsSheet({ uid, graph, profiles, blocks=[], sendRequest, acc
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Friends</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
 
     <div style="display:flex;gap:8px">
       <input class="input" placeholder="Search by handle or name…" value=${q}
         onInput=${e=>setQ(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')search()}} autocapitalize="none"/>
-      <button class="btn" style="flex:none;padding:11px 13px" onClick=${search}><${IcSearch} size=${16}/></button>
+      <button aria-label="Search" class="btn" style="flex:none;padding:11px 13px" onClick=${search}><${IcSearch} size=${16}/></button>
     </div>
     ${busy && html`<div class="small" style="margin-top:10px">searching…</div>`}
     ${results && !busy && html`<div class="stack" style="margin-top:12px">
@@ -312,8 +312,8 @@ export function FriendsSheet({ uid, graph, profiles, blocks=[], sendRequest, acc
               <div class="rowname">${p?(shownName(p)||'Someone'):'Someone'}</div>
               <div class="rowsub">@${p?.handle||'…'}</div>
             </div>
-            <button class="btn btn-soft-green" style="padding:8px 12px;flex:none" onClick=${()=>acceptRequest(r)}><${IcCheck} size=${14}/></button>
-            <button class="btn" style="padding:8px 12px;flex:none" onClick=${()=>removeFriendship(r.id)}><${IcX} size=${14}/></button>
+            <button aria-label="Accept" class="btn btn-soft-green" style="padding:8px 12px;flex:none" onClick=${()=>acceptRequest(r)}><${IcCheck} size=${14}/></button>
+            <button aria-label="Decline" class="btn" style="padding:8px 12px;flex:none" onClick=${()=>removeFriendship(r.id)}><${IcX} size=${14}/></button>
           </div>`;})}
       </div>
     </div>`}
@@ -342,7 +342,7 @@ export function FriendsSheet({ uid, graph, profiles, blocks=[], sendRequest, acc
             <div class="rowsub">@${p.handle}</div>
           </div>
         </button>
-        <button class="btn" style="padding:8px 11px;flex:none" title="Unfriend"
+        <button aria-label="Unfriend" class="btn" style="padding:8px 11px;flex:none" title="Unfriend"
           onClick=${async()=>{ if(await ui.confirm({ title:`Remove ${shownName(p)}?`, body:'They drop off your orbit and you off theirs. You can add each other again anytime.', confirmLabel:'Remove', danger:true })) removeFriendship(row.id); }}><${IcTrash} size=${14}/></button>
       </div>`)}
     </div>

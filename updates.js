@@ -97,7 +97,7 @@ export function PublishUpdate({ onPublish, onClose }) {
   const [busy, setBusy] = useState(false);
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Publish an update</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:4px">Lands in everyone's Updates panel, live.</div>
     <div class="flabel">Emoji</div>
     <div class="glyphgrid">${UPDATE_SET.map(g=>html`<button key=${g} class=${'glyphbtn'+(emoji===g?' on':'')}

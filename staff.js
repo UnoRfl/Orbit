@@ -100,7 +100,7 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
       <div>
         <${Eyebrow} color="var(--major)">Mission control<//>
         <div class="small" style="margin-top:5px">signed in as <b style="color:var(--ink)">${fname(me)}</b>
-          <span class="badgechip" style=${'margin-left:6px;vertical-align:1px;'+chipStyle(BADGE_DEFS[myRole])}><span style="font-size:10px;opacity:.8">${BADGE_DEFS[myRole]?.icon}</span>${BADGE_DEFS[myRole]?.label}</span></div>
+          <span class="badgechip" style=${'margin-left:6px;vertical-align:1px;'+chipStyle(BADGE_DEFS[myRole])}><${Sym} v=${BADGE_DEFS[myRole]?.icon} size=${11}/>${BADGE_DEFS[myRole]?.label}</span></div>
       </div>
       <button class="btn" style="padding:8px 12px;flex:none" onClick=${reload}>↻ Refresh</button>
     </div>
@@ -155,7 +155,7 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
 
     ${sec==='badges' && isFounder && html`<div style="margin-top:10px">
       ${badgeList().map(([slug,d])=>html`<div key=${slug} class="staffrow" style="align-items:center">
-        <span class="badgechip" style=${chipStyle(d)}><span style="font-size:10px;opacity:.8">${d.icon}</span>${d.label}</span>
+        <span class="badgechip" style=${chipStyle(d)}><${Sym} v=${d.icon} size=${11}/>${d.label}</span>
         <div style="flex:1;min-width:0"><div class="rowsub" style="white-space:normal">${d.tier==='power' ? 'Role — carries staff abilities' : 'Recognition — zero permissions'}${d.blurb?` · ${d.blurb}`:''}</div></div>
         ${d.tier!=='power' && html`<button class="btn" style="padding:7px 10px;flex:none" aria-label="Delete badge"
           onClick=${async()=>{ if(await ui.confirm({ title:`Delete the ${d.label} badge?`, body:'It disappears from every profile that has it.', confirmLabel:'Delete', danger:true })) actions.deleteBadgeDef(slug); }}><${IcTrash} size=${13}/></button>`}
@@ -203,7 +203,7 @@ export function ReportSheet({ f, onSend, onClose }) {
   const [r, setR] = useState(null); const [d, setD] = useState(''); const [busy, setBusy] = useState(false);
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Report ${fname(f)||('@'+(f?.handle||''))}</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px">Goes straight to Orbit staff — one report per person per day.</div>
     <div class="flabel">Reason</div>
     <div class="stack">${REASONS.map(x=>html`<button key=${x} class="cardrow" style=${r===x?'border-color:var(--now);background:rgba(255,93,143,.08)':''}

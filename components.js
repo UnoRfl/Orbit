@@ -178,7 +178,7 @@ export function SetStatusSheet({ current, onSet, onClose }) {
   const sel = ACTIVITY_CATALOG.find(e=>e.id===pick);
   return html`<div>
     <div class="sheethead"><div class="sheettitle">What are you on?</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="pillrow">
       ${Object.entries(ACT_KINDS).map(([id,v])=>html`<button key=${id} class=${'pill'+(k===id?' on':'')} style="font-weight:600"
         onClick=${()=>{ setK(id); setPick(null); }}>${v.label}</button>`)}
@@ -865,7 +865,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <input class="input" maxlength="24" value=${hobbyIn} onInput=${e=>setHobbyIn(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')addHobby()}} placeholder="add your own — Fishing"/>
-        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!hobbyIn.trim()||p.hobbies.length>=10} onClick=${addHobby}><${IcPlus} size=${14}/></button>
+        <button aria-label="Add hobby" class="btn" style="flex:none;padding:11px 13px" disabled=${!hobbyIn.trim()||p.hobbies.length>=10} onClick=${addHobby}><${IcPlus} size=${14}/></button>
       </div>
 
       <div class="set-eyebrow" style="margin:18px 0 2px">Connections · ${p.links.length}/5</div>
@@ -885,7 +885,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
       ${linkPick && html`<div style="display:flex;gap:8px;margin-top:8px">
         <input class="input" maxlength="30" value=${linkIn} onInput=${e=>setLinkIn(e.target.value)} autocapitalize="none"
           placeholder=${'your '+(SOCIALS[linkPick]?.name||'')+' handle'} onKeyDown=${e=>{ if(e.key==='Enter') addLink(); }}/>
-        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!cleanSocial(linkIn)} onClick=${addLink}><${IcPlus} size=${14}/></button>
+        <button aria-label="Add link" class="btn" style="flex:none;padding:11px 13px" disabled=${!cleanSocial(linkIn)} onClick=${addLink}><${IcPlus} size=${14}/></button>
       </div>`}
       ${linkPick==='discord' && html`<div class="dcbox">
         <div class="flabel" style="margin-top:4px">Discord user ID · for your live status</div>
@@ -1052,7 +1052,7 @@ export function ImageAdjust({ url, round=false, aspect='1 / 1', pos, onChange, o
   const up = () => { drag.current=null; };
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Frame your ${round?'photo':'cover'}</div>
-      <button class="xbtn" onClick=${onDone}><${IcX} size=${16}/></button></div>
+      <button aria-label="Done" class="xbtn" onClick=${onDone}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:12px">Drag to move · slide to zoom. ${round?'The circle is exactly what friends see.':'The whole frame is exactly what friends see.'}</div>
     <div class="adjframe" ref=${ref} style=${`aspect-ratio:${aspect};${round?'max-width:320px;margin:0 auto':''}`}
       onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>

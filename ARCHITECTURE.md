@@ -11,22 +11,29 @@ Orbit/
 ├── index.html        Shell: <head>, import map, boot markup, entry <script>
 ├── styles.css        All global styles
 ├── lib.js            Vendor bindings: Preact, hooks, htm (html), Supabase client
-├── core.js           Config, themes, catalogs, store, helpers, icons
+├── glyphs.js         Orbit's own symbol set (Glyph, GlyphTile, Sym) — no emoji as symbols
+├── core.js           Config, themes, catalogs, store, helpers, icons, plan time (evSpan…)
+├── connect.js        Live linked accounts: Discord via Lanyard, GitHub
 ├── components.js     Shared UI (Avatar, Sheet, Grid, AuthScreen, You, Bubble, Toggle…)
 ├── shell.js          Data hub + navigation (loads Supabase, runs realtime, routes tabs)
 ├── home.js           Home tab
-├── map.js            Map / galaxy tab
+├── map.js            Map tab (overview + a system's real map)
+├── galaxy.js         The Map tab's interactive galaxy overview
+├── geomap.js · live.js  Real map (MapLibre) · live location
+├── updates.js        Updates panel (top-bar button)
 ├── plans.js          Plans + schedule import
 ├── chat.js           Chat
 ├── settings.js       Settings
 ├── staff.js          Moderation panel
 ├── main.js           App root, session boot, background canvas
 ├── manifest.webmanifest · sw.js · icon.png · tos.html
-└── sql/             Reviewed migrations (see sql/README.md)
+├── avatars/          17 premade profile pictures (SVG)
+├── tests/            node:test unit tests (run in CI — .github/workflows/tests.yml)
+└── sql/             Migrations, applied and pending (see sql/README.md)
 ```
 
 Dependencies point downward only (no cycles):
-`lib → core → components → (home, map+geomap+live, plans, chat, settings, staff) → shell → main`
+`lib → glyphs → core → connect → components → (home, map+galaxy+geomap+live, plans, chat, settings, staff, updates) → shell → main`
 
 ## Full maintainer's guide
 

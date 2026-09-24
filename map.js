@@ -269,8 +269,8 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
               <div class="small" style="margin-top:3px;color:var(--pe)">${going.length} going${mineHost?' · your event':myInv?.status==='accepted'?' · you’re in':''}</div>
             </div>
             ${myInv?.status==='pending' && html`<div style="display:flex;gap:6px;flex:none">
-              <button class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>respondInvite(e.id,'accepted')}><${IcCheck} size=${13}/></button>
-              <button class="btn" style="padding:7px 10px" onClick=${()=>respondInvite(e.id,'declined')}><${IcX} size=${13}/></button>
+              <button aria-label="Accept" class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>respondInvite(e.id,'accepted')}><${IcCheck} size=${13}/></button>
+              <button aria-label="Decline" class="btn" style="padding:7px 10px" onClick=${()=>respondInvite(e.id,'declined')}><${IcX} size=${13}/></button>
             </div>`}
           </div>`;})}
       </div>
@@ -303,7 +303,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
           ${iAmHere
             ? html`<button class="btn btn-block" onClick=${leave}>Leave ${p.name}</button>`
             : html`<button class="btn btn-grad btn-block" onClick=${()=>checkIn(active, p)}><${Glyph} k="pin" size=${15}/> Check in here</button>`}
-          ${canDeletePlanet(p) && html`<button class="btn btn-soft-red" style="flex:none"
+          ${canDeletePlanet(p) && html`<button aria-label="Remove place" class="btn btn-soft-red" style="flex:none"
             onClick=${async()=>{ if(await ui.confirm({ title:`Remove ${p.name}?`, body:`Removed from ${active.name} for everyone.`, confirmLabel:'Remove', danger:true })) removePlanet(p); }}><${IcTrash} size=${14}/></button>`}
         </div>
       </div>`; })()}
@@ -329,7 +329,7 @@ export function NewSystemForm({ onSave, onClose }) {
   const ok = name.trim().length > 0;
   return html`<div>
     <div class="sheethead"><div class="sheettitle">New system</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:4px">A shared circle — a barkada, a class block, a home crew. You'll be the leader: invite friends, and everyone sees the same planets.</div>
     <div class="flabel">Name</div>
     <input class="input" placeholder="e.g. Barkada, Block 3B, Home crew" value=${name} maxLength=${24} onInput=${e=>setName(e.target.value)} />
@@ -349,7 +349,7 @@ export function AddPlanetForm({ system, onSave, onClose, at=null }) {
   const ok = name.trim().length > 0;
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Add a place</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:4px">A spot you actually go — home, a café, the mall. It becomes a place in ${system?.name}${system?.kind==='shared'?' that the whole circle can see':''}.</div>
     ${at && html`<div class="okbox gi" style="margin-top:10px"><${Glyph} k="pin" size=${14}/> Pinned where you tapped — ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}</div>`}
     <div class="flabel">Name</div>
@@ -375,7 +375,7 @@ export function SystemPeople({ sys, uid, me, friends, profiles, nameOf, actions,
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">${isLeader?'Manage system':sys.name}</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
 
     ${isLeader && html`<${Fragment}>
       <div class="flabel">Name</div>
@@ -412,14 +412,14 @@ export function SystemPeople({ sys, uid, me, friends, profiles, nameOf, actions,
           <div class="rowname">${m.user_id===uid?'You':(fname(profOf(m.user_id))||'??')}</div>
           <div class="rowsub gi">${m.role==='leader'?html`<${Glyph} k="crown" size=${12}/> Leader`:'Member'}</div>
         </div>
-        ${isLeader && m.user_id!==uid && html`<button class="btn btn-soft-red" style="padding:7px 10px;flex:none"
+        ${isLeader && m.user_id!==uid && html`<button aria-label="Remove member" class="btn btn-soft-red" style="padding:7px 10px;flex:none"
           onClick=${async()=>{ if(await ui.confirm({ title:`Remove ${nameOf(m.user_id)} from ${sys.name}?`, confirmLabel:'Remove', danger:true })) actions.kickMember(sys.key, m.user_id); }}><${IcX} size=${13}/></button>`}
       </div>`)}
       ${invited.map(m=>html`<div key=${m.user_id} class="cardrow" style="cursor:default;opacity:.65">
         <${Avatar} p=${profOf(m.user_id)} size=${34}/>
         <div style="min-width:0;flex:1"><div class="rowname">${fname(profOf(m.user_id))||'??'}</div>
         <div class="rowsub">Invited — waiting</div></div>
-        ${isLeader && html`<button class="btn" style="padding:7px 10px;flex:none"
+        ${isLeader && html`<button aria-label="Cancel invite" class="btn" style="padding:7px 10px;flex:none"
           onClick=${()=>actions.kickMember(sys.key, m.user_id)}><${IcX} size=${13}/></button>`}
       </div>`)}
     </div>

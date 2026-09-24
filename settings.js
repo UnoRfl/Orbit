@@ -49,7 +49,7 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Settings</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
 
     <div class="pillrow" style="margin-bottom:4px">
       ${[['look','Appearance',IcPalette],['account','Account',IcUser],['privacy','Privacy',IcShield]].map(([k,l,Ic])=>html`
