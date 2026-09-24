@@ -382,6 +382,13 @@ export function useLiveShare({ uid, myPres, setPres }) {
      a check-in made after the share started. Always use the current one. */
   const setPresRef = useRef(setPres);
   setPresRef.current = setPres;
+  /* The same goes for the row itself. A GPS write must never overrule an
+     opt-out that happened while it was in flight — acquisition alone can take
+     ~20s, and ghost/sharing-off during that window used to be undone by the
+     write that followed it. */
+  const presRef = useRef(myPres);
+  presRef.current = myPres;
+  const startSeq = useRef(0);       // bumped by stop(): cancels a pending start()
   const kal = useRef(null);
   if (!kal.current) kal.current = makeKalman();
 
@@ -389,9 +396,14 @@ export function useLiveShare({ uid, myPres, setPres }) {
   const active = !!until && until > Date.now() && !myPres?.ghost && !!myPres?.sharing;
   untilRef.current = until;
 
-  async function push(lat, lng, accuracy, untilIso) {
+  const optedOut = () => !!presRef.current?.ghost || !presRef.current?.sharing;
+
+  // `begin` is only true for the first write of a session the user just asked
+  // for; every later tick writes coordinates and nothing else.
+  async function push(lat, lng, accuracy, untilIso, begin = false) {
+    if (!begin && optedOut()) return;
     await setPresRef.current({
-      sharing: true, ghost: false,
+      ...(begin ? { sharing: true, ghost: false } : {}),
       live_lat: lat, live_lng: lng,
       live_acc: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
       live_until: untilIso,
@@ -399,6 +411,7 @@ export function useLiveShare({ uid, myPres, setPres }) {
   }
 
   async function stop(reason) {
+    startSeq.current++;
     if (watchId.current != null) {
       try { navigator.geolocation.clearWatch(watchId.current); } catch {}
       watchId.current = null;
@@ -417,8 +430,13 @@ export function useLiveShare({ uid, myPres, setPres }) {
     if (!navigator.geolocation) { setErr('This browser has no location support'); return; }
     const mins = Math.min(LIVE_MAX_MIN, Math.max(1, minutes | 0));
     const untilIso = new Date(Date.now() + mins * 60000).toISOString();
+    const seq = ++startSeq.current;
+    const g0 = !!presRef.current?.ghost, s0 = !!presRef.current?.sharing;
 
     const first = await acquireFix();
+    // stopped, restarted, or opted out (ghost on / sharing off) while GPS was acquiring
+    if (seq !== startSeq.current) return;
+    if ((!g0 && presRef.current?.ghost) || (s0 && !presRef.current?.sharing)) return;
     if (!first.ok) { setErr(fixError(first.e)); return; }
     const { latitude, longitude, accuracy } = first.p.coords;
     /* Feed the acquire burst's best fix through the filter rather than
@@ -430,7 +448,7 @@ export function useLiveShare({ uid, myPres, setPres }) {
                                { speed: first.p.coords.speed, heading: first.p.coords.heading });
     setAcc(k.acc);
     last.current = { at: Date.now(), lat: k.lat, lng: k.lng, acc: k.acc };
-    await push(k.lat, k.lng, k.acc, untilIso);
+    await push(k.lat, k.lng, k.acc, untilIso, true);
     /* Committing a coarse fix is deliberate — friends should see something
        immediately — but it is a neighbourhood, not a spot, and the watch below
        will replace it the moment GPS actually locks. Say that rather than
@@ -537,11 +555,16 @@ export function useLiveShare({ uid, myPres, setPres }) {
      Released the moment sharing ends, so it never outlives its reason. */
   useEffect(() => {
     if (!active || !('wakeLock' in navigator)) return;
-    let sentinel = null, dead = false;
+    let sentinel = null, dead = false, pending = false;
     const grab = async () => {
       try {
         if (dead || document.hidden || sentinel) return;
-        sentinel = await navigator.wakeLock.request('screen');
+        if (pending) return;
+        pending = true;
+        const s = await navigator.wakeLock.request('screen').finally(() => { pending = false; });
+        // the share ended while the request was pending: don't keep the screen on for nothing
+        if (dead) { s.release().catch(()=>{}); return; }
+        sentinel = s;
         sentinel.addEventListener('release', () => { sentinel = null; });
       } catch { /* denied, low battery, or unsupported — not worth telling anyone */ }
     };

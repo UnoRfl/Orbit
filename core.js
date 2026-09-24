@@ -77,6 +77,20 @@ export const NAME_FX = [
   { id:'gold',   name:'24K',    c:['#ffd43b','#fff3bf'] },
   { id:'chrome', name:'Chrome', c:['#f4f4f5','#8f8f98'] },
 ];
+/* Anything another user controls that ends up inside a style STRING must go
+   through one of these. Preact applies a string style as cssText, so a ';'
+   smuggled into an accent colour or a position adds declarations of its own —
+   a full-screen overlay on every avatar of that user, for everyone who sees it. */
+export const safeColor = (c, d) => /^#[0-9a-f]{3,8}$/i.test(String(c ?? '')) ? c : d;
+export const safeNum = (n, d = 0, lo = -400, hi = 400) => {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+};
+// `--cx:…%;--cy:…%;--cz:…` for the pan/zoom framing of an image
+export const posVars = pos => {
+  const q = (pos && typeof pos === 'object') ? pos : {};
+  return `--cx:${safeNum(q.x)}%;--cy:${safeNum(q.y)}%;--cz:${safeNum(q.z, 1, 0.2, 6)}`;
+};
 export const flairOf = p => (p && p.flair && typeof p.flair === 'object' && !Array.isArray(p.flair)) ? p.flair : {};
 
 /* profile identity — pronouns, hobbies, developer badges + event emojis */
@@ -281,6 +295,28 @@ export function bgFor(id, tier = perfTier()){
   return bgAllowed(pick, tier) ? pick : 'waves';
 }
 export const DEFAULT_PREFS = { asteroids:true, bgStyle:'waves', sounds:false, autoSpeed:60 };
+
+/* Sign-out on a shared device (a school lab PC) used to leave the last user
+   behind: their push subscription kept delivering DM previews to this
+   browser, their block list and device-pinned places seeded whoever signed
+   in next, and a live share kept advertising their last fix until it expired.
+   Every sign-out goes through here. The theme is kept — it is cosmetic. */
+export async function signOutClean() {
+  try {
+    const { data } = await sb.auth.getSession();
+    const id = data?.session?.user?.id;
+    if (id) await sb.from('presence')
+      .update({ live_lat:null, live_lng:null, live_acc:null, live_until:null }).eq('user_id', id);
+  } catch {}
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub) { await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); }
+  } catch {}
+  try { ['orbit.blocks','orbit.prefs','orbit.systems.v2','orbit.systems.migrated']
+          .forEach(k => localStorage.removeItem(k)); } catch {}
+  await sb.auth.signOut();
+}
 
 export const store = {
   getTheme(){ try{ return localStorage.getItem('orbit.theme') || 'nebula'; }catch{ return 'nebula'; } },

@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, resumeBg, sb, ui } from './core.js';
+import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, posVars, resumeBg, sb, ui } from './core.js';
 import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
 
 export function ChatsScreen({ kit }) {
@@ -138,7 +138,9 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
     if (!payload) return;
     if (kind==='text') { setText(''); requestAnimationFrame(grow); }
     setPane(null); stick.current = true;
-    await sendMsg(sel, { kind, body:payload }, peerId);
+    const ok = await sendMsg(sel, { kind, body:payload }, peerId);
+    // a failed send used to eat the draft; put it back so it can be retried
+    if (!ok && kind==='text') setText(t => t || payload);
     taRef.current?.focus();
   };
 
@@ -213,7 +215,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
     ${mod && html`<div class="modbar">👁 Founder moderation view — visible because this chat was reported</div>`}
 
     <div class="chatbody">
-      ${bg && html`<div class="chatbg shade" style=${`--cx:${bgPos.x||0}%;--cy:${bgPos.y||0}%;--cz:${bgPos.z||1}`}>
+      ${bg && html`<div class="chatbg shade" style=${posVars(bgPos)}>
         <img src=${bg} alt="" referrerpolicy="no-referrer" draggable=${false} onError=${e=>{ e.target.style.display='none'; }}/></div>`}
       ${bgGrad && html`<div class="chatbg" style=${`background:${bgGrad}`}></div>`}
       <div class="msgs" ref=${boxRef} onScroll=${onScroll}
@@ -367,7 +369,7 @@ export function LookPane({ isDm, look, onSave, onClose }) {
         onInput=${e=>setL(v=>({ ...v, bg:e.target.value, bgPos:{ x:0, y:0, z:1 } }))} inputmode="url" autocapitalize="none"/>
       ${isImg && html`<button class="btn" style="margin-top:8px;width:100%" onClick=${()=>setFraming(true)}>🖼️ Frame background · drag & zoom</button>`}
       <div class="lookdemo" style=${`font-family:${ff};${preset?`background:${preset}`:''}`}>
-        ${isImg && html`<div class="chatbg shade" style=${`--cx:${l.bgPos.x||0}%;--cy:${l.bgPos.y||0}%;--cz:${l.bgPos.z||1}`}>
+        ${isImg && html`<div class="chatbg shade" style=${posVars(l.bgPos)}>
           <img src=${l.bg.trim()} alt="" referrerpolicy="no-referrer" draggable=${false} onError=${e=>{ e.target.style.display='none'; }}/></div>`}
         <div class="bub them" style="position:relative;z-index:1;align-self:flex-start;cursor:default">preview 👀</div>
         <div class="bub me" style=${`position:relative;z-index:1;align-self:flex-end;cursor:default;background:${th.my}`}>looks like this ✨</div>

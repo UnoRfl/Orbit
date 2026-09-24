@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
@@ -316,7 +316,7 @@ export function Shell({ session }) {
       })
       .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, payload => {
         const n = payload.new || {};
-        if (payload.eventType==='INSERT' && n.addressee===uid)
+        if (payload.eventType==='INSERT' && n.addressee===uid && !blockRef.current.includes(n.requester))
           ensureProfiles([n.requester]).then(()=>toast(`Friend request from ${nameOf(n.requester)}`, '👥'));
         if (payload.eventType==='UPDATE' && n.status==='accepted' && n.requester===uid)
           toast(`${nameOf(n.addressee)} accepted your request`, '🎉');
@@ -341,7 +341,7 @@ export function Shell({ session }) {
       .on('postgres_changes', { event:'*', schema:'public', table:'system_members' }, () => later('shared', loadShared))
       .on('postgres_changes', { event:'*', schema:'public', table:'planets' }, () => later('shared', loadShared))
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'notifications', filter:`user_id=eq.${uid}` }, ({ new:n }) => {
-        if (!n) return;
+        if (!n || (n.actor && blockRef.current.includes(n.actor))) return;
         setNotifs(x => x.some(q=>q.id===n.id) ? x : [n, ...x]);
         if (prefsRef.current.sounds) pingChime();
         ensureProfiles([n.actor]).then(()=> toast(n.title, '🔔'));
@@ -380,7 +380,7 @@ export function Shell({ session }) {
         const openNow = chatSelRef.current && chatKeyOf(chatSelRef.current)===key && !document.hidden;
         if (openNow || chatReadsRef.current[key]?.muted) return;
         if (prefsRef.current.sounds) pingChime();
-        ensureProfiles([n.sender]).then(()=> toast(`${nameOf(n.sender)}: ${n.kind==='text' ? n.body.slice(0,60) : msgPreview(n)}`, '💬'));
+        ensureProfiles([n.sender]).then(()=> toast(`${nameOf(n.sender)}: ${n.kind==='text' ? (n.body||'').slice(0,60) : msgPreview(n)}`, '💬'));
       })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages' }, ({ new:n }) => {
         if (!n) return;
@@ -856,12 +856,15 @@ export function Shell({ session }) {
     return true;
   }
   async function importClasses(rows, { replace, profilePatch }) {
-    if (replace) {
-      const { error:de } = await sb.from('classes').delete().eq('owner', uid);
-      if (de) { toast('Could not clear your old schedule'); return false; }
-    }
+    // Insert first, then drop the old rows by id — deleting first meant any
+    // rejected row left you with no schedule at all.
+    const { data:old } = replace ? await sb.from('classes').select('id').eq('owner', uid) : { data:[] };
     const { error } = await sb.from('classes').insert(rows.map(r=>({ ...r, owner:uid })));
     if (error) { toast('Import failed — the file has values the database rejected'); return false; }
+    if (replace && old?.length) {
+      const { error:de } = await sb.from('classes').delete().in('id', old.map(r=>r.id));
+      if (de) toast('Imported, but could not clear your old schedule');
+    }
     if (profilePatch) await saveProfile(profilePatch, true);
     await loadClasses(friendIdsOf(graphRef.current));
     toast(`Imported ${rows.length} class${rows.length>1?'es':''}`, '📥');
@@ -882,7 +885,7 @@ export function Shell({ session }) {
       await sb.from('systems').delete().eq('owner', uid);
       await sb.from('profiles').delete().eq('id', uid);
     } catch(e) { /* best effort — RLS limits deletes to your own rows */ }
-    await sb.auth.signOut();
+    await signOutClean();
   }
 
   /* ---------- derived ---------- */
@@ -930,7 +933,7 @@ export function Shell({ session }) {
       <div style="font-weight:700;font-size:15px;font-family:'Space Grotesk',sans-serif">🔒 Account restricted</div>
       <div class="hint" style="margin-top:8px">${isBanned ? 'This account has been banned.' : `Suspended until ${suspUntil.toLocaleString()}.`}${me?.ban_reason ? ` Reason: ${me.ban_reason}` : ''}</div>
       <div class="hint">You can still sign in, but pinging, planning and posting are switched off. If this looks like a mistake, contact the Orbit team.</div>
-      <button class="btn btn-block" style="margin-top:12px" onClick=${()=>sb.auth.signOut()}><${IcOut} size=${15}/> Sign out</button>
+      <button class="btn btn-block" style="margin-top:12px" onClick=${()=>signOutClean()}><${IcOut} size=${15}/> Sign out</button>
     </div>
   </div></div>`;
 
@@ -1039,7 +1042,7 @@ export function Shell({ session }) {
         myPres=${myPres} setPres=${setPres} theme=${theme} setTheme=${setTheme} prefs=${prefs} setPrefs=${setPrefs}
         blocks=${blocks} profiles=${profiles} friends=${friends} unblock=${unblockUser} block=${blockUser}
         pushOn=${pushOn} enablePush=${enablePush} disablePush=${disablePush}
-        onClose=${()=>setSheet(null)} onSignOut=${()=>sb.auth.signOut()}
+        onClose=${()=>setSheet(null)} onSignOut=${()=>signOutClean()}
         onDeleteAccount=${deleteAccount} />`}
     <//>
 
@@ -1060,7 +1063,10 @@ export function ConfirmHost() {
   }, []);
   useEffect(()=>{
     if (!q) return;
-    const f = e => { if (e.key==='Escape') done(false); if (e.key==='Enter') done(true); };
+    // Enter on a focused button is that button's own click — otherwise Enter
+    // on "Cancel" fired this handler first and confirmed a Block or Delete
+    const f = e => { if (e.key==='Escape') done(false);
+      if (e.key==='Enter' && document.activeElement?.tagName!=='BUTTON') done(true); };
     addEventListener('keydown', f); return ()=>removeEventListener('keydown', f);
   }, [q]);
   if (!q) return null;

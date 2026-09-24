@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useState } from './lib.js';
-import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, nowInfo, presencePlace, PROFILE_VIEW, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, nowInfo, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
 import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
 export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
@@ -34,7 +34,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
     <div class="stories">
       <button class="story" onClick=${onYou}>
         <${Bubble} d=${myHere} salt=${'me'} color="var(--ge)"/>
-        <div class="ring" style=${`background:linear-gradient(140deg,${me?.accent1||'#b06bff'},${me?.accent2||'#2dd4bf'})`}><div><${Avatar} p=${me} size=${48}/></div></div>
+        <div class="ring" style=${`background:linear-gradient(140deg,${safeColor(me?.accent1,'#b06bff')},${safeColor(me?.accent2,'#2dd4bf')})`}><div><${Avatar} p=${me} size=${48}/></div></div>
         <div class="story-label">You</div>
       </button>
       <button class="story" onClick=${onAdd}>

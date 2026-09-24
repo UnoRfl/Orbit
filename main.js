@@ -43,8 +43,11 @@ if ('serviceWorker' in navigator) {
        previous deploy's modules. Reload once so the whole app is from one
        deploy — the guard stops the reload/claim cycle from looping. */
     let reloading = false;
+    // A first visit has no controller yet; clients.claim() still fires this, and
+    // reloading then would wipe a half-typed sign-up form for nothing.
+    const hadCtl = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return; reloading = true;
+      if (reloading || !hadCtl) return; reloading = true;
       location.reload();
     });
   });

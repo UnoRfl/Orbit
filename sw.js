@@ -61,7 +61,9 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(req)
         .then(res => {
-          if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(SHELL, copy)).catch(() => {}); }
+          // only the app itself is the offline shell — opening tos.html used to replace it
+          const isShell = url.pathname.endsWith('/') || url.pathname.endsWith('/index.html');
+          if (isShell && res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(SHELL, copy)).catch(() => {}); }
           return res;
         })
         .catch(() => caches.match(SHELL).then(hit => hit || Response.error()))

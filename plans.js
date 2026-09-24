@@ -88,7 +88,9 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
 
 export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classesBy, events, onClose, onCreate }) {
   const nd = nowInfo();
-  const snap30 = m => Math.min(18*60, Math.max(7*60, Math.round(m/30)*30));
+  // the grid is 24h, so the picker is too — clamping to 7am–6pm turned an 8pm
+  // "study now" into a plan that had already ended
+  const snap30 = m => Math.min(23*60+30, Math.max(0, Math.round(m/30)*30));
   const [kind, setKind] = useState(sys ? 'study' : (slot ? 'study' : 'coffee'));
   const [emoji, setEmoji] = useState('');
   const [title, setTitle] = useState('');
@@ -118,7 +120,7 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
     return w;
   }, [day, start, end, inv, classesBy, events]);
 
-  const times = []; for(let m=7*60; m<=18*60; m+=30) times.push(m);
+  const times = []; for(let m=0; m<=23*60+30; m+=30) times.push(m);
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">${sys ? 'New cosmic event ☄️' : 'New plan'}</div>
@@ -382,10 +384,12 @@ export const DAY_IDX = { mon:0, monday:0, tue:1, tues:1, tuesday:1, wed:2, weds:
   thu:3, thur:3, thurs:3, thursday:3, fri:4, friday:4, sat:5, saturday:5 };
 
 export function parseTimeVal(v) {
-  if (typeof v==='number' && isFinite(v)) return Math.round(v<24 ? v*60 : v);
+  if (typeof v==='number' && isFinite(v)) { const n = Math.round(v<24 ? v*60 : v);
+    if (n<0 || n>1440) throw new Error('bad time'); return n; }
   const m = String(v??'').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i);
   if (!m) throw new Error('bad time');
   let h=+m[1], mm=+(m[2]||0); const ap=(m[3]||'').toLowerCase();
+  if (mm>59 || h>24 || (ap && (h<1 || h>12))) throw new Error('bad time');
   if (ap.startsWith('p') && h<12) h+=12;
   if (ap.startsWith('a') && h===12) h=0;
   if (!ap && h<6) h+=12;               // bare "1:30" on a class schedule means PM
@@ -405,6 +409,7 @@ export function parseScheduleFile(text) {
   if (Array.isArray(data)) data = { classes: data };
   const src = data.classes || data.schedule || [];
   if (!Array.isArray(src) || !src.length) throw new Error('No classes found in this file.');
+  if (src.length > 200) throw new Error('That file has more than 200 classes — is it the right one?');
   const rows = [], skipped = [];
   src.forEach((c, i) => {
     try {
@@ -413,13 +418,13 @@ export function parseScheduleFile(text) {
       let day = c.day;
       if (typeof day === 'string' && !/^\d+$/.test(day.trim())) {
         const k = day.trim().toLowerCase();
-        day = k in DAY_IDX ? DAY_IDX[k] : DAY_IDX[k.slice(0,3)];
+        day = Object.hasOwn(DAY_IDX, k) ? DAY_IDX[k] : Object.hasOwn(DAY_IDX, k.slice(0,3)) ? DAY_IDX[k.slice(0,3)] : -1;
       } else day = Number(day);
       if (!(day>=0 && day<=5)) throw 0;
       let s, e;
       if (c.time) { const p = String(c.time).split(/[-–—]/); s = parseTimeVal(p[0]); e = parseTimeVal(p[1]); }
       else { s = parseTimeVal(c.start ?? c.start_min ?? c.from); e = parseTimeVal(c.end ?? c.end_min ?? c.to); }
-      if (!(e>s)) throw 0;
+      if (!(e>s && s>=0 && e<=1440)) throw 0;
       rows.push({ name:name.slice(0,80), meta:String(c.room||c.meta||c.note||'').trim().slice(0,60),
         cat:catOf(c.type||c.cat||c.category), day, start_min:s, end_min:e });
     } catch { skipped.push(i+1); }

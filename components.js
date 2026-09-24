@@ -1,11 +1,10 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, PRONOUN_PRESETS, pxFor, sb, shownName, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
-  const a1 = p?.accent1 || '#b06bff', a2 = p?.accent2 || '#2dd4bf';
-  const ap = (p?.avatar_pos && typeof p.avatar_pos==='object') ? p.avatar_pos : {};
-  const core = html`<div class="avatar" style=${`width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;background:linear-gradient(140deg,${a1},${a2})`}>${initialsOf(shownName(p))}${p?.avatar_url && html`<img class="avimg" src=${p.avatar_url} alt="" loading="lazy" referrerpolicy="no-referrer" draggable=${false} style=${`--cx:${ap.x||0}%;--cy:${ap.y||0}%;--cz:${ap.z||1}`} onError=${e=>{e.target.style.display='none'}}/>`}</div>`;
+  const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
+  const core = html`<div class="avatar" style=${`width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;background:linear-gradient(140deg,${a1},${a2})`}>${initialsOf(shownName(p))}${p?.avatar_url && html`<img class="avimg" src=${p.avatar_url} alt="" loading="lazy" referrerpolicy="no-referrer" draggable=${false} style=${posVars(p.avatar_pos)} onError=${e=>{e.target.style.display='none'}}/>`}</div>`;
   if (ring) return html`<div class="avwrap">
     <div class=${'ring'+(ring==='live'?' live':'')} style=${ring==='live' ? `background:conic-gradient(from 0deg, ${a1}, ${a2}, ${a1})` : 'background:rgba(255,255,255,.12)'}><div>${core}</div></div>
     ${badge}</div>`;
@@ -29,7 +28,7 @@ export function StarSig({ id, size=15 }) {
 export function NameFx({ p, text, style='' }) {
   const fl = flairOf(p);
   const label = text ?? shownName(p);
-  const grad = Array.isArray(fl.ng) && fl.ng.length===2 ? fl.ng : null;
+  const grad = Array.isArray(fl.ng) && fl.ng.length===2 && fl.ng.every(c=>safeColor(c)) ? fl.ng : null;
   const nameEl = grad
     ? html`<span class=${'ngrad'+(fl.anim?' shine':'')} style=${`background-image:linear-gradient(90deg,${grad[0]},${grad[1]},${grad[0]});${style}`}>${label}</span>`
     : html`<span style=${style}>${label}</span>`;
@@ -73,7 +72,7 @@ export function ActivityCard({ act, mine=false, onClear, onEdit }) {
 /* connection chips — URL is always built from the allowlist template */
 export function LinkChips({ links }) {
   const [copied, setCopied] = useState('');
-  const rows = (links||[]).map(l=>{ const s = SOCIALS[l?.k]; const u = cleanSocial(l?.u);
+  const rows = (links||[]).map(l=>{ const s = Object.hasOwn(SOCIALS, l?.k) ? SOCIALS[l.k] : null; const u = cleanSocial(l?.u);
     return (s && u) ? { l, s, u } : null; }).filter(Boolean).slice(0,5);
   if (!rows.length) return null;
   return html`<div class="linkrow">
@@ -766,7 +765,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
       <div class="set-eyebrow" style="margin:18px 0 2px">Connections · ${p.links.length}/5</div>
       <div class="hint" style="margin:0 0 8px">Pick a platform, drop your handle — Orbit builds the link itself, so only real profiles on known apps can show up. Discord copies to clipboard instead of linking.</div>
       ${p.links.length>0 && html`<div class="linkrow" style="margin-bottom:10px">
-        ${p.links.map(l=>{ const s = SOCIALS[l.k]; if (!s) return null;
+        ${p.links.map(l=>{ const s = Object.hasOwn(SOCIALS, l?.k) ? SOCIALS[l.k] : null; if (!s) return null;
           return html`<button key=${l.k} class="linkchip" title="Remove" onClick=${()=>setP(v=>({ ...v, links:v.links.filter(x=>x.k!==l.k) }))}>
             <span class="ltile" style=${`background:linear-gradient(135deg,${s.c[0]},${s.c[1]})`}><${s.Ic} size=${13}/></span>
             <span class="lmeta"><span class="lname" style=${`color:${s.tc||s.c[0]}`}>${s.name}</span><span class="lhandle">@${l.u} ✕</span></span>
@@ -854,7 +853,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
         </div>`)}
     </div>
 
-    <button class="btn btn-block" style="margin-top:26px;color:var(--muted)" onClick=${()=>sb.auth.signOut()}>
+    <button class="btn btn-block" style="margin-top:26px;color:var(--muted)" onClick=${()=>signOutClean()}>
       <${IcOut} size=${15}/> Sign out</button>
     <div class="small" style="text-align:center;margin-top:14px;opacity:.7">Orbit · built by Uno</div>
 
@@ -913,11 +912,10 @@ export function RichText({ text }) {
 }
 
 export function CoverImg({ p }) {
-  const cp = (p?.cover_pos && typeof p.cover_pos==='object') ? p.cover_pos : {};
-  return html`<div class="profcover" style=${`--pa:${p?.accent1||'#b06bff'};--pb:${p?.accent2||'#2dd4bf'}`}>
+  return html`<div class="profcover" style=${`--pa:${safeColor(p?.accent1,'#b06bff')};--pb:${safeColor(p?.accent2,'#2dd4bf')}`}>
     ${!p?.cover_url && html`<div class="mapstars"></div>`}
     ${p?.cover_url && html`<img class="cimg" src=${p.cover_url} alt="" referrerpolicy="no-referrer"
-      style=${`--cx:${cp.x||0}%;--cy:${cp.y||0}%;--cz:${cp.z||1}`} onError=${e=>{e.target.style.display='none'}}/>`}
+      style=${posVars(p.cover_pos)} onError=${e=>{e.target.style.display='none'}}/>`}
   </div>`;
 }
 
@@ -942,7 +940,7 @@ export function ImageAdjust({ url, round=false, aspect='1 / 1', pos, onChange, o
     <div class="adjframe" ref=${ref} style=${`aspect-ratio:${aspect};${round?'max-width:320px;margin:0 auto':''}`}
       onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>
       <img src=${url} alt="" referrerpolicy="no-referrer" draggable=${false}
-        style=${`--cx:${pos.x||0}%;--cy:${pos.y||0}%;--cz:${pos.z||1}`}/>
+        style=${posVars(pos)}/>
       <div class=${'adjmask'+(round?' round':'')}></div>
     </div>
     <div class="flabel">Zoom</div>
