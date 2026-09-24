@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useState } from './lib.js';
-import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, nowInfo, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
 import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
 export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
@@ -10,8 +10,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
   const free = withStatus.filter(x=>x.st.kind==='free');
   const upcoming = events
     .filter(e => e.host===uid || (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='accepted'))
-    .filter(e => e.day>nd.day || (e.day===nd.day && e.end_min>nd.min))
-    .sort((a,b)=>a.day-b.day||a.start_min-b.start_min).slice(0,3);
+    .filter(e => evUpcoming(e)).sort(evSort).slice(0,3);
   const noClasses = !(classesBy[uid]||[]).length;
   const sysById = Object.fromEntries((systems||[]).map(s=>[s.key,s]));
 
@@ -72,7 +71,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
           <span style="font-size:18px;flex:none">${e.emoji||K.emoji}</span>
           <div style="min-width:0;flex:1">
             <div class="rowname">${e.title}</div>
-            <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}${e.place?` · ${e.place}`:''}</div>
+            <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
           </div>
           <div style="display:flex;gap:6px;flex:none">
             <button class="btn btn-soft-green" style="padding:7px 10px" onClick=${()=>onRespond(e.id,'accepted')}><${IcCheck} size=${13}/></button>
@@ -153,7 +152,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
               <div style=${`width:40px;height:40px;border-radius:13px;background:${K.accent}22;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:19px`}>${e.emoji||K.emoji}</div>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title}</div>
-                <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+                <div class="rowsub">${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
                 <div class="uporigin">
                   ${s && html`<span style="color:var(--major)">${s.glyph} ${s.name}</span><span>·</span>`}
                   <span>set up by ${e.host===uid ? 'you' : nameOf(e.host)}</span>

@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
-import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
+import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, evSort, evUpcoming, whenLabel, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
 import { GeoMap, canUseGeoMap } from './geomap.js';
 import { Galaxy } from './galaxy.js';
@@ -151,8 +151,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   /* ============ GRID: pick a solar system ============ */
   const ndG = nowInfo();
   const sysByKey = Object.fromEntries(shared.accepted.map(s=>[s.key,s]));
-  const cosmicAll = events.filter(e=>e.system_id && sysByKey[e.system_id] && (e.day>ndG.day || (e.day===ndG.day && e.end_min>ndG.min)))
-    .sort((a,b)=>a.day-b.day||a.start_min-b.start_min).slice(0,6);
+  const cosmicAll = events.filter(e=>e.system_id && sysByKey[e.system_id] && evUpcoming(e)).sort(evSort).slice(0,6);
   if (!active) {
     return html`<div>
       <${Eyebrow} color="var(--ge)">Your galaxy<//>
@@ -173,7 +172,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
               <span style="font-size:18px;flex:none">${e.emoji||K.emoji}</span>
               <div style="min-width:0;flex:1">
                 <div class="rowname">${e.title}</div>
-                <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}${e.place?` · ${e.place}`:''}</div>
+                <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
                 <div class="uporigin"><span style=${`color:${hueCss(s.hue)}`}>${s.glyph} ${s.name}</span><span>·</span><span>set up by ${e.host===uid?'you':nameOf(e.host)}</span></div>
               </div>
             </button>`;})}
@@ -213,8 +212,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   const emptySys = P===0;
   const nd0 = nowInfo();
   const cosmic = active.kind==='shared'
-    ? events.filter(e=>e.system_id===active.key && (e.day>nd0.day || (e.day===nd0.day && e.end_min>nd0.min)))
-        .sort((a,b)=>a.day-b.day||a.start_min-b.start_min).slice(0,4)
+    ? events.filter(e=>e.system_id===active.key && evUpcoming(e)).sort(evSort).slice(0,4)
     : [];
 
   return html`<div>
@@ -262,7 +260,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
             <span style="font-size:18px;flex:none;margin-top:2px">${e.emoji||K.emoji}</span>
             <div style="min-width:0;flex:1" onClick=${()=>onOpenEvent(e)}>
               <div class="rowname">${e.title}</div>
-              <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}${e.place?` · ${e.place}`:''}</div>
+              <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
               <div class="small" style="margin-top:3px;color:var(--pe)">${going.length} going${mineHost?' · your event':myInv?.status==='accepted'?' · you’re in':''}</div>
             </div>
             ${myInv?.status==='pending' && html`<div style="display:flex;gap:6px;flex:none">

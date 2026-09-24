@@ -1,14 +1,13 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
-import { Fragment, h, html, useMemo, useRef, useState } from './lib.js';
-import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, ago, fmt, fname, nowInfo, ui, zoneName } from './core.js';
+import { Fragment, h, html, useEffect, useMemo, useRef, useState } from './lib.js';
+import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
 import { Avatar, You, conflictsFor } from './components.js';
 
 export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen }) {
   const nd = nowInfo();
   const going = e => e.host===uid || (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='accepted');
-  const future = e => e.day>nd.day || (e.day===nd.day && e.end_min>nd.min);
-  const confirmed = events.filter(e=>going(e) && future(e)).sort((a,b)=>a.day-b.day||a.start_min-b.start_min);
-  const waiting = events.filter(e=>e.host===uid && (e.event_invitees||[]).some(i=>i.status==='pending'));
+  const confirmed = events.filter(e=>going(e) && evUpcoming(e)).sort(evSort);
+  const waiting = events.filter(e=>e.host===uid && evUpcoming(e) && (e.event_invitees||[]).some(i=>i.status==='pending')).sort(evSort);
 
   return html`<div>
     <div style="display:flex;align-items:center;justify-content:flex-end">
@@ -20,13 +19,13 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
       <div class="stack">
         ${myInvites.map(e=>{
           const K = KINDS[e.kind]||KINDS.hangout;
-          const conf = conflictsFor(uid, e.day, e.start_min, e.end_min, classesBy, events.filter(x=>x.id!==e.id));
+          const conf = conflictsFor(uid, evSpan(e), classesBy, events.filter(x=>x.id!==e.id));
           return html`<div key=${e.id} class="card" style="padding:14px">
             <div style="display:flex;align-items:center;gap:11px">
               <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${e.emoji||K.emoji}</div>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="font-size:13.5px">${e.title}</div>
-                <div class="rowsub">from ${nameOf(e.host)} · ${DAYS[e.day]} ${fmt(e.start_min)}–${fmt(e.end_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+                <div class="rowsub">from ${nameOf(e.host)} · ${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
               </div>
             </div>
             ${conf.length>0 && html`<div class="warnbox" style="margin-top:10px;display:flex;gap:8px;align-items:flex-start">
@@ -50,7 +49,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
             <span style="font-size:16px;flex:none">${e.emoji||KINDS[e.kind]?.emoji||'✨'}</span>
             <div style="min-width:0;flex:1">
               <div class="rowname" style="font-size:12.5px">${e.title}</div>
-              <div class="rowsub">${DAYS[e.day]} ${fmt(e.start_min)} · waiting on ${pend}</div>
+              <div class="rowsub">${whenLabel(e)} · waiting on ${pend}</div>
             </div>
             <span style="color:var(--faint);display:flex;flex:none"><${IcClock} size=${14}/></span>
           </button>`;})}
@@ -69,7 +68,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
               <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${e.emoji||K.emoji}</div>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="font-size:13.5px">${e.title}</div>
-                <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)} · ${zoneName(e.place)||e.place||'—'}</div>
+                <div class="rowsub">${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
               </div>
             </div>
             <div style="display:flex;align-items:center">
@@ -86,23 +85,135 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
    PLAN CREATOR
    ============================================================ */
 
+/* ============================================================
+   WHEN PICKER — date chips, two scroll wheels, lengths, a 48h strip.
+   A plan can start any minute of the day and run up to two days: the end
+   wheel picks a clock time and the end-day chips say which day it lands on,
+   so "Fri 9PM → Sat 7AM" is two flicks, not arithmetic.
+   ============================================================ */
+const WHEEL_H = 34;
+function Wheel({ items, index, onPick, label }) {
+  const ref = useRef(null), t = useRef(0), quiet = useRef(false);
+  // keep the wheel on the value when it changes from outside (chips, the strip)
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    if (Math.round(el.scrollTop / WHEEL_H) !== index) {
+      quiet.current = true; el.scrollTop = index * WHEEL_H;
+      setTimeout(() => { quiet.current = false; }, 60);
+    }
+  }, [index]);
+  const onScroll = () => {
+    if (quiet.current) return;
+    clearTimeout(t.current);
+    t.current = setTimeout(() => {
+      const el = ref.current; if (!el) return;
+      const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_H)));
+      if (i !== index) onPick(i);
+    }, 110);
+  };
+  return html`<div class="wheel" ref=${ref} onScroll=${onScroll} role="listbox" aria-label=${label}>
+    <div class="wheel-pad"></div>
+    ${items.map((it, i) => html`<button key=${i} type="button" class=${'wheel-i' + (i === index ? ' on' : '')} role="option" aria-selected=${i === index}
+      onClick=${() => onPick(i)}>${it}</button>`)}
+    <div class="wheel-pad"></div>
+  </div>`;
+}
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+const MINS = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+function TimeWheel({ value, onChange, label }) {
+  const h24 = Math.floor(value / 60), m = value % 60, pm = h24 >= 12, h12 = h24 % 12 || 12;
+  const set = (h, mm, p) => onChange(((h % 12) + (p ? 12 : 0)) * 60 + mm);
+  return html`<div class="twheel" aria-label=${label}>
+    <div class="twheel-hl" aria-hidden="true"></div>
+    <${Wheel} label="hour" items=${HOURS} index=${h12 - 1} onPick=${i => set(i + 1, m, pm)}/>
+    <span class="twheel-c">:</span>
+    <${Wheel} label="minute" items=${MINS} index=${Math.round(m / 5) % 12} onPick=${i => set(h12, i * 5, pm)}/>
+    <${Wheel} label="am or pm" items=${['AM', 'PM']} index=${pm ? 1 : 0} onPick=${i => set(h12, m, i === 1)}/>
+  </div>`;
+}
+const LENGTHS = [[30, '30m'], [60, '1h'], [90, '1.5h'], [120, '2h'], [180, '3h'], [240, '4h']];
+export function WhenPicker({ date, setDate, start, setStart, dur, setDur, span }) {
+  const days = useMemo(() => Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i); return d; }), []);
+  const endAbs = start + dur, endOff = Math.floor((endAbs - 1) / 1440), endClock = endAbs % 1440;
+  const setEnd = (clock, off = endOff) => {
+    let d = off * 1440 + clock - start;
+    if (d <= 0) d += 1440;                          // an end before the start means the next day
+    setDur(Math.max(15, Math.min(2880, d)));
+  };
+  const overnight = () => { const s = start >= 17 * 60 ? start : 21 * 60; setStart(s); setDur(24 * 60 - s + 7 * 60); };
+  const crosses = endAbs > 1440;
+  const pct = m => `${(Math.min(2880, m) / 2880) * 100}%`;
+  const onStrip = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const m = Math.round(((e.clientX - r.left) / r.width) * 2880 / 15) * 15;
+    if (m < 1440) setStart(m);
+  };
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  return html`<div class="when">
+    <div class="pillrow scroll when-days">
+      ${days.map(d => html`<button key=${d.getTime()} type="button" class=${'pill when-day' + (same(d, date) ? ' on' : '')} onClick=${() => setDate(d)}>
+        <b>${relDay(d).split(' ')[0]}</b><span>${d.getDate()} ${d.toLocaleDateString(undefined, { month: 'short' })}</span></button>`)}
+    </div>
+
+    <div class="when-wheels">
+      <div class="when-col">
+        <div class="when-cap">Starts</div>
+        <${TimeWheel} label="start time" value=${start} onChange=${v => setStart(v)}/>
+      </div>
+      <div class="when-col">
+        <div class="when-cap">Ends</div>
+        <${TimeWheel} label="end time" value=${endClock} onChange=${v => setEnd(v)}/>
+        <div class="when-endday">
+          ${['Same day', 'Next day', '+2 days'].map((l, off) => html`<button key=${off} type="button"
+            class=${'pill' + (endOff === off ? ' on' : '')} disabled=${off === 0 && endClock <= start && endAbs % 1440 !== 0}
+            onClick=${() => setEnd(endClock, off)}>${l}</button>`)}
+        </div>
+      </div>
+    </div>
+
+    <div class="pillrow" style="margin-top:10px">
+      ${LENGTHS.map(([m, l]) => html`<button key=${m} type="button" class=${'pill' + (dur === m ? ' on' : '')} onClick=${() => setDur(m)}>${l}</button>`)}
+      <button type="button" class=${'pill' + (crosses && start >= 17 * 60 && endClock <= 12 * 60 ? ' on' : '')} onClick=${overnight}>Overnight</button>
+      <button type="button" class=${'pill' + (dur === 1440 ? ' on' : '')} onClick=${() => setDur(1440)}>24h</button>
+    </div>
+
+    <div class="when-strip" onClick=${onStrip} title="Tap to move the start">
+      <div class="when-band" style=${`left:${pct(start)};width:calc(${pct(endAbs)} - ${pct(start)})`}></div>
+      <div class="when-mid" aria-hidden="true"></div>
+      ${[0, 6, 12, 18, 24, 30, 36, 42].map(h => html`<span key=${h} class="when-tick" style=${`left:${(h / 48) * 100}%`}>${h % 24 === 0 ? '12a' : h % 24 === 12 ? '12p' : (h % 12) + (h % 24 < 12 ? 'a' : 'p')}</span>`)}
+    </div>
+    <div class="when-sum">
+      <b>${whenLabel({ starts_at: span.s.toISOString(), ends_at: span.e.toISOString() })}</b>
+      <span>${durLabel(dur)}${crosses ? ' · runs past midnight' : ''}</span>
+    </div>
+  </div>`;
+}
+
 export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classesBy, events, onClose, onCreate }) {
-  const nd = nowInfo();
-  // the grid is 24h, so the picker is too — clamping to 7am–6pm turned an 8pm
-  // "study now" into a plan that had already ended
-  const snap30 = m => Math.min(23*60+30, Math.max(0, Math.round(m/30)*30));
+  // any start in the day, any length up to two days — sleepovers and all-nighters
+  // included; "study now" from Home arrives as a slot on today
+  const snap5 = m => Math.min(1435, Math.max(0, Math.round(m/5)*5));
+  const [date, setDate] = useState(() => {
+    const d = new Date(); d.setHours(0,0,0,0);
+    if (slot && Number.isFinite(slot.day)) d.setDate(d.getDate() + ((slot.day - dayIdx(d) + 7) % 7));
+    return d;
+  });
+  const [start, setStart] = useState(() => {
+    if (slot) return snap5(slot.start);
+    const n = new Date(); return Math.min(1435, Math.ceil((n.getHours()*60 + n.getMinutes() + 1) / 30) * 30) % 1440 || 15*60;
+  });
   const [kind, setKind] = useState(sys ? 'study' : (slot ? 'study' : 'coffee'));
   const [emoji, setEmoji] = useState('');
   const [title, setTitle] = useState('');
-  const [day, setDay] = useState(slot ? Math.min(slot.day,5) : Math.min(nd.day,5));
-  const [start, setStart] = useState(slot ? snap30(slot.start) : 15*60);
   const [dur, setDur] = useState(slot ? slot.dur : 90);
   const [place, setPlace] = useState(sys ? '' : 'library');
   const [inv, setInv] = useState(()=> sys
     ? (sys.members||[]).filter(m=>m.status==='accepted' && m.user_id!==uid).map(m=>m.user_id)
     : (pre ? [pre] : []));
   const [busy, setBusy] = useState(false);
-  const end = start + dur;
+  const span = useMemo(() => { const a = new Date(date); a.setMinutes(start); return { s:a, e:new Date(a.getTime() + dur*6e4) }; }, [date, start, dur]);
+  const day = dayIdx(date);
+  const over = span.e.getTime() <= Date.now();           // already finished — nothing to invite anyone to
   const toggle = id => setInv(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
   const nmOf = id => { const f=(profiles&&profiles[id])||friends.find(x=>x.id===id);
     const n = f ? fname(f) : ''; return n || (nameOf ? nameOf(id) : 'Someone'); };
@@ -114,13 +225,11 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
   const finalTitle = title.trim() || `${KINDS[kind].label}${inv.length?` with ${inv.map(nmOf).join(' & ')}`:''}`;
   const warnings = useMemo(()=>{
     const w = [];
-    const mine = conflictsFor(uid, day, start, end, classesBy, events);
+    const mine = conflictsFor(uid, span, classesBy, events);
     if (mine.length) w.push({ who:'You', items:mine });
-    inv.forEach(id=>{ const c = conflictsFor(id, day, start, end, classesBy, events); if (c.length) w.push({ who:nmOf(id), items:c }); });
+    inv.forEach(id=>{ const c = conflictsFor(id, span, classesBy, events); if (c.length) w.push({ who:nmOf(id), items:c }); });
     return w;
-  }, [day, start, end, inv, classesBy, events]);
-
-  const times = []; for(let m=0; m<=23*60+30; m+=30) times.push(m);
+  }, [span, inv, classesBy, events]);
 
   return html`<div>
     <div class="sheethead"><div class="sheettitle">${sys ? 'New cosmic event ☄️' : 'New plan'}</div>
@@ -145,21 +254,9 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
     <div class="flabel">Title · optional</div>
     <input class="input" value=${title} onInput=${e=>setTitle(e.target.value)} placeholder=${finalTitle}/>
 
-    <div class="flabel">Day</div>
-    <div class="pillrow scroll">
-      ${DAYS.map((d,i)=>html`<button key=${d} class=${'pill'+(day===i?' on':'')} onClick=${()=>setDay(i)} style="font-weight:600">${d}</button>`)}
-    </div>
-
-    <div class="formrow">
-      <div><div class="flabel">Start</div>
-        <select class="input" value=${start} onChange=${e=>setStart(+e.target.value)}>
-          ${times.map(m=>html`<option key=${m} value=${m}>${fmt(m)}</option>`)}
-        </select></div>
-      <div><div class="flabel">Length</div>
-        <select class="input" value=${dur} onChange=${e=>setDur(+e.target.value)}>
-          ${[30,60,90,120,180].map(d=>html`<option key=${d} value=${d}>${d<60?`${d} min`:`${d/60} hr${d>60?'s':''}`}</option>`)}
-        </select></div>
-    </div>
+    <div class="flabel">When</div>
+    <${WhenPicker} date=${date} setDate=${setDate} start=${start} setStart=${setStart} dur=${dur} setDur=${setDur} span=${span}/>
+    ${over && html`<div class="errbox" style="margin-top:10px">That time has already passed — pick a later start.</div>`}
 
     ${(!sys || (sys.planets||[]).length>0) && html`<${Fragment}>
       <div class="flabel">Where${sys?' · optional':''}</div>
@@ -191,8 +288,9 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
     </div>`}
 
     <button class=${'btn btn-block '+((inv.length||sys)?'btn-grad':'')} style="margin-top:16px;padding:13px"
-      disabled=${busy || (!sys && !inv.length)}
-      onClick=${async()=>{ setBusy(true); await onCreate({ kind, emoji:emoji||null, title:finalTitle, day, start_min:start, end_min:end, place, invitees:inv, system_id: sys?sys.key:null }); setBusy(false); }}>
+      disabled=${busy || over || (!sys && !inv.length)}
+      onClick=${async()=>{ setBusy(true); await onCreate({ kind, emoji:emoji||null, title:finalTitle, day, start_min:start, end_min:start+dur,
+        starts_at:span.s.toISOString(), ends_at:span.e.toISOString(), place, invitees:inv, system_id: sys?sys.key:null }); setBusy(false); }}>
       <${IcSend} size=${16}/> ${busy?'Sending…':(sys?'Create cosmic event':`Send invite${inv.length>1?'s':''}`)}
     </button>
   </div>`;
@@ -279,7 +377,7 @@ export function Detail({ d, uid, profiles, nameOf, onCancel }) {
       </div>
       <div class="sheettitle" style="font-size:20px">${e.title}</div>
       <div style="margin-top:14px">
-        <div class="detrow"><span class="detlab">When</span><span class="detval">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}</span></div>
+        <div class="detrow"><span class="detlab">When</span><span class="detval">${whenLabel(e)} · ${durLabel(Math.round((evSpan(e).e - evSpan(e).s) / 6e4))}</span></div>
         <div class="detrow"><span class="detlab">Where</span><span class="detval">${zoneName(e.place)||e.place||'—'}</span></div>
         <div class="detrow"><span class="detlab">Going</span><span class="detval">${ppl.map(nameOf).join(', ')}</span></div>
         ${pend.length>0 && html`<div class="detrow"><span class="detlab">Waiting</span><span class="detval" style="color:var(--muted)">${pend.join(', ')}</span></div>`}

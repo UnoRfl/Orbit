@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -253,7 +253,9 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
   });
   const counts = [0,0,0,0,0,0];
   myClasses.forEach(c=>counts[c.day]++);
-  myEvents.forEach(e=>{ if(e.day>=0 && e.day<=5) counts[e.day]++; });
+  // a plan is drawn from its pieces this week — an overnight one is two
+  const evBits = myEvents.flatMap(e => evPieces(e).filter(p => p.day <= 5).map(p => ({ e, p })));
+  evBits.forEach(({ p }) => counts[p.day]++);
 
   /* Traffic. Every schedule Orbit has loaded — yours and your friends' — binned
      by hour, so the grid shows when people are actually busy instead of making
@@ -274,7 +276,7 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
     };
     for (const list of Object.values(classesByOwner || {}))
       for (const c of (list || [])) bump(c.day, c.start_min, c.end_min);
-    for (const e of (events || [])) bump(e.day, e.start_min, e.end_min);
+    for (const e of (events || [])) for (const p of evPieces(e)) bump(p.day, p.s, p.e);
     let peak = 0; for (const v of grid.values()) peak = Math.max(peak, v);
     return peak > 1 ? { grid, peak } : null;   // one person busy is not traffic
   }, [classesByOwner, events]);
@@ -339,10 +341,10 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
         ${!compact && html`<span class="cmeta">${c.meta}</span>`}
         <span class="ctime">${fmt(c.start_min)}–${fmt(c.end_min)}</span>
       </div>`)}
-      ${myEvents.filter(e=>e.day===di).map(e=>html`<div key=${e.id} class="evt" style=${`top:${off+pxFor(e.start_min)}px;height:${pxFor(e.end_min)-pxFor(e.start_min)-3}px`}
+      ${evBits.filter(x=>x.p.day===di).map(({ e, p })=>html`<div key=${e.id+':'+p.day} class="evt" style=${`top:${off+pxFor(p.s)}px;height:${Math.max(14, pxFor(p.e)-pxFor(p.s)-3)}px`}
           onClick=${()=>onPick && onPick({type:'event', row:e})}>
         <span class="cname">${e.emoji||KINDS[e.kind]?.emoji||'✨'} ${e.title}</span>
-        <span class="ctime">${fmt(e.start_min)}–${fmt(e.end_min)}</span>
+        <span class="ctime">${whenLabel(e)}</span>
       </div>`)}
       ${di===nd.day && html`<div class="nowline" style=${`top:${off+pxFor(nd.min)}px`}></div>`}
       <//>`; })}
@@ -358,24 +360,39 @@ export function statusOf(pid, classesByOwner, events) {
   const cls = classesByOwner[pid] || [];
   for (const c of cls) if (c.day===nd.day && c.start_min<=nd.min && c.end_min>nd.min)
     return { kind:'class', text:`In ${c.name} · until ${fmt(c.end_min)}`, color:CATHEX[c.cat]||CATHEX.major };
+  const now = Date.now();
   for (const e of events) {
     const going = e.host===pid || (e.event_invitees||[]).some(i=>i.invitee===pid && i.status==='accepted');
-    if (going && e.day===nd.day && e.start_min<=nd.min && e.end_min>nd.min)
-      return { kind:'event', text:`${KINDS[e.kind]?.label||'Plan'} · until ${fmt(e.end_min)}`, color:KINDS[e.kind]?.accent||'#b06bff' };
+    const sp = going && evSpan(e);
+    if (sp && sp.s <= now && sp.e > now)
+      return { kind:'event', text:`${KINDS[e.kind]?.label||'Plan'} · until ${fmtClockOf(sp.e)}`, color:KINDS[e.kind]?.accent||'#b06bff' };
   }
   const rest = cls.filter(c=>c.day===nd.day && c.start_min>nd.min).sort((a,b)=>a.start_min-b.start_min);
   if (rest.length) return { kind:'free', text:`Free · next class ${fmt(rest[0].start_min)}`, color:'#9a8fa8' };
   return { kind:'free', text:'Free · no more classes today', color:'#9a8fa8' };
 }
-export function conflictsFor(pid, day, s, e, classesByOwner, events) {
+/* span = { s: Date, e: Date } — a real interval, which may cross midnight.
+   Classes repeat weekly, so each day the span touches is checked against the
+   classes on that weekday; plans are compared by their actual dates. */
+export function conflictsFor(pid, span, classesByOwner, events) {
   const out = [];
-  for (const c of (classesByOwner[pid]||[]))
-    if (c.day===day && c.start_min<e && c.end_min>s) out.push(`${c.name} (${fmt(c.start_min)}–${fmt(c.end_min)})`);
+  const d0 = new Date(span.s); d0.setHours(0,0,0,0);
+  for (let d = new Date(d0); d < span.e; d.setDate(d.getDate() + 1)) {
+    const wd = (d.getDay() + 6) % 7;
+    for (const c of (classesByOwner[pid]||[])) {
+      if (c.day !== wd) continue;
+      const cs = new Date(d); cs.setHours(0, c.start_min, 0, 0);
+      const ce = new Date(d); ce.setHours(0, c.end_min, 0, 0);
+      if (cs < span.e && ce > span.s) out.push(`${c.name} (${fmt(c.start_min)}–${fmt(c.end_min)})`);
+    }
+  }
   for (const ev of events) {
     const going = ev.host===pid || (ev.event_invitees||[]).some(i=>i.invitee===pid && i.status==='accepted');
-    if (going && ev.day===day && ev.start_min<e && ev.end_min>s) out.push(`${ev.title} (${fmt(ev.start_min)}–${fmt(ev.end_min)})`);
+    if (!going) continue;
+    const sp = evSpan(ev);
+    if (sp.s < span.e && sp.e > span.s) out.push(`${ev.title} (${whenLabel(ev)})`);
   }
-  return out;
+  return [...new Set(out)];
 }
 
 /* ============================================================
@@ -390,7 +407,7 @@ export function busyOn(pid, day, classesByOwner, events) {
   for (const c of (classesByOwner[pid]||[])) if (c.day===day) iv.push([c.start_min, c.end_min]);
   for (const e of (events||[])) {
     const going = e.host===pid || (e.event_invitees||[]).some(i=>i.invitee===pid && i.status==='accepted');
-    if (going && e.day===day) iv.push([e.start_min, e.end_min]);
+    if (going) for (const p of evPieces(e)) if (p.day===day) iv.push([p.s, p.e]);
   }
   iv.sort((a,b)=>a[0]-b[0]);
   const out = [];

@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcRadio, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, evUpcoming, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcRadio, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
@@ -521,8 +521,9 @@ export function Shell({ session }) {
      map. Friends saw a dot that never moved again. Owned by the shell, it runs
      for as long as Orbit is open, whatever you are looking at. */
   const live = useLiveShare({ uid, myPres, setPres });
-  async function createEvent({ kind, title, day, start_min, end_min, place, invitees, system_id=null, emoji=null }) {
+  async function createEvent({ kind, title, day, start_min, end_min, starts_at=null, ends_at=null, place, invitees, system_id=null, emoji=null }) {
     const row = { host:uid, kind, title, day, start_min, end_min, place };
+    if (starts_at && ends_at) { row.starts_at = starts_at; row.ends_at = ends_at; }
     if (system_id) row.system_id = system_id;
     if (emoji) row.emoji = emoji;
     let { data:ev, error } = await sb.from('events').insert(row).select().single();
@@ -893,7 +894,7 @@ export function Shell({ session }) {
   const friendIds = friendIdsOf(graph).filter(id=>!blocks.includes(id));
   const friends = friendIds.map(id=>profiles[id]).filter(Boolean);
   const unseen = pings.filter(p=>p.recipient===uid && !p.seen && !blocks.includes(p.sender)).length;
-  const myInvites = events.filter(e=>(e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='pending'));
+  const myInvites = events.filter(e=>evUpcoming(e) && (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='pending'));
   const reqBadge = graph.incoming.filter(r=>!blocks.includes(r.requester)).length;
   const sysById = Object.fromEntries(shared.systems.map(s=>[s.id, s]));
   const sharedAccepted = shared.mems.filter(m=>m.status==='accepted').map(m=>sysById[m.system_id]).filter(Boolean)

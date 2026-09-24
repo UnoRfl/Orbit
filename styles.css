@@ -1191,3 +1191,37 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .uitem-t{font-weight:700;font-size:13.5px}
 .uitem-body{font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:4px;white-space:pre-line}
 .unew{width:7px;height:7px;border-radius:50%;background:var(--nstp);box-shadow:0 0 9px var(--nstp);margin-left:auto}
+
+/* ============================================================
+   WHEN PICKER (plans.js) — date chips, scroll wheels, 48h strip
+   ============================================================ */
+.when-days{margin-bottom:10px}
+.when-day{flex-direction:column;align-items:flex-start;gap:0;padding:6px 11px;min-width:64px;line-height:1.25}
+.when-day b{font-size:12px;font-weight:700;color:var(--ink)}
+.when-day span{font-size:10.5px;color:var(--muted)}
+.when-day.on span{color:var(--ink);opacity:.8}
+.when-wheels{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.when-col{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);padding:9px 8px 10px}
+.when-cap{font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0 0 4px 4px}
+.twheel{position:relative;display:flex;align-items:stretch;justify-content:center;gap:2px;height:170px;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.twheel-hl{position:absolute;left:2px;right:2px;top:68px;height:34px;border-radius:10px;pointer-events:none;
+  background:color-mix(in srgb,var(--major) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--major) 45%,transparent)}
+.twheel-c{align-self:center;font-weight:700;color:var(--muted);position:relative}
+.wheel{position:relative;height:170px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;min-width:34px;flex:1}
+.wheel::-webkit-scrollbar{display:none}
+.wheel-pad{height:68px}
+.wheel-i{display:block;width:100%;height:34px;scroll-snap-align:center;border:none;background:none;color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums;padding:0}
+.wheel-i.on{color:var(--ink);font-weight:700}
+.when-endday{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.when-endday .pill{padding:4px 9px;font-size:11px}
+.when-endday .pill:disabled{opacity:.35;cursor:not-allowed}
+.when-strip{position:relative;height:30px;margin-top:14px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--line);cursor:pointer;overflow:hidden}
+.when-band{position:absolute;top:3px;bottom:3px;border-radius:6px;min-width:4px;
+  background:linear-gradient(90deg,var(--major),var(--ge));box-shadow:0 0 14px color-mix(in srgb,var(--major) 45%,transparent)}
+.when-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-strong)}
+.when-tick{position:absolute;bottom:2px;transform:translateX(3px);font-size:8.5px;color:var(--faint);pointer-events:none;letter-spacing:.02em}
+.when-sum{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12.5px}
+.when-sum span{color:var(--muted);font-size:11.5px}

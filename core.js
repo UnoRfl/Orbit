@@ -56,6 +56,7 @@ export const KINDS = {
   study:{ label:'Study group', emoji:'📚', accent:'#2dd4bf' },
   lunch:{ label:'Lunch', emoji:'🍜', accent:'#34d399' },
   hangout:{ label:'Hangout', emoji:'✨', accent:'#b06bff' },
+  sleepover:{ label:'Sleepover', emoji:'🌙', accent:'#7c8cff' },
 };
 export const PING_PRESETS = [
   { t:'Study?', e:'📖' }, { t:'Coffee?', e:'☕' }, { t:'Lunch?', e:'🍜' },
@@ -518,6 +519,59 @@ export const pxFor = m => (Math.max(START, Math.min(END, m)) - START) * (HOUR/60
 export const fmt = min => { let h=Math.floor(min/60), m=min%60, ap=h>=12?'PM':'AM', hh=h%12||12; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; };
 export const nowInfo = () => { const d=new Date(); return { day:(d.getDay()+6)%7, min:d.getHours()*60+d.getMinutes() }; };
 export const zoneName = id => ZONES.find(z=>z.id===id)?.name || null;
+
+/* ---------- plan time ----------
+   Plans carry a real start and end (starts_at / ends_at), so one on next
+   Tuesday is next Tuesday, and a sleepover that starts Friday 9PM ends
+   Saturday 7AM instead of being impossible. day / start_min / end_min stay on
+   the row for the weekly grid; end_min may run past 1440, which means "into
+   the next day". Rows written before starts_at existed fall back to this
+   week's occurrence of their weekday. */
+export const DAYS7 = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+export const dayIdx = d => (d.getDay() + 6) % 7;                    // 0 = Monday
+export function weekStart(d = new Date()) {
+  const m = new Date(d); m.setHours(0,0,0,0); m.setDate(m.getDate() - dayIdx(m)); return m;
+}
+export function evSpan(e) {
+  if (e && e.starts_at && e.ends_at) return { s: new Date(e.starts_at), e: new Date(e.ends_at) };
+  const mon = weekStart();
+  const s = new Date(mon); s.setDate(mon.getDate() + (e?.day || 0)); s.setHours(0, e?.start_min || 0, 0, 0);
+  const en = new Date(mon); en.setDate(mon.getDate() + (e?.day || 0)); en.setHours(0, e?.end_min || 0, 0, 0);
+  return { s, e: en };
+}
+export const evUpcoming = (e, now = Date.now()) => evSpan(e).e.getTime() > now;
+export const evSort = (a, b) => evSpan(a).s - evSpan(b).s;
+/* The parts of a plan that land on each day of THIS week, in minutes from that
+   day's midnight — what the grid draws and what "busy now" checks. An overnight
+   plan is two pieces. */
+export function evPieces(ev, mon = weekStart()) {
+  const { s, e } = evSpan(ev), out = [];
+  for (let d = 0; d < 7; d++) {
+    const d0 = new Date(mon); d0.setDate(mon.getDate() + d);
+    const d1 = new Date(d0); d1.setDate(d0.getDate() + 1);
+    const a = Math.max(s, d0), b = Math.min(e, d1);
+    if (b > a) out.push({ day: d, s: Math.round((a - d0) / 6e4), e: Math.round((b - d0) / 6e4) });
+  }
+  return out;
+}
+export const fmtClockOf = d => fmt(d.getHours() * 60 + d.getMinutes());
+export function relDay(d, now = new Date()) {
+  const a = new Date(d); a.setHours(0,0,0,0); const b = new Date(now); b.setHours(0,0,0,0);
+  const n = Math.round((a - b) / 864e5);
+  if (n === 0) return 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n === -1) return 'Yesterday';
+  if (n > 1 && n < 7) return DAYS7[dayIdx(a)];
+  return DAYS7[dayIdx(a)] + ' ' + a.getDate() + ' ' + a.toLocaleDateString(undefined, { month: 'short' });
+}
+// "Today 3PM–5PM" · "Fri 9PM → Sat 7AM" · "Tomorrow 8PM–11:30PM"
+export function whenLabel(ev) {
+  const { s, e } = evSpan(ev);
+  const sameDay = s.toDateString() === new Date(e - 1).toDateString();
+  return sameDay ? `${relDay(s)} ${fmtClockOf(s)}–${fmtClockOf(e)}`
+                 : `${relDay(s)} ${fmtClockOf(s)} → ${relDay(e)} ${fmtClockOf(e)}`;
+}
+export const durLabel = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`;
 export const initialsOf = n => { n=(n||'??').trim(); return (n[0]==='@' ? n.slice(1,3) : n.split(/\s+/).map(w=>w[0]).slice(0,2).join('')).toUpperCase(); };
 export const firstName = n => (n||'').trim().split(/\s+/)[0] || '—';
 // what a person chose to go by — full name, or just @handle if they keep their name private

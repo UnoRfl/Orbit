@@ -20,7 +20,7 @@
    starts on perf tier 2 or under reduced motion — those get the same layout,
    drawn once, still draggable, just not drifting. */
 import { html, useEffect, useMemo, useRef, useState } from './lib.js';
-import { DAYS, IcCheck, IcPlus, IcTrash, IcX, KINDS, fmt, fname, hueCss, perfTier, planetsOf } from './core.js';
+import { DAYS, IcCheck, IcPlus, IcTrash, IcX, KINDS, fmt, fname, hueCss, perfTier, planetsOf, whenLabel } from './core.js';
 import { Avatar } from './components.js';
 
 const TAU = Math.PI * 2;
@@ -326,7 +326,7 @@ function FocusCard({ n, here, uid, me, events, nameOf, summary, count, onClose, 
 
     ${next && html`<button class="gcard-ev" onClick=${() => onOpenEvent(next)}>
       <span>${next.emoji || K.emoji}</span>
-      <span style="min-width:0;flex:1"><b>${next.title}</b> · ${DAYS[next.day]} ${fmt(next.start_min)}</span>
+      <span style="min-width:0;flex:1"><b>${next.title}</b> · ${whenLabel(next)}</span>
       <span class="small">by ${next.host === uid ? 'you' : nameOf(next.host)}</span>
     </button>`}
 
