@@ -7,7 +7,7 @@
    (localStorage), which is all an announcement feed needs — nothing to sync,
    nothing to store server-side. */
 import { html, useEffect, useState } from './lib.js';
-import { IcPlus, IcSend, IcTrash, IcX, LOG_TAGS, ago } from './core.js';
+import { Glyph, IcPlus, IcSend, IcTrash, IcX, LOG_TAGS, Sym, UPDATE_SET, ago, glyphLabel } from './core.js';
 
 const seenKey = uid => 'orbit.updatesSeen.' + uid;
 export const updatesSeenAt = uid => { try { return Number(localStorage.getItem(seenKey(uid))) || 0; } catch { return 0; } };
@@ -44,7 +44,7 @@ export function UpdatesPanel({ uid, updates, isFounder, nameOf, onPublish, onDel
 
   return html`<div class="upanel">
     <div class="sheethead">
-      <div class="sheettitle">📡 Updates</div>
+      <div class="sheettitle gi"><${Glyph} k="radio" size=${18}/> Updates</div>
       <div style="display:flex;gap:8px">
         ${isFounder && !composing && html`<button class="sysedit" style="padding:7px 11px" onClick=${() => setComposing(true)}><${IcPlus} size=${12}/> Publish</button>`}
         <button class="xbtn" onClick=${onClose} aria-label="Close"><${IcX} size=${16}/></button>
@@ -70,7 +70,7 @@ export function UpdatesPanel({ uid, updates, isFounder, nameOf, onPublish, onDel
             const T = LOG_TAGS[u.tag] || LOG_TAGS.new;
             const fresh = u.author !== uid && Date.parse(u.created_at) > since;
             return html`<article key=${u.id} class=${'uitem' + (fresh ? ' fresh' : '')} style=${`--ut:${T.c}`}>
-              <div class="uitem-dot"><span>${u.emoji}</span></div>
+              <div class="uitem-dot"><${Sym} v=${u.emoji} size=${18} fallback="radio"/></div>
               <div class="uitem-b">
                 <div class="uitem-top">
                   <span class="uitem-t">${u.title}</span>
@@ -78,7 +78,7 @@ export function UpdatesPanel({ uid, updates, isFounder, nameOf, onPublish, onDel
                   ${fresh && html`<span class="unew" title="New since your last visit" aria-label="unread"></span>`}
                 </div>
                 ${u.body && html`<div class="uitem-body">${u.body}</div>`}
-                <div class="small" style="margin-top:6px">${ago(u.created_at)} · ${u.author === uid ? 'you' : nameOf(u.author)} ✦</div>
+                <div class="small" style="margin-top:6px">${ago(u.created_at)} · ${u.author === uid ? 'you' : nameOf(u.author)}</div>
               </div>
               ${u.author === uid && isFounder && html`<button class="btn" style="padding:6px 9px;flex:none;align-self:flex-start"
                 onClick=${() => onDelete(u.id)} aria-label="Delete update"><${IcTrash} size=${13}/></button>`}
@@ -90,18 +90,18 @@ export function UpdatesPanel({ uid, updates, isFounder, nameOf, onPublish, onDel
 }
 
 export function PublishUpdate({ onPublish, onClose }) {
-  const [emoji, setEmoji] = useState('🚀');
+  const [emoji, setEmoji] = useState('rocket');
   const [tag, setTag] = useState('new');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   return html`<div>
-    <div class="sheethead"><div class="sheettitle">Publish an update 📡</div>
+    <div class="sheethead"><div class="sheettitle">Publish an update</div>
       <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:4px">Lands in everyone's Updates panel, live.</div>
     <div class="flabel">Emoji</div>
-    <div class="emojigrid">${['🚀','✨','🛠️','🐛','📡','🪐','☄️','🎉','📢','🧪','🗺️','🔔','🎨','⚡','🧭','💾'].map(em=>html`
-      <button key=${em} class=${'emojibtn'+(emoji===em?' on':'')} onClick=${()=>setEmoji(em)}>${em}</button>`)}</div>
+    <div class="glyphgrid">${UPDATE_SET.map(g=>html`<button key=${g} class=${'glyphbtn'+(emoji===g?' on':'')}
+      aria-label=${glyphLabel(g)} title=${glyphLabel(g)} onClick=${()=>setEmoji(g)}><${Glyph} k=${g} size=${19}/></button>`)}</div>
     <div class="flabel">Tag</div>
     <div class="pillrow">${Object.entries(LOG_TAGS).map(([k,T])=>html`<button key=${k}
       class=${'pill'+(tag===k?' on':'')} style=${tag===k?`border-color:${T.c};background:${T.c}18;color:var(--ink);font-weight:600`:'font-weight:600'}

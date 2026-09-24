@@ -31,7 +31,7 @@
    move the camera; it is never uploaded.
    ============================================================ */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { bootTier, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
+import { Glyph, Sym, bootTier, glyphSVG, hueCss, initialsOf, pauseBg, resumeBg, shownName, ui } from './core.js';
 import { COARSE_M, LIVE_DURATIONS, acquireFix, ageLabel, fixError, snapToPlace, untilLabel } from './live.js';
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
@@ -192,7 +192,8 @@ function pinEl(place, hue, count){
   /* Everything visual lives one level in, because MapLibre drives the root
      element's transform and anything of ours on it fights that. */
   el.innerHTML = `<div class="geopin-in">` +
-                 `<span class="geopin-i">${escapeHtml(place.icon || '📍')}</span>` +
+                 // glyphSVG only ever emits a body from the glyph table; the stored value is a lookup key, never markup
+                 `<span class="geopin-i">${glyphSVG(place.icon || 'pin', 17)}</span>` +
                  (count > 0 ? `<span class="geopin-n">${count > 9 ? '9+' : count}</span>` : '') +
                  `<span class="geopin-l">${escapeHtml(place.name)}</span>` +
                  `</div>`;
@@ -428,7 +429,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
   }
 
   if (status === 'failed') return html`<div class="geofail">
-    <div style="font-size:26px">🛰️</div>
+    <${Glyph} k="satlite" size=${28}/>
     <div style="font-weight:600;margin-top:6px">Couldn't load the map</div>
     <div class="hint">Check your connection, or switch back to Orbit view.</div>
   </div>`;
@@ -444,7 +445,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
         ? html`<button class="geobtn live on" onClick=${()=>live.stop('Live location off')}
             aria-label="Stop sharing live location"><span class="geodot"></span>${untilLabel(live.until)} · Stop</button>`
         : html`<button class="geobtn live" onClick=${()=>setAskLive(v=>!v)}
-            aria-label="Share live location">📡 Go live</button>`)}
+            aria-label="Share live location"><${Glyph} k="radio" size=${14}/> Go live</button>`)}
     </div>
 
     ${live && askLive && !live.active && html`<div class="geolive">
@@ -459,7 +460,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     </div>`}
 
     ${dropping && html`<div class="geohint">
-      Tap the map to place <b>${dropping.icon || '📍'} ${dropping.name}</b>
+      Tap the map to place <b class="gi"><${Sym} v=${dropping.icon || 'pin'} size=${13}/> ${dropping.name}</b>
       <button class="pill" style="margin-left:8px;padding:4px 9px" onClick=${()=>setDropping(null)}>Cancel</button>
     </div>`}
     ${!dropping && canAdd && status === 'ready' && !placed.length && !unplaced.length && html`<div class="geohint">
@@ -470,7 +471,7 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
       <div class="small" style="margin-bottom:6px">Not on the map yet — tap one, then tap where it is</div>
       <div class="pillrow scroll">
         ${unplaced.map(p => html`<button key=${p.id} class=${'pill'+(dropping?.id===p.id?' on':'')}
-          onClick=${()=>setDropping(dropping?.id===p.id ? null : p)}>${p.icon||'📍'} ${p.name}</button>`)}
+          onClick=${()=>setDropping(dropping?.id===p.id ? null : p)}><${Sym} v=${p.icon||'pin'} size=${13}/> ${p.name}</button>`)}
       </div>
     </div>`}
   </div>`;

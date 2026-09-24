@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -40,12 +40,12 @@ export function NameFx({ p, text, style='' }) {
 export function BadgeChips({ p }) {
   const b = badgesOf(p).map(k=>BADGE_DEFS[k]).filter(Boolean);
   if (!b.length) return null;
-  return html`<${Fragment}>${b.map(d=>html`<span key=${d.label} class="badgechip" title=${d.blurb||''} style=${d.color?`color:${d.color};border-color:color-mix(in srgb, ${d.color} 45%, transparent)`:''}><span style="font-size:10px;opacity:.8">${d.icon}</span>${d.label}</span>`)}<//>`;
+  return html`<${Fragment}>${b.map(d=>html`<span key=${d.label} class="badgechip" title=${d.blurb||''} style=${d.color?`color:${d.color};border-color:color-mix(in srgb, ${d.color} 45%, transparent)`:''}><${Sym} v=${d.icon} size=${11}/>${d.label}</span>`)}<//>`;
 }
 
 export function TileGlyph({ e, size=40 }) {
   return html`<span class="acttile" style=${`width:${size}px;height:${size}px;border-radius:${Math.round(size*.3)}px;background:linear-gradient(135deg,${e.c[0]},${e.c[1]})`}>
-    ${e.ic ? html`<${e.ic} size=${Math.round(size*.52)}/>` : html`<span style=${`font-size:${Math.round(size*.48)}px;line-height:1`}>${e.g}</span>`}
+    ${e.ic ? html`<${e.ic} size=${Math.round(size*.52)}/>` : html`<${Glyph} k=${e.g} size=${Math.round(size*.54)}/>`}
   </span>`;
 }
 
@@ -67,6 +67,13 @@ export function ActivityCard({ act, mine=false, onClear, onEdit }) {
   return mine
     ? html`<button class="actcard" style=${`--ac:${ac}`} onClick=${onEdit}>${body}</button>`
     : html`<div class="actcard" style=${`--ac:${ac}`}>${body}</div>`;
+}
+
+// a hobby as a chip: old "🎮 Gaming" rows and new "Gaming" rows render the same
+export function HobbyChip({ raw, bare=false }) {
+  const { text, g } = hobbyOf(raw);
+  const inner = html`${g && html`<${Glyph} k=${g} size=${13}/>`}${text}`;
+  return bare ? html`<span class="gi">${inner}</span>` : html`<span class="idchip gi">${inner}</span>`;
 }
 
 /* connection chips — URL is always built from the allowlist template */
@@ -98,7 +105,7 @@ export function SetStatusSheet({ current, onSet, onClose }) {
   const opts = ACTIVITY_CATALOG.filter(e=>e.k===k);
   const sel = ACTIVITY_CATALOG.find(e=>e.id===pick);
   return html`<div>
-    <div class="sheethead"><div class="sheettitle">What are you on? ✨</div>
+    <div class="sheethead"><div class="sheettitle">What are you on?</div>
       <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="pillrow">
       ${Object.entries(ACT_KINDS).map(([id,v])=>html`<button key=${id} class=${'pill'+(k===id?' on':'')} style="font-weight:600"
@@ -343,7 +350,7 @@ export function Grid({ ownerId, classesByOwner, events, onPick, compact=false })
       </div>`)}
       ${evBits.filter(x=>x.p.day===di).map(({ e, p })=>html`<div key=${e.id+':'+p.day} class="evt" style=${`top:${off+pxFor(p.s)}px;height:${Math.max(14, pxFor(p.e)-pxFor(p.s)-3)}px`}
           onClick=${()=>onPick && onPick({type:'event', row:e})}>
-        <span class="cname">${e.emoji||KINDS[e.kind]?.emoji||'✨'} ${e.title}</span>
+        <span class="cname"><${Sym} v=${e.emoji||KINDS[e.kind]?.emoji} size=${11}/> ${e.title}</span>
         <span class="ctime">${whenLabel(e)}</span>
       </div>`)}
       ${di===nd.day && html`<div class="nowline" style=${`top:${off+pxFor(nd.min)}px`}></div>`}
@@ -712,19 +719,19 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
         <${NameFx} p=${pv}/><${BadgeChips} p=${pv}/>
       </div>
       <div class="rowsub" style="margin-top:2px">@${pv?.handle}${pv?.course?` · ${pv.course}`:''}${pv?.school?` · ${pv.school}`:''}</div>
-      ${pv?.pronouns && html`<div class="chiprow" style="margin-top:8px"><span class="idchip">💫 <b>${pv.pronouns}</b></span></div>`}
+      ${pv?.pronouns && html`<div class="chiprow" style="margin-top:8px"><span class="idchip"><b>${pv.pronouns}</b></span></div>`}
       ${pv?.bio && html`<div class="biotext">${pv.bio}</div>`}
-      ${Array.isArray(pv?.hobbies) && pv.hobbies.length>0 && html`<div class="chiprow">${pv.hobbies.map(hb=>html`<span key=${hb} class="idchip">${hb}</span>`)}</div>`}
+      ${Array.isArray(pv?.hobbies) && pv.hobbies.length>0 && html`<div class="chiprow">${pv.hobbies.map(hb=>html`<${HobbyChip} key=${hb} raw=${hb}/>`)}</div>`}
     </div>
     <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
       ${(()=>{ const a = actOf(myPres); return a
         ? html`<${ActivityCard} act=${a} mine onClear=${()=>setPres({ activity:null })} onEdit=${()=>setStatusOpen(true)}/>`
-        : html`<button class="setactbtn" onClick=${()=>setStatusOpen(true)}><span style="font-size:14px">✨</span> Set a status — what are you on right now?</button>`; })()}
+        : html`<button class="setactbtn" onClick=${()=>setStatusOpen(true)}><${Glyph} k="spark" size=${15}/> Set a status — what are you on right now?</button>`; })()}
       ${Array.isArray(pv?.links) && pv.links.length>0 && html`<${LinkChips} links=${pv.links}/>`}
     </div>
 
     ${d0 && d0.place && html`<div class="card" style="margin-top:16px;display:flex;align-items:center;gap:10px">
-      <span style="font-size:18px;flex:none">${d0.emoji}</span>
+      <${GlyphTile} k=${d0.emoji} size=${34}/>
       <div style="min-width:0;flex:1">
         <div style="font-size:13px;font-weight:600">Checked in · ${d0.place}</div>
         <div class="rowsub">${systemPhrase(d0.system,'me')} — friends can see this</div>
@@ -772,10 +779,10 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
 
       <div class="flabel">Hobbies · ${p.hobbies.length}/10</div>
       <div class="pillrow">
-        ${[...new Set([...HOBBY_PRESETS, ...p.hobbies])].map(h=>html`<button key=${h} class=${'pill'+(p.hobbies.includes(h)?' on':'')} onClick=${()=>togHobby(h)}>${h}</button>`)}
+        ${[...new Set([...HOBBY_PRESETS, ...p.hobbies])].map(h=>html`<button key=${h} class=${'pill'+(p.hobbies.includes(h)?' on':'')} onClick=${()=>togHobby(h)}><${HobbyChip} raw=${h} bare=${true}/></button>`)}
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <input class="input" maxlength="24" value=${hobbyIn} onInput=${e=>setHobbyIn(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')addHobby()}} placeholder="add your own — 🎣 Fishing"/>
+        <input class="input" maxlength="24" value=${hobbyIn} onInput=${e=>setHobbyIn(e.target.value)} onKeyDown=${e=>{if(e.key==='Enter')addHobby()}} placeholder="add your own — Fishing"/>
         <button class="btn" style="flex:none;padding:11px 13px" disabled=${!hobbyIn.trim()||p.hobbies.length>=10} onClick=${addHobby}><${IcPlus} size=${14}/></button>
       </div>
 
@@ -907,7 +914,7 @@ export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUn
         ? html`<div class=${cls} onClick=${onSel}><${RichText} text=${m.body}/></div>`
         : html`<div class=${cls+' pic'} onClick=${onSel}>
             ${bad
-              ? html`<div class="imgfail">🖼️ link didn't load</div>`
+              ? html`<div class="imgfail"><${Glyph} k="image" size=${15}/> link didn't load</div>`
               : html`<img class="bubimg" src=${m.body} loading="lazy" referrerpolicy="no-referrer" alt="shared media"
                   onError=${onBad} onLoad=${()=>onImgLoad&&onImgLoad()} onClick=${e=>{ e.stopPropagation(); onImg(m.body); }}/>`}
           </div>`}

@@ -1110,7 +1110,7 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
   background:radial-gradient(circle at 33% 28%, #fff 0 3%, color-mix(in srgb,var(--gh) 70%,#fff) 13%, var(--gh) 44%, color-mix(in srgb,var(--gh) 38%,#000) 100%);
   box-shadow:0 0 24px color-mix(in srgb,var(--gh) 55%,transparent),0 0 64px color-mix(in srgb,var(--gh) 22%,transparent),
     inset -7px -9px 18px rgba(0,0,0,.38)}
-.gglyph{font-size:calc(var(--gs) * .42);line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.gglyph{display:flex;color:#fff;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
 .gnode.busy .gstar::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--gh) 75%,transparent);
   animation:gbeat 2.6s ease-out infinite;pointer-events:none}
 @keyframes gbeat{from{transform:scale(.92);opacity:.9}to{transform:scale(1.55);opacity:0}}
@@ -1134,7 +1134,6 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 
 .gnode.invite .gstar{background:radial-gradient(circle at 40% 36%, #fff 0 8%, var(--gh) 38%, transparent 72%);
   box-shadow:0 0 20px var(--gh);animation:gflick 1.7s ease-in-out infinite}
-.gnode.invite .gglyph{font-size:15px}
 .gnode.invite .gname{border-style:dashed;border-color:color-mix(in srgb,var(--gh) 70%,transparent)}
 .gtail{position:absolute;left:50%;top:17px;width:78px;height:7px;margin-top:-3.5px;transform-origin:0 50%;transform:rotate(var(--tail,180deg));
   border-radius:99px;background:linear-gradient(90deg, color-mix(in srgb,var(--gh) 75%,transparent), transparent);filter:blur(1.5px);pointer-events:none}
@@ -1225,3 +1224,27 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .when-tick{position:absolute;bottom:2px;transform:translateX(3px);font-size:8.5px;color:var(--faint);pointer-events:none;letter-spacing:.02em}
 .when-sum{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12.5px}
 .when-sum span{color:var(--muted);font-size:11.5px}
+
+/* ============================================================
+   GLYPHS (glyphs.js) — Orbit's own symbol set
+   ============================================================ */
+.glyph{display:inline-block;flex:none;vertical-align:-.18em}
+.glyph .f{fill:currentColor;stroke:none}
+.gtile{display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff;
+  background:
+    radial-gradient(120% 90% at 30% 18%, hsl(var(--th) 85% 72% / .55), transparent 60%),
+    linear-gradient(155deg, hsl(var(--th) 70% 52%), hsl(calc(var(--th) + 25) 65% 30%));
+  box-shadow:inset 0 0 0 1px hsl(var(--th) 90% 80% / .28), inset 0 -6px 12px rgba(0,0,0,.22), 0 4px 14px -6px hsl(var(--th) 80% 45% / .7)}
+.gtile .glyph{filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
+/* inline glyph beside text (buttons, labels) — optically matched to 13px text */
+.gi{display:inline-flex;align-items:center;gap:6px}
+
+/* glyph pickers (system icon, place icon, plan icon, update icon) */
+.glyphgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:7px}
+.glyphbtn{height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.035);color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:border-color .15s ease,background .15s ease,color .15s ease}
+.glyphbtn:hover{border-color:var(--line-strong);color:var(--ink)}
+.glyphbtn.on{color:#fff;border-color:hsl(var(--th,265) 80% 70% / .7);
+  background:linear-gradient(155deg,hsl(var(--th,265) 70% 52%),hsl(calc(var(--th,265) + 25) 65% 30%));box-shadow:0 4px 14px -6px hsl(var(--th,265) 80% 45% / .8)}
+.symtxt{line-height:1}
+.geopin-i .glyph{color:#fff}

@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, html, useState } from './lib.js';
-import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui } from './core.js';
+import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui, Glyph } from './core.js';
 import { Avatar, Bubble, NameFx, PwInput, Toggle, You } from './components.js';
 import { Home } from './home.js';
 
@@ -128,7 +128,7 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
             disabled=${!ok}
             title=${ok?'':'Too heavy for this device'}
             onClick=${()=>{ if(ok) patch({ bgStyle:id }); }}>
-            <div class="bgglyph">${ok?b.g:'🔒'}</div>
+            <div class="bgglyph">${ok?b.g:html`<${Glyph} k="lock" size=${16}/>`}</div>
             <div class="tname">${b.name}</div>
             <div class="tdesc">${ok ? b.desc : 'Desktop only'}</div>
           </button>`; })}

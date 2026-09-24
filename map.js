@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
-import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, evSort, evUpcoming, whenLabel, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
+import { B, DAYS, EMOJI_SUGGESTIONS, Glyph, GlyphTile, Sym, glyphLabel, toGlyph, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, evSort, evUpcoming, whenLabel, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
 import { GeoMap, canUseGeoMap } from './geomap.js';
 import { Galaxy } from './galaxy.js';
@@ -91,14 +91,14 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
         <span style=${`display:flex;color:${sharingOn?'var(--ge)':'var(--faint)'}`}><${IcRadio} size=${16}/></span>
         <div style="min-width:0">
           <div style="font-size:13px;font-weight:600">Share my location</div>
-          <div class="rowsub">${myD ? `On ${myD.emoji} ${myD.place} · ${myD.system}` : (sharingOn ? 'Open a system and tap a planet to check in' : 'Hidden from everyone')}</div>
+          <div class="rowsub">${myD ? `On ${myD.place} · ${myD.system}` : (sharingOn ? 'Open a system and tap a planet to check in' : 'Hidden from everyone')}</div>
         </div>
       </div>
       <button class=${'tgl'+(sharingOn?' on':'')} aria-label="Toggle sharing" onClick=${()=>setPres({ sharing:!sharingOn, ghost:false })}><span></span></button>
     </div>
     <button class=${'btn btn-block'} style=${`margin-top:14px;${myPres?.ghost?'border-color:var(--major);background:rgba(176,107,255,.14)':''}`}
       onClick=${()=>setPres({ ghost:!myPres?.ghost })}>
-      👻 ${myPres?.ghost ? "Ghost mode on — you're invisible" : 'Ghost mode'}
+      <${Glyph} k="ghost" size=${15}/> ${myPres?.ghost ? "Ghost mode on — you're invisible" : 'Ghost mode'}
     </button>
 
     ${/* Live location lives in the same card as the other location controls,
@@ -169,11 +169,11 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
         <div class="stack" style="margin-top:10px">
           ${cosmicAll.map(e=>{ const K = KINDS[e.kind]||KINDS.hangout; const s = sysByKey[e.system_id];
             return html`<button key=${e.id} class="cardrow" onClick=${()=>onOpenEvent(e)}>
-              <span style="font-size:18px;flex:none">${e.emoji||K.emoji}</span>
+              <${GlyphTile} k=${e.emoji||K.emoji} hue=${s.hue} size=${34}/>
               <div style="min-width:0;flex:1">
                 <div class="rowname">${e.title}</div>
                 <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
-                <div class="uporigin"><span style=${`color:${hueCss(s.hue)}`}>${s.glyph} ${s.name}</span><span>·</span><span>set up by ${e.host===uid?'you':nameOf(e.host)}</span></div>
+                <div class="uporigin"><span class="gi" style=${`color:${hueCss(s.hue)}`}><${Sym} v=${s.glyph} size=${12} fallback="planet"/> ${s.name}</span><span>·</span><span>set up by ${e.host===uid?'you':nameOf(e.host)}</span></div>
               </div>
             </button>`;})}
         </div>
@@ -185,7 +185,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
           ${friendPlaces.map(({f,d})=>html`<button key=${f.id} class="cardrow" onClick=${()=>onOpenFriend(f.id)}>
             <${Avatar} p=${f} size=${36}/>
             <div style="min-width:0;flex:1">
-              <div class="rowname">${fname(f)} · <span style="color:var(--major)">${d.emoji} ${d.place}</span></div>
+              <div class="rowname">${fname(f)} · <span class="gi" style="color:var(--major)"><${Sym} v=${d.emoji} size=${13}/> ${d.place}</span></div>
               <div class="rowsub">${systemPhrase(d.system, f.id)}</div>
             </div>
             <div class="small">${ago(presence[f.id].updated_at)}</div>
@@ -218,7 +218,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   return html`<div>
     <div class="syshead">
       <button class="sysback" onClick=${()=>{ setActiveKey(null); setSel(null); }}><${IcBack} size=${15}/> Systems</button>
-      <div class="systitle">${active.glyph} ${active.name}</div>
+      <div class="systitle gi"><${GlyphTile} k=${active.glyph} hue=${active.hue} size=${30}/> ${active.name}</div>
       ${active.kind==='shared' && html`<button class="sysedit" style="padding:8px 10px;position:relative" aria-label="System chat"
         onClick=${()=>chat.setSel(chat.sel?.scope==='sys'&&chat.sel.ref===active.key ? null : { scope:'sys', ref:active.key })}>
         <${IcChat} size=${15}/>${(chat.ov['sys:'+active.key]?.n||0)>0 && !chat.reads['sys:'+active.key]?.muted && html`<span class="nbadge">${chat.ov['sys:'+active.key].n}</span>`}</button>`}
@@ -239,7 +239,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
         onPlaceAt=${(p,lat,lng)=>placeAt(p,lat,lng)}
         onAddAt=${(lat,lng)=>setForm({ t:'addplanet', lat, lng })} />`
     : html`<div class="geofail">
-        <div style="font-size:26px">🗺️</div>
+        <${Glyph} k="map" size=${28}/>
         <div style="font-weight:600;margin-top:6px">This device can't draw the map</div>
         <div class="hint">Orbit's map needs WebGL, which this browser has switched off or can't do. Your places and check-ins are all still here — the list below works.</div>
       </div>`}
@@ -247,7 +247,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
     ${active.kind==='shared' && html`<div style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <${Eyebrow} color="var(--nstp)">Cosmic events<//>
-        <button class="sysedit" style="padding:6px 11px" onClick=${()=>onNewCosmic(active)}>☄️ New</button>
+        <button class="sysedit" style="padding:6px 11px" onClick=${()=>onNewCosmic(active)}><span class="gi"><${Glyph} k="comet" size=${13}/> New</span></button>
       </div>
       ${!cosmic.length && html`<div class="small" style="margin-top:8px">Nothing on the calendar — set up a study sesh or a hangout.</div>`}
       <div class="stack" style="margin-top:10px">
@@ -257,7 +257,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
           const myInv = (e.event_invitees||[]).find(i=>i.invitee===uid);
           const mineHost = e.host===uid;
           return html`<div key=${e.id} class="cardrow" style="cursor:default;align-items:flex-start">
-            <span style="font-size:18px;flex:none;margin-top:2px">${e.emoji||K.emoji}</span>
+            <${GlyphTile} k=${e.emoji||K.emoji} hue=${active.hue} size=${34}/>
             <div style="min-width:0;flex:1" onClick=${()=>onOpenEvent(e)}>
               <div class="rowname">${e.title}</div>
               <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
@@ -280,7 +280,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
     ${sel && (()=>{ const found=planetsOf(active).find(x=>x.id===(sel&&sel.id?sel.id:sel)); if(!found) return null;
       const L=placeInfo(found); const p=L.planet; const iAmHere=L.meHere;
       return html`<div style="margin-top:14px">
-        <${Eyebrow}>${p.icon} ${p.name}<//>
+        <div class="gi" style="gap:10px"><${GlyphTile} k=${p.icon} hue=${active.hue} size=${30}/><${Eyebrow}>${p.name}<//></div>
         <div class="stack" style="margin-top:10px">
           ${!L.faces.length && !iAmHere && html`<div class="small">No one's on this planet right now.</div>`}
           ${iAmHere && html`<div class="cardrow" style="cursor:default;border-color:var(--ge)">
@@ -297,7 +297,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
         <div style="display:flex;gap:8px;margin-top:12px">
           ${iAmHere
             ? html`<button class="btn btn-block" onClick=${leave}>Leave ${p.name}</button>`
-            : html`<button class="btn btn-grad btn-block" onClick=${()=>checkIn(active, p)}>📍 Check in here</button>`}
+            : html`<button class="btn btn-grad btn-block" onClick=${()=>checkIn(active, p)}><${Glyph} k="pin" size=${15}/> Check in here</button>`}
           ${canDeletePlanet(p) && html`<button class="btn btn-soft-red" style="flex:none"
             onClick=${async()=>{ if(await ui.confirm({ title:`Remove ${p.name}?`, body:`Removed from ${active.name} for everyone.`, confirmLabel:'Remove', danger:true })) removePlanet(p); }}><${IcTrash} size=${14}/></button>`}
         </div>
@@ -329,7 +329,7 @@ export function NewSystemForm({ onSave, onClose }) {
     <div class="flabel">Name</div>
     <input class="input" placeholder="e.g. Barkada, Block 3B, Home crew" value=${name} maxLength=${24} onInput=${e=>setName(e.target.value)} />
     <div class="flabel">Icon</div>
-    <div class="emojigrid">${SYSTEM_GLYPHS.map(g=>html`<button key=${g} class=${'emojibtn'+(glyph===g?' on':'')} onClick=${()=>setGlyph(g)}>${g}</button>`)}</div>
+    <div class="glyphgrid">${SYSTEM_GLYPHS.map(g=>html`<button key=${g} class=${'glyphbtn'+(glyph===g?' on':'')} style=${`--th:${hue}`} aria-label=${glyphLabel(g)} title=${glyphLabel(g)} onClick=${()=>setGlyph(g)}><${Glyph} k=${g} size=${20}/></button>`)}</div>
     <div class="flabel">Colour</div>
     <div class="huerow">${SYSTEM_HUES.map(h=>html`<button key=${h} class=${'hueswatch'+(hue===h?' on':'')} style=${`background:${hueCss(h)}`} onClick=${()=>setHue(h)} aria-label="colour"></button>`)}</div>
     <button class="btn btn-grad btn-block" style="margin-top:18px" disabled=${!ok||busy}
@@ -339,18 +339,18 @@ export function NewSystemForm({ onSave, onClose }) {
 
 export function AddPlanetForm({ system, onSave, onClose, at=null }) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('📍');
+  const [icon, setIcon] = useState('pin');
   const [busy, setBusy] = useState(false);
   const ok = name.trim().length > 0;
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Add a place</div>
       <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     <div class="hint" style="margin-top:-8px;margin-bottom:4px">A spot you actually go — home, a café, the mall. It becomes a place in ${system?.name}${system?.kind==='shared'?' that the whole circle can see':''}.</div>
-    ${at && html`<div class="okbox" style="margin-top:10px">📍 Pinned where you tapped — ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}</div>`}
+    ${at && html`<div class="okbox gi" style="margin-top:10px"><${Glyph} k="pin" size=${14}/> Pinned where you tapped — ${at.lat.toFixed(5)}, ${at.lng.toFixed(5)}</div>`}
     <div class="flabel">Name</div>
     <input class="input" placeholder="e.g. Home, SM Molino, Kuya's café" value=${name} maxLength=${28} onInput=${e=>setName(e.target.value)} />
     <div class="flabel">Icon</div>
-    <div class="emojigrid">${EMOJI_SUGGESTIONS.map(g=>html`<button key=${g} class=${'emojibtn'+(icon===g?' on':'')} onClick=${()=>setIcon(g)}>${g}</button>`)}</div>
+    <div class="glyphgrid">${EMOJI_SUGGESTIONS.map(g=>html`<button key=${g} class=${'glyphbtn'+(icon===g?' on':'')} style=${`--th:${system?.hue ?? 265}`} aria-label=${glyphLabel(g)} title=${glyphLabel(g)} onClick=${()=>setIcon(g)}><${Glyph} k=${g} size=${20}/></button>`)}</div>
     <button class="btn btn-grad btn-block" style="margin-top:18px" disabled=${!ok||busy}
       onClick=${async()=>{ setBusy(true); await onSave({ name:name.trim(), icon }); setBusy(false); }}>${busy?'Adding…':'Add planet'}</button>
   </div>`;
@@ -383,8 +383,8 @@ export function SystemPeople({ sys, uid, me, friends, profiles, nameOf, actions,
 
     ${canStyle && html`<${Fragment}>
       <div class="flabel">Icon</div>
-      <div class="emojigrid">${SYSTEM_GLYPHS.map(g=>html`<button key=${g} class=${'emojibtn'+(sys.glyph===g?' on':'')}
-        onClick=${()=>actions.updateSystem(sys.key,{ glyph:g })}>${g}</button>`)}</div>
+      <div class="glyphgrid">${SYSTEM_GLYPHS.map(g=>html`<button key=${g} class=${'glyphbtn'+(toGlyph(sys.glyph)===g?' on':'')} style=${`--th:${sys.hue}`}
+        aria-label=${glyphLabel(g)} title=${glyphLabel(g)} onClick=${()=>actions.updateSystem(sys.key,{ glyph:g })}><${Glyph} k=${g} size=${20}/></button>`)}</div>
       <div class="flabel">Colour</div>
       <div class="huerow">${SYSTEM_HUES.map(h=>html`<button key=${h} class=${'hueswatch'+(sys.hue===h?' on':'')}
         style=${`background:${hueCss(h)}`} onClick=${()=>actions.updateSystem(sys.key,{ hue:h })} aria-label="colour"></button>`)}</div>
@@ -405,7 +405,7 @@ export function SystemPeople({ sys, uid, me, friends, profiles, nameOf, actions,
         <${Avatar} p=${profOf(m.user_id)} size=${34}/>
         <div style="min-width:0;flex:1">
           <div class="rowname">${m.user_id===uid?'You':(fname(profOf(m.user_id))||'??')}</div>
-          <div class="rowsub">${m.role==='leader'?'👑 Leader':'Member'}</div>
+          <div class="rowsub gi">${m.role==='leader'?html`<${Glyph} k="crown" size=${12}/> Leader`:'Member'}</div>
         </div>
         ${isLeader && m.user_id!==uid && html`<button class="btn btn-soft-red" style="padding:7px 10px;flex:none"
           onClick=${async()=>{ if(await ui.confirm({ title:`Remove ${nameOf(m.user_id)} from ${sys.name}?`, confirmLabel:'Remove', danger:true })) actions.kickMember(sys.key, m.user_id); }}><${IcX} size=${13}/></button>`}

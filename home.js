@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useState } from './lib.js';
-import { actOf, ago, DAYS, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
-import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
+import { actOf, ago, DAYS, Glyph, GlyphTile, Sym, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, HobbyChip, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
 export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
   const nd = nowInfo();
@@ -52,12 +52,12 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
 
     ${(sysInvites.length>0 || myInvites.length>0) && html`<div class="card" style="margin-top:10px;border-color:rgba(245,181,68,.45)">
       <div style="display:flex;align-items:center;gap:7px">
-        <span style="font-size:14px">☄️</span>
+        <span style="color:var(--nstp);display:flex"><${Glyph} k="comet" size=${15}/></span>
         <span class="eyebrow" style="color:var(--nstp);letter-spacing:.22em;font-size:10px">Waiting on you</span>
       </div>
       <div class="stack" style="margin-top:10px">
         ${sysInvites.map(({sys,mem})=>html`<div key=${'s'+sys.id} class="cardrow" style="cursor:default">
-          <span style="font-size:18px;flex:none">${sys.glyph}</span>
+          <${GlyphTile} k=${sys.glyph} hue=${sys.hue} size=${32}/>
           <div style="min-width:0;flex:1">
             <div class="rowname">${sys.name}</div>
             <div class="rowsub">${nameOf(mem.invited_by)} invited you to this system</div>
@@ -68,7 +68,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
           </div>
         </div>`)}
         ${myInvites.map(e=>{ const K=KINDS[e.kind]||KINDS.hangout; return html`<div key=${e.id} class="cardrow" style="cursor:default">
-          <span style="font-size:18px;flex:none">${e.emoji||K.emoji}</span>
+          <${GlyphTile} k=${e.emoji||K.emoji} size=${32}/>
           <div style="min-width:0;flex:1">
             <div class="rowname">${e.title}</div>
             <div class="rowsub">${whenLabel(e)}${e.place?` · ${e.place}`:''}</div>
@@ -134,7 +134,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
                 <div class="rowsub" style=${`color:${st.color}`}>${st.text}</div>
               </div>
               ${(()=>{ const d=presencePlace(presence[f.id]); return d && html`<div class="small" style="display:flex;align-items:center;gap:4px;color:var(--faint)">
-                <span style="color:var(--ge);display:flex"><${IcPin} size=${11}/></span>${d.emoji} ${d.place}</div>`; })()}
+                <span style="color:var(--ge);display:flex"><${IcPin} size=${11}/></span>${d.place}</div>`; })()}
             </button>`)}
         </div>
       </div>`}
@@ -149,12 +149,12 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
             const K = KINDS[e.kind]||KINDS.hangout;
             const s = e.system_id ? sysById[e.system_id] : null;
             return html`<div key=${e.id} class="uprow">
-              <div style=${`width:40px;height:40px;border-radius:13px;background:${K.accent}22;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:19px`}>${e.emoji||K.emoji}</div>
+              <${GlyphTile} k=${e.emoji||K.emoji} size=${40}/>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.title}</div>
                 <div class="rowsub">${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
                 <div class="uporigin">
-                  ${s && html`<span style="color:var(--major)">${s.glyph} ${s.name}</span><span>·</span>`}
+                  ${s && html`<span class="gi" style="color:var(--major)"><${Sym} v=${s.glyph} size=${12} fallback="planet"/> ${s.name}</span><span>·</span>`}
                   <span>set up by ${e.host===uid ? 'you' : nameOf(e.host)}</span>
                 </div>
               </div>
@@ -184,9 +184,9 @@ export function FriendDash({ f, uid, classesBy, events, presence, onBack, onPoke
     <div class="profbody" style="margin-bottom:14px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><${NameFx} p=${f}/><${BadgeChips} p=${f}/></div>
       <div class="rowsub" style="margin-top:2px">@${f.handle}${f.course?` · ${f.course}`:''}${f.school?` · ${f.school}`:''}</div>
-      ${f.pronouns && html`<div class="chiprow" style="margin-top:8px"><span class="idchip">💫 <b>${f.pronouns}</b></span></div>`}
+      ${f.pronouns && html`<div class="chiprow" style="margin-top:8px"><span class="idchip"><b>${f.pronouns}</b></span></div>`}
       ${f.bio && html`<div class="biotext">${f.bio}</div>`}
-      ${Array.isArray(f.hobbies) && f.hobbies.length>0 && html`<div class="chiprow">${f.hobbies.map(hb=>html`<span key=${hb} class="idchip">${hb}</span>`)}</div>`}
+      ${Array.isArray(f.hobbies) && f.hobbies.length>0 && html`<div class="chiprow">${f.hobbies.map(hb=>html`<${HobbyChip} key=${hb} raw=${hb}/>`)}</div>`}
     </div>
     ${(actOf(presence[f.id]) || (Array.isArray(f.links) && f.links.length>0)) && html`<div style="margin:-4px 0 16px;display:flex;flex-direction:column;gap:10px">
       ${(()=>{ const a = actOf(presence[f.id]); return a && html`<${ActivityCard} act=${a}/>`; })()}
@@ -200,16 +200,16 @@ export function FriendDash({ f, uid, classesBy, events, presence, onBack, onPoke
       <div class="card" style="flex:1;padding:11px 13px">
         <div class="flabel" style="margin:0 0 4px">Location</div>
         <div style=${`font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px;color:${hereD?'var(--ge)':'var(--faint)'}`}>
-          ${hereD ? html`<${IcPin} size=${13}/>${hereD.emoji} ${hereD.place}` : 'Not sharing'}
+          ${hereD ? html`<${IcPin} size=${13}/>${hereD.place}` : 'Not sharing'}
         </div>
         ${hereD && hereD.system && html`<div class="small" style="margin-top:3px;color:var(--major)">${systemPhrase(hereD.system, f.id)}</div>`}
         ${hereD && html`<div class="small" style="margin-top:2px">${ago(pres.updated_at)}</div>`}
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:18px">
-      ${[['💬','Message',onMessage],['👋','Poke',onPoke],['📡','Ping',onPing],['🗓️','Plan',onPlan]].map(([em,lbl,fn])=>html`
-        <button key=${lbl} class="btn" style="flex:1;flex-direction:column;gap:5px;padding:12px 8px" onClick=${fn}>
-          <span style="font-size:17px">${em}</span><span style="font-size:12px">${lbl}</span></button>`)}
+      ${[['chat','Message',onMessage],['wave','Poke',onPoke],['radio','Ping',onPing],['cal','Plan',onPlan]].map(([g,lbl,fn])=>html`
+        <button key=${lbl} class="btn" style="flex:1;flex-direction:column;gap:6px;padding:12px 8px" onClick=${fn}>
+          <${Glyph} k=${g} size=${19}/><span style="font-size:12px">${lbl}</span></button>`)}
     </div>
     ${(()=>{ const _nd=nowInfo(); const wins=sharedToday(uid, f.id, classesBy, events, null, 30);
       if (!wins.length) return null;

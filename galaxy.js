@@ -20,7 +20,7 @@
    starts on perf tier 2 or under reduced motion — those get the same layout,
    drawn once, still draggable, just not drifting. */
 import { html, useEffect, useMemo, useRef, useState } from './lib.js';
-import { DAYS, IcCheck, IcPlus, IcTrash, IcX, KINDS, fmt, fname, hueCss, perfTier, planetsOf, whenLabel } from './core.js';
+import { DAYS, Glyph, GlyphTile, IcCheck, IcPlus, IcTrash, IcX, KINDS, Sym, fmt, fname, hueCss, perfTier, planetsOf, whenLabel } from './core.js';
 import { Avatar } from './components.js';
 
 const TAU = Math.PI * 2;
@@ -239,7 +239,7 @@ export function Galaxy({ uid, me, systems, invites, myD, matchSys, friendsInSys,
       <div class="gcore" style="z-index:50">
         <div class="gcore-halo"></div>
         <${Avatar} p=${me} size=${52}/>
-        <div class="gcore-l">${myD ? html`${myD.emoji} ${myD.place}` : 'You'}</div>
+        <div class="gcore-l">${myD ? html`<${Sym} v=${myD.emoji} size=${11}/> ${myD.place}` : 'You'}</div>
       </div>
 
       ${nodes.map(n => {
@@ -247,7 +247,7 @@ export function Galaxy({ uid, me, systems, invites, myD, matchSys, friendsInSys,
             style=${`--gh:${hueCss(n.s.hue ?? 265)};--gs:34px`} onPointerDown=${e => { e.stopPropagation(); onDown(e); }} onClick=${ev => tapNode(n, ev)}
             aria-label=${`Invitation to ${n.s.name}`}>
           <span class="gtail"></span>
-          <span class="gstar"><span class="gglyph">${n.s.glyph}</span></span>
+          <span class="gstar"><span class="gglyph"><${Sym} v=${n.s.glyph} size=${16} fallback="planet"/></span></span>
           <span class="gname">Invite · ${n.s.name}</span>
         </button>`;
         const s = n.s, h = here[s.key], pls = planetsOf(s);
@@ -262,13 +262,13 @@ export function Galaxy({ uid, me, systems, invites, myD, matchSys, friendsInSys,
             onClick=${ev => tapNode(n, ev)} onDblClick=${() => onOpen(s.key)}
             aria-label=${`${s.name}: ${pls.length} places${liveN ? `, ${liveN} here now` : ''}`}>
           <span class="gstar">
-            <span class="gglyph">${s.glyph}</span>
+            <span class="gglyph"><${Sym} v=${s.glyph} size=${Math.round(px * 0.42)} fallback="planet"/></span>
             ${pls.slice(0, 4).map((p, i) => html`<span key=${p.id || i} class="gmoon" style=${`--mr:${px / 2 + 7 + i * 5}px;--md:${7 + i * 3.5}s;--mo:${-i * 2.3}s;--ma:${i * 97}deg`}><i></i></span>`)}
             ${h.friends.slice(0, 4).map((x, i) => html`<span key=${x.f.id} class="gsat" style=${`--sr:${px / 2 + 14}px;--sd:16s;--so:${-(i * 16) / Math.min(4, h.friends.length)}s;--sa:${(i * 360) / Math.min(4, h.friends.length) - 90}deg`}>
               <span class="gsat-in"><${Avatar} p=${x.f} size=${20}/></span></span>`)}
             ${liveN > 0 && html`<span class="gcount">${liveN}</span>`}
           </span>
-          <span class="gname">${s.glyph} ${s.name}${s.kind === 'shared' && s.owner === uid ? ' 👑' : ''}</span>
+          <span class="gname">${s.name}${s.kind === 'shared' && s.owner === uid ? html` <${Glyph} k="crown" size=${11}/>` : ''}</span>
         </button>`;
       })}
 
@@ -292,7 +292,7 @@ function FocusCard({ n, here, uid, me, events, nameOf, summary, count, onClose, 
 
   if (n.kind === 'invite') return html`<div class="gcard" style=${`--gh:${hueCss(n.s.hue ?? 265)}`}>
     <div class="gcard-h">
-      <span class="gcard-g">${n.s.glyph}</span>
+      <${GlyphTile} k=${n.s.glyph} hue=${n.s.hue ?? 265} size=${44}/>
       <div style="min-width:0;flex:1"><div class="gcard-t">${n.s.name}</div>
         <div class="small">An invitation is heading your way</div></div>
       <button class="xbtn" onClick=${onClose} aria-label="Close"><${IcX} size=${15}/></button>
@@ -310,9 +310,9 @@ function FocusCard({ n, here, uid, me, events, nameOf, summary, count, onClose, 
   const K = next && (KINDS[next.kind] || KINDS.hangout);
   return html`<div class="gcard" style=${`--gh:${hueCss(s.hue)}`}>
     <div class="gcard-h">
-      <span class="gcard-g">${s.glyph}</span>
+      <${GlyphTile} k=${s.glyph} hue=${s.hue} size=${44}/>
       <div style="min-width:0;flex:1">
-        <div class="gcard-t">${s.name}${mine ? ' 👑' : ''}</div>
+        <div class="gcard-t">${s.name}${mine ? html` <${Glyph} k="crown" size=${13}/>` : ''}</div>
         <div class="small">${pls.length} ${pls.length === 1 ? 'place' : 'places'}${members ? ` · ${members} ${members === 1 ? 'member' : 'members'}` : ''}</div>
       </div>
       <button class="xbtn" onClick=${onClose} aria-label="Close"><${IcX} size=${15}/></button>
@@ -321,11 +321,11 @@ function FocusCard({ n, here, uid, me, events, nameOf, summary, count, onClose, 
     ${(here.me || here.friends.length > 0) ? html`<div class="gcard-who">
       ${here.me && html`<span class="gwho me"><${Avatar} p=${me} size=${24}/> You</span>`}
       ${here.friends.map(x => html`<button key=${x.f.id} class="gwho" onClick=${() => onOpenFriend(x.f.id)}>
-        <${Avatar} p=${x.f} size=${24}/> ${fname(x.f)} <span class="gwho-at">${x.d.emoji} ${x.d.place}</span></button>`)}
+        <${Avatar} p=${x.f} size=${24}/> ${fname(x.f)} <span class="gwho-at"><${Sym} v=${x.d.emoji} size=${11}/> ${x.d.place}</span></button>`)}
     </div>` : html`<div class="small" style="margin-top:10px">No one’s here right now.</div>`}
 
     ${next && html`<button class="gcard-ev" onClick=${() => onOpenEvent(next)}>
-      <span>${next.emoji || K.emoji}</span>
+      <${Sym} v=${next.emoji || K.emoji} size=${15}/>
       <span style="min-width:0;flex:1"><b>${next.title}</b> · ${whenLabel(next)}</span>
       <span class="small">by ${next.host === uid ? 'you' : nameOf(next.host)}</span>
     </button>`}

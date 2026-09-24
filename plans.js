@@ -1,7 +1,11 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useMemo, useRef, useState } from './lib.js';
-import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
+import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, Glyph, GlyphTile, Sym, glyphLabel, toGlyph, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
 import { Avatar, You, conflictsFor } from './components.js';
+
+// plan tiles take their colour from the plan type
+const KIND_HUE = { coffee:35, study:175, lunch:150, hangout:285, sleepover:235 };
+const kindHue = k => KIND_HUE[k] ?? 265;
 
 export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen }) {
   const nd = nowInfo();
@@ -22,7 +26,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
           const conf = conflictsFor(uid, evSpan(e), classesBy, events.filter(x=>x.id!==e.id));
           return html`<div key=${e.id} class="card" style="padding:14px">
             <div style="display:flex;align-items:center;gap:11px">
-              <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${e.emoji||K.emoji}</div>
+              <${GlyphTile} k=${e.emoji||K.emoji} hue=${kindHue(e.kind)} size=${36}/>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="font-size:13.5px">${e.title}</div>
                 <div class="rowsub">from ${nameOf(e.host)} · ${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
@@ -46,7 +50,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
         ${waiting.map(e=>{
           const pend = (e.event_invitees||[]).filter(i=>i.status==='pending').map(i=>nameOf(i.invitee)).join(', ');
           return html`<button key=${e.id} class="cardrow" style="border-style:dashed;opacity:.9" onClick=${()=>onOpen(e)}>
-            <span style="font-size:16px;flex:none">${e.emoji||KINDS[e.kind]?.emoji||'✨'}</span>
+            <${GlyphTile} k=${e.emoji||KINDS[e.kind]?.emoji} hue=${kindHue(e.kind)} size=${30}/>
             <div style="min-width:0;flex:1">
               <div class="rowname" style="font-size:12.5px">${e.title}</div>
               <div class="rowsub">${whenLabel(e)} · waiting on ${pend}</div>
@@ -65,7 +69,7 @@ export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me,
           const ppl = [e.host, ...(e.event_invitees||[]).filter(i=>i.status==='accepted').map(i=>i.invitee)];
           return html`<button key=${e.id} class="cardrow" style="background:linear-gradient(135deg,rgba(176,107,255,.10),rgba(45,212,191,.07));border-color:var(--line-strong);align-items:flex-start;flex-direction:column;gap:10px" onClick=${()=>onOpen(e)}>
             <div style="display:flex;align-items:center;gap:11px;width:100%">
-              <div style=${`width:36px;height:36px;border-radius:10px;background:${K.accent}20;border:1px solid ${K.accent}55;display:flex;align-items:center;justify-content:center;flex:none;font-size:17px`}>${e.emoji||K.emoji}</div>
+              <${GlyphTile} k=${e.emoji||K.emoji} hue=${kindHue(e.kind)} size=${36}/>
               <div style="min-width:0;flex:1">
                 <div class="rowname" style="font-size:13.5px">${e.title}</div>
                 <div class="rowsub">${whenLabel(e)} · ${zoneName(e.place)||e.place||'—'}</div>
@@ -232,7 +236,7 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
   }, [span, inv, classesBy, events]);
 
   return html`<div>
-    <div class="sheethead"><div class="sheettitle">${sys ? 'New cosmic event ☄️' : 'New plan'}</div>
+    <div class="sheethead"><div class="sheettitle">${sys ? 'New cosmic event' : 'New plan'}</div>
       <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
     ${sys && html`<div class="hint" style="margin-top:-8px;margin-bottom:8px">For the ${sys.glyph} ${sys.name} system — members get the invite, and accepting drops it straight onto their schedule.</div>`}
 
@@ -240,15 +244,15 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
       ${Object.entries(KINDS).map(([k,K])=>html`<button key=${k}
         class="btn" style=${`flex:1;flex-direction:column;gap:5px;padding:11px 6px;${kind===k?`background:${K.accent}20;border-color:${K.accent}`:''}`}
         onClick=${()=>setKind(k)}>
-        <span style="font-size:17px">${K.emoji}</span>
+        <${GlyphTile} k=${K.emoji} hue=${kindHue(k)} size=${30}/>
         <span style=${`font-size:10.5px;${kind===k?'color:var(--ink)':'color:var(--muted)'}`}>${K.label}</span>
       </button>`)}
     </div>
 
     <div class="flabel">Event emoji</div>
     <div class="pillrow scroll">
-      <button class=${'pill'+(!emoji?' on':'')} style="font-weight:600" onClick=${()=>setEmoji('')}>${KINDS[kind].emoji} Auto</button>
-      ${EVENT_EMOJIS.map(em=>html`<button key=${em} class=${'pill'+(emoji===em?' on':'')} style="font-size:15px;padding:6px 10px" onClick=${()=>setEmoji(emoji===em?'':em)}>${em}</button>`)}
+      <button class=${'pill'+(!emoji?' on':'')} style="font-weight:600" onClick=${()=>setEmoji('')}><${Glyph} k=${KINDS[kind].emoji} size=${15}/> Auto</button>
+      ${EVENT_EMOJIS.map(em=>html`<button key=${em} class=${'pill'+(emoji===em?' on':'')} style="padding:7px 10px" aria-label=${glyphLabel(em)} title=${glyphLabel(em)} onClick=${()=>setEmoji(emoji===em?'':em)}><${Glyph} k=${em} size=${16}/></button>`)}
     </div>
 
     <div class="flabel">Title · optional</div>
@@ -262,9 +266,9 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
       <div class="flabel">Where${sys?' · optional':''}</div>
       <div class="pillrow">
         ${sys
-          ? (sys.planets||[]).map(p=>{ const v=`${p.icon} ${p.name}`;
-              return html`<button key=${p.id} class=${'pill'+(place===v?' on-teal':'')} onClick=${()=>setPlace(place===v?'':v)}>${v}</button>`; })
-          : ZONES.map(z=>html`<button key=${z.id} class=${'pill'+(place===z.id?' on-teal':'')} onClick=${()=>setPlace(z.id)}>${z.icon} ${z.name}</button>`)}
+          ? (sys.planets||[]).map(p=>{ const v=p.name;
+              return html`<button key=${p.id} class=${'pill'+(place===v?' on-teal':'')} onClick=${()=>setPlace(place===v?'':v)}><${Sym} v=${p.icon} size=${13}/> ${v}</button>`; })
+          : ZONES.map(z=>html`<button key=${z.id} class=${'pill'+(place===z.id?' on-teal':'')} onClick=${()=>setPlace(z.id)}><${Glyph} k=${z.icon} size=${13}/> ${z.name}</button>`)}
       </div>
     <//>`}
 
@@ -311,7 +315,7 @@ export function PingSheet({ f, onSend }) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${PING_PRESETS.map(p=>html`<button key=${p.t} class="btn" style="padding:14px 10px;justify-content:flex-start" onClick=${()=>onSend(p.t,p.e)}>
-        <span style="font-size:18px">${p.e}</span> ${p.t}</button>`)}
+        <${GlyphTile} k=${p.e} size=${28}/> ${p.t}</button>`)}
     </div>
   </div>`;
 }
@@ -321,7 +325,7 @@ export function Inbox({ uid, pings, notifs=[], events=[], sysInvites=[], profile
     ...notifs.map(n=>({ t:'n', id:'n'+n.id, at:n.created_at, n })),
     ...pings.filter(p=>p.recipient===uid).map(p=>({ t:'p', id:'p'+p.id, at:p.created_at, p })),
   ].sort((a,b)=> new Date(b.at)-new Date(a.at)).slice(0,80);
-  const NICON = { system_invite:'🪐', cosmic_invite:'☄️', event_invite:'📨', event_going:'🎉', system_joined:'👋' };
+  const NICON = { system_invite:'planet', cosmic_invite:'comet', event_invite:'mail', event_going:'party', system_joined:'wave', moderation:'shield' };
   const anyUnread = notifs.some(n=>!n.read) || pings.some(p=>p.recipient===uid && !p.seen);
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Signals</div>
@@ -338,14 +342,14 @@ export function Inbox({ uid, pings, notifs=[], events=[], sysInvites=[], profile
             <div style="font-size:13px"><b>${nameOf(p.sender)}</b> ${p.kind==='poke'?'waved at you':`pinged: ${p.text}`}</div>
             <div class="small" style="margin-top:2px">${ago(p.created_at)}</div>
           </div>
-          ${p.emoji && html`<span style="font-size:18px;flex:none">${p.emoji}</span>`}
+          ${p.emoji && html`<${GlyphTile} k=${p.emoji} size=${32}/>`}
         </div>`; }
         const n = r.n;
         const sysInv = n.kind==='system_invite' ? sysInvites.find(x=>x.sys.id===(n.data||{}).system_id) : null;
         const ev = (n.kind==='cosmic_invite'||n.kind==='event_invite') ? events.find(e=>e.id===(n.data||{}).event_id) : null;
         const pend = ev && (ev.event_invitees||[]).some(i=>i.invitee===uid && i.status==='pending');
         return html`<div key=${r.id} class="cardrow" style=${'cursor:default;align-items:flex-start;'+(n.read?'':'background:rgba(176,107,255,.08);border-color:rgba(176,107,255,.3)')}>
-          <span style="font-size:18px;flex:none;margin-top:2px">${NICON[n.kind]||'🔔'}</span>
+          <${GlyphTile} k=${NICON[n.kind]||'bell'} size=${32}/>
           <div style="min-width:0;flex:1">
             <div style="font-size:13px;font-weight:600">${n.title}</div>
             ${n.body && html`<div class="rowsub" style="margin-top:1px">${n.body}</div>`}
@@ -372,7 +376,7 @@ export function Detail({ d, uid, profiles, nameOf, onCancel }) {
     const pend = (e.event_invitees||[]).filter(i=>i.status==='pending').map(i=>nameOf(i.invitee));
     return html`<div>
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
-        <span style="font-size:15px">${e.emoji||K.emoji}</span>
+        <${Sym} v=${e.emoji||K.emoji} size=${15}/>
         <span class="eyebrow" style=${`color:${K.accent};letter-spacing:.22em;font-size:10px`}>${K.label}</span>
       </div>
       <div class="sheettitle" style="font-size:20px">${e.title}</div>

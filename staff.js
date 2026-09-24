@@ -1,7 +1,10 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useState } from './lib.js';
-import { ago, BADGE_DEFS, badgesOf, fname, IcFlag, IcTrash, IcUser, IcX, PROFILE_VIEW, roleOf, sb, shownName, ui } from './core.js';
+import { ago, BADGE_DEFS, badgesOf, fname, Glyph, glyphLabel, Sym, toGlyph, IcFlag, IcTrash, IcUser, IcX, PROFILE_VIEW, roleOf, sb, shownName, ui } from './core.js';
 import { Avatar, BadgeChips, Eyebrow, You } from './components.js';
+
+// what a recognition badge can wear — the power roles keep their own fixed glyphs
+const BADGE_GLYPHS = ['medal','star','spark','heart','bolt','flame','trophy','rocket','flask','bug','code','palette','music','game','book','leaf','comet','planet'];
 
 export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, actions, onOpenProfile, openMod }) {
   const [sec, setSec] = useState('reports');
@@ -10,7 +13,7 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
   const [busy, setBusy] = useState(false);
   const [badgeFor, setBadgeFor] = useState(null);   // member row with the role editor open
   const [bBusy, setBBusy] = useState(false);
-  const [nb, setNb] = useState({ label:'', emoji:'✨', color:'#b06bff', blurb:'' });
+  const [nb, setNb] = useState({ label:'', emoji:'medal', color:'#b06bff', blurb:'' });
   useEffect(()=>{ reload(); }, []);
   const canAct = myRole==='founder' || myRole==='staff';
   const isFounder = myRole==='founder';
@@ -54,7 +57,7 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
         onClick=${async()=>{ setBBusy(true);
           const out = has ? await actions.revokeBadge(p.id, slug) : await actions.grantBadge(p.id, slug);
           patchRes(p.id, out); setBBusy(false); }}>
-        <span style="font-size:10px;opacity:.8">${d.icon}</span>${d.label}${has?' ✓':''}</button>`;
+        <${Sym} v=${d.icon} size=${11}/>${d.label}${has?' ✓':''}</button>`;
     })}
     <div class="set-hint" style="flex-basis:100%">${isFounder
       ? 'Tap to grant or remove. Staff and Support carry real abilities; everything else is recognition only.'
@@ -75,7 +78,7 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
         <button class="pill" style="color:#ff9db8;border-color:rgba(255,93,143,.4)"
           onClick=${()=>{ const n = prompt(`Ban ${shownName(p)} permanently? Type a reason — they'll see it:`); if (n!==null) actions.suspendUser(p.id, 0, n||'').then(out=>patchRes(p.id, out)); }}>Ban</button>
         ${restrictedTxt(p) && html`<button class="pill on-teal" onClick=${()=>actions.liftUser(p.id).then(out=>patchRes(p.id, out))}>Lift</button>`}
-        <button class=${'pill'+(badgeFor===p.id?' on':'')} onClick=${()=>setBadgeFor(badgeFor===p.id?null:p.id)}>🎖 Roles</button>
+        <button class=${'pill'+(badgeFor===p.id?' on':'')} onClick=${()=>setBadgeFor(badgeFor===p.id?null:p.id)}><${Glyph} k="medal" size=${13}/> Roles</button>
       </div>`}
       ${canTouch(p) && badgeFor===p.id && roleEditor(p)}
     </div>
@@ -87,9 +90,9 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
     const slug = slugOf(nb.label);
     if (slug.length<2) { actions.notify('Give the badge a name first'); return; }
     if (BADGE_DEFS[slug]) { actions.notify('A badge with that name already exists'); return; }
-    const ok = await actions.saveBadgeDef({ slug, label:nb.label.trim().slice(0,40), emoji:(nb.emoji.trim()||'★').slice(0,4),
+    const ok = await actions.saveBadgeDef({ slug, label:nb.label.trim().slice(0,40), emoji:toGlyph(nb.emoji, 'medal'),
       color:nb.color, tier:'cosmetic', blurb:nb.blurb.trim().slice(0,120)||null });
-    if (ok) setNb({ label:'', emoji:'✨', color:'#b06bff', blurb:'' });
+    if (ok) setNb({ label:'', emoji:'medal', color:'#b06bff', blurb:'' });
   }
 
   return html`<div style="animation:pop .2s ease">
@@ -104,16 +107,16 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
     ${myRole==='support' && html`<div class="hint" style="margin-top:10px">Support is read-only — you see everything here, actions are for staff.</div>`}
 
     <div class="pillrow" style="margin-top:14px">
-      ${[['reports','🚩 Reports'+(openR.length?` · ${openR.length}`:'')],['members','👥 Members'],
-         ...(isFounder?[['badges','🎖 Badges']]:[]),['log','📜 Log']].map(([k,l])=>html`
-        <button key=${k} class=${'pill'+(sec===k?' on':'')} style="font-weight:600" onClick=${()=>setSec(k)}>${l}</button>`)}
+      ${[['reports','flag','Reports'+(openR.length?` · ${openR.length}`:'')],['members','users','Members'],
+         ...(isFounder?[['badges','medal','Badges']]:[]),['log','log','Log']].map(([k,g,l])=>html`
+        <button key=${k} class=${'pill'+(sec===k?' on':'')} style="font-weight:600" onClick=${()=>setSec(k)}><${Glyph} k=${g} size=${14}/> ${l}</button>`)}
     </div>
 
     ${sec==='reports' && html`<div style="margin-top:10px">
       ${data.reports===null && html`<div class="card"><div class="hint" style="margin:0">Mission control isn’t reachable right now — try ↻ Refresh in a moment.</div></div>`}
-      ${data.reports!==null && !openR.length && html`<div class="small" style="padding:8px 2px">No open reports — space is quiet ✨</div>`}
+      ${data.reports!==null && !openR.length && html`<div class="small" style="padding:8px 2px">No open reports — space is quiet.</div>`}
       ${openR.map(r=>html`<div key=${r.id} class="staffrow">
-        <span style="font-size:16px;flex:none;margin-top:2px">🚩</span>
+        <span style="flex:none;margin-top:2px;display:flex;color:var(--now)"><${Glyph} k="flag" size=${16}/></span>
         <div style="min-width:0;flex:1">
           <div class="rowname" style="white-space:normal">${who(r.reporter)} reported <b style="cursor:pointer;color:var(--major)" onClick=${()=>onOpenProfile(r.target)}>${who(r.target)}</b>${r.kind==='message' ? '’s message' : ''}</div>
           <div class="rowsub" style="white-space:normal;margin-top:2px;line-height:1.45">${r.reason}</div>
@@ -123,13 +126,13 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
             <button class="pill on-teal" onClick=${()=>actions.resolveReport(r,'resolved')}>✓ Resolve</button>
             <button class="pill" onClick=${()=>actions.resolveReport(r,'dismissed')}>Dismiss</button>
             <button class="pill" onClick=${()=>onOpenProfile(r.target)}>Profile</button>
-            ${myRole==='founder' && r.ref?.ref && html`<button class="pill" onClick=${()=>openMod(r.ref)}>👁 Open chat</button>`}
+            ${myRole==='founder' && r.ref?.ref && html`<button class="pill" onClick=${()=>openMod(r.ref)}><${Glyph} k="eye" size=${13}/> Open chat</button>`}
           </div>`}
         </div>
       </div>`)}
       ${doneR.length>0 && html`<div class="flabel" style="margin-top:16px">Recently handled</div>`}
       ${doneR.map(r=>html`<div key=${r.id} class="staffrow" style="opacity:.55">
-        <span style="font-size:14px;flex:none">${r.status==='resolved'?'✅':'🫥'}</span>
+        <span style="flex:none;display:flex;color:var(--muted)"><${Glyph} k=${r.status==='resolved'?'check':'eye'} size=${15}/></span>
         <div style="min-width:0;flex:1">
           <div class="rowsub" style="white-space:normal">${who(r.reporter)} → ${who(r.target)} · ${r.reason.slice(0,60)}</div>
           <div class="small">${r.status}${r.handled_by?` by ${who(r.handled_by)}`:''} · ${ago(r.created_at)}</div>
@@ -144,8 +147,8 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
         <button class="btn" style="flex:none;padding:11px 14px" disabled=${busy||q.trim().length<2} onClick=${search}>${busy?'…':'Search'}</button>
       </div>
       <div class="hint" style="margin-top:8px">${isFounder
-        ? 'You can act on anyone — nobody can touch you. 🎖 Roles hands out staff roles and recognition badges.'
-        : 'You can act on members; the founder handles staff. 🎖 Roles hands out recognition badges.'}</div>
+        ? 'You can act on anyone — nobody can touch you. <b>Roles</b> hands out staff roles and recognition badges.'
+        : 'You can act on members; the founder handles staff. <b>Roles</b> hands out recognition badges.'}</div>
       ${res && !res.length && html`<div class="small" style="margin-top:8px">No matches.</div>`}
       ${(res||[]).map(memberRow)}
     </div>`}
@@ -160,22 +163,23 @@ export function StaffPanel({ uid, me, myRole, data, profiles, nameOf, reload, ac
       <div class="flabel" style="margin-top:18px">New recognition badge</div>
       <input class="input" style="margin-top:8px" placeholder="Name — e.g. Influencer, Beta Tester" value=${nb.label} onInput=${e=>setNb({ ...nb, label:e.target.value })}/>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <input class="input" style="width:76px;flex:none;text-align:center" maxlength="4" aria-label="Badge emoji" value=${nb.emoji} onInput=${e=>setNb({ ...nb, emoji:e.target.value })}/>
         <input class="input" placeholder="One-liner (optional)" value=${nb.blurb} onInput=${e=>setNb({ ...nb, blurb:e.target.value })}/>
       </div>
+      <div class="glyphgrid" style="margin-top:8px">${BADGE_GLYPHS.map(g=>html`<button key=${g} class=${'glyphbtn'+(nb.emoji===g?' on':'')}
+        aria-label=${glyphLabel(g)} title=${glyphLabel(g)} onClick=${()=>setNb({ ...nb, emoji:g })}><${Glyph} k=${g} size=${18}/></button>`)}</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         ${['#b06bff','#2dd4bf','#34d399','#f5b544','#ff5d8f','#4dabf7','#ff6b5d','#ffd43b','#f4f4f5'].map(c=>html`
           <button key=${c} class=${'bswatch'+(nb.color===c?' on':'')} style=${`background:${c}`} aria-label=${'colour '+c} onClick=${()=>setNb({ ...nb, color:c })}/>`)}
       </div>
-      <div style="margin-top:10px"><span class="badgechip" style=${chipStyle({ color:nb.color })}><span style="font-size:10px;opacity:.8">${nb.emoji.trim()||'★'}</span>${nb.label.trim()||'Preview'}</span></div>
+      <div style="margin-top:10px"><span class="badgechip" style=${chipStyle({ color:nb.color })}><${Sym} v=${nb.emoji} size=${11}/>${nb.label.trim()||'Preview'}</span></div>
       <button class="btn btn-block" style="margin-top:12px" onClick=${createBadge}>Create badge</button>
-      <div class="hint" style="margin-top:10px">Recognition badges are pure cosmetics — hand them out freely, they unlock nothing. The three power roles are fixed: Support reads reports, Staff moderates members, Founder is you. Grant any badge from 👥 Members → 🎖 Roles.</div>
+      <div class="hint" style="margin-top:10px">Recognition badges are pure cosmetics — hand them out freely, they unlock nothing. The three power roles are fixed: Support reads reports, Staff moderates members, Founder is you. Grant any badge from <b>Members</b> → <b>Roles</b>.</div>
     </div>`}
 
     ${sec==='log' && html`<div style="margin-top:10px">
       ${!data.log.length && html`<div class="small" style="padding:8px 2px">${myRole==='founder'?'No staff actions yet.':'Your actions will show here.'}</div>`}
       ${data.log.map(a=>html`<div key=${a.id} class="staffrow">
-        <span style="font-size:14px;flex:none">🛠️</span>
+        <span style="flex:none;display:flex;color:var(--muted)"><${Glyph} k="gavel" size=${15}/></span>
         <div style="min-width:0;flex:1">
           <div class="rowname" style="font-size:12.5px">${who(a.actor)} · ${a.action}${a.target?` → ${who(a.target)}`:''}</div>
           ${a.note && html`<div class="rowsub" style="white-space:normal">${a.note}</div>`}

@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useRef, useState } from './lib.js';
-import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, posVars, resumeBg, sb, ui } from './core.js';
+import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, Glyph, Sym, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, posVars, resumeBg, sb, ui } from './core.js';
 import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
 
 export function ChatsScreen({ kit }) {
@@ -28,9 +28,9 @@ export function ChatsScreen({ kit }) {
       ${systems.length>0 && html`<div class="stack" style="margin-top:8px">
         ${systems.map(s=>{ const k='sys:'+s.key, o=ov[k], un=o?.n||0, mut=reads[k]?.muted;
           return html`<button key=${s.key} class=${'convrow'+(kSel===k?' on':'')} onClick=${()=>setSel({ scope:'sys', ref:s.key })}>
-            <div class="convglyph" style=${`--sh:${hueCss(s.hue)}`}>${s.glyph}</div>
+            <div class="convglyph" style=${`--sh:${hueCss(s.hue)}`}><${Sym} v=${s.glyph} size=${18} fallback="planet"/></div>
             <div style="min-width:0;flex:1">
-              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${s.name}${mut?html`<span style="opacity:.5;font-weight:400"> · 🔕</span>`:''}</div>
+              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${s.name}${mut?html`<span style="opacity:.5;font-weight:400"> · <${Glyph} k="belloff" size=${12}/></span>`:''}</div>
               <div class="rowsub">${pv(k) || `${(s.members||[]).filter(m=>m.status==='accepted').length} members · say hi`}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none">
@@ -41,14 +41,14 @@ export function ChatsScreen({ kit }) {
       </div>`}
 
       <div class="flabel" style="margin-top:14px">Direct messages</div>
-      ${db!==false && !visible.length && html`<div class="small" style="padding:8px 2px;line-height:1.5">No DMs yet — hit <b>New</b>, or 💬 Message on a friend's profile.</div>`}
+      ${db!==false && !visible.length && html`<div class="small" style="padding:8px 2px;line-height:1.5">No DMs yet — hit <b>New</b>, or <b>Message</b> on a friend's profile.</div>`}
       <div class="stack" style="margin-top:8px">
         ${visible.map(t=>{ const pid=peerOf(t), p=profiles[pid], k='dm:'+t.id, o=ov[k], un=o?.n||0, mut=reads[k]?.muted;
           return html`<button key=${t.id} class=${'convrow'+(kSel===k?' on':'')} onClick=${()=>setSel({ scope:'dm', ref:t.id })}>
             <${Avatar} p=${p||{ id:pid }} size=${40}/>
             <div style="min-width:0;flex:1">
-              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${p?fname(p):'…'}${mut?html`<span style="opacity:.5;font-weight:400"> · 🔕</span>`:''}</div>
-              <div class="rowsub">${pv(k) || 'Say hi 👋'}</div>
+              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${p?fname(p):'…'}${mut?html`<span style="opacity:.5;font-weight:400"> · <${Glyph} k="belloff" size=${12}/></span>`:''}</div>
+              <div class="rowsub">${pv(k) || 'Say hi'}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none">
               ${o?.last_at && html`<span class="convtime">${ago(o.last_at)}</span>`}
@@ -60,7 +60,7 @@ export function ChatsScreen({ kit }) {
     </div>
 
     ${sel ? html`<${ChatView} key=${kSel} kit=${kit} sel=${sel} onClose=${()=>setSel(null)}/>`
-          : html`<div class="chatempty"><div style="font-size:34px">💬</div>
+          : html`<div class="chatempty"><div style="color:var(--muted)"><${Glyph} k="chat" size=${34}/></div>
               <div style="font-weight:600;margin-top:8px;color:var(--ink)">Pick a conversation</div></div>`}
 
     ${pick && html`<${FriendPickPop} friends=${friends} onClose=${()=>setPick(false)}
@@ -181,7 +181,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const canStyle = !mod && (isDm ? !!thread : !!sys && (sys.owner===uid || !!sys.members_can_style));
   const memberN = sys ? (sys.members||[]).filter(m=>m.status==='accepted').length : 0;
 
-  const title = isDm ? (peer ? fname(peer) : '…') : (sys ? `${sys.glyph} ${sys.name}` : 'System chat');
+  const title = isDm ? (peer ? fname(peer) : '…') : (sys ? sys.name : 'System chat');
   const st = !mod && isDm && peerId ? statusOf(peerId) : null;
   const subtitle = mod ? 'read-only moderation view'
     : peerTyping ? (isDm ? 'typing…' : `${peerTyping} is typing…`)
@@ -205,14 +205,14 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       <button class="xbtn" style="width:32px;height:32px" onClick=${onClose} aria-label="Back"><${IcBack} size=${15}/></button>
       ${isDm
         ? html`<${Avatar} p=${peer||{ id:peerId||'x' }} size=${34}/>`
-        : html`<div class="convglyph" style=${`width:34px;height:34px;font-size:16px;${sys?`--sh:${hueCss(sys.hue)}`:''}`}>${sys?.glyph||'🛰️'}</div>`}
+        : html`<div class="convglyph" style=${`width:34px;height:34px;font-size:16px;${sys?`--sh:${hueCss(sys.hue)}`:''}`}><${Sym} v=${sys?.glyph} size=${17} fallback="satlite"/></div>`}
       <div style=${`min-width:0;flex:1;${isDm&&peerId&&!mod?'cursor:pointer':''}`} onClick=${()=>{ if (isDm && peerId && !mod) onOpenFriend(peerId); }}>
         <div class="rowname" style="font-size:14px">${title}</div>
         <div class="rowsub" style=${peerTyping ? 'color:var(--ge)' : ''}>${subtitle}</div>
       </div>
       ${!mod && html`<button class="xbtn" style="width:32px;height:32px" onClick=${()=>setPane(pane==='menu'?null:'menu')} aria-label="Chat options"><${IcMore} size=${15}/></button>`}
     </div>
-    ${mod && html`<div class="modbar">👁 Founder moderation view — visible because this chat was reported</div>`}
+    ${mod && html`<div class="modbar"><${Glyph} k="eye" size=${14}/> Founder moderation view — visible because this chat was reported</div>`}
 
     <div class="chatbody">
       ${bg && html`<div class="chatbg shade" style=${posVars(bgPos)}>
@@ -223,7 +223,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       ${bucket.hasMore && html`<button class="pill" style="align-self:center;margin-bottom:10px;flex:none" onClick=${()=>loadMsgs(sel, rows[0]?.created_at)}>↑ Load earlier</button>`}
       ${!bucket.loaded && html`<div class="small" style="align-self:center;padding:24px 0">Loading…</div>`}
       ${bucket.loaded && !rows.length && html`<div class="chatzero">
-        <div style="font-size:30px">${isDm?'👋':'🛰️'}</div>
+        <div style="color:var(--muted)"><${Glyph} k=${isDm?'wave':'satlite'} size=${30}/></div>
         <div style="font-weight:600;margin-top:6px;font-size:14px">${isDm ? `Say hi to ${title}` : `Welcome to ${sys?.name||'the system'} chat`}</div>
         <div class="hint" style="max-width:270px;margin:6px auto 0">Be kind — Orbit's rules apply here. Chats clear after 3 months, and founders can review a conversation if someone reports it.</div>
       </div>`}
@@ -255,11 +255,11 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
     </div>`}
 
     ${pane==='menu' && html`<div class="chatmenu glass">
-      ${canStyle && html`<button onClick=${()=>setPane('look')}>🎨 Personalize</button>`}
-      <button onClick=${()=>{ muteChat(sel, !(reads[key]?.muted)); setPane(null); }}>${reads[key]?.muted ? '🔔 Unmute' : '🔕 Mute'}</button>
-      ${isDm && peerId && html`<button onClick=${()=>{ setPane(null); onOpenFriend(peerId); }}>👤 View profile</button>`}
+      ${canStyle && html`<button onClick=${()=>setPane('look')}><${Glyph} k="palette" size=${15}/> Personalize</button>`}
+      <button onClick=${()=>{ muteChat(sel, !(reads[key]?.muted)); setPane(null); }}>${reads[key]?.muted ? html`<${Glyph} k="bell" size=${15}/> Unmute` : html`<${Glyph} k="belloff" size=${15}/> Mute`}</button>
+      ${isDm && peerId && html`<button onClick=${()=>{ setPane(null); onOpenFriend(peerId); }}><${Glyph} k="user" size=${15}/> View profile</button>`}
       ${isDm && peerId && html`<button style="color:#ff9db8" onClick=${async()=>{ setPane(null);
-        if (await ui.confirm({ title:`Block ${title}?`, body:"They won't be able to message you, and you won't see their messages.", confirmLabel:'Block', danger:true })) { blockUser(peerId); onClose(); } }}>🚫 Block</button>`}
+        if (await ui.confirm({ title:`Block ${title}?`, body:"They won't be able to message you, and you won't see their messages.", confirmLabel:'Block', danger:true })) { blockUser(peerId); onClose(); } }}><${Glyph} k="block" size=${15}/> Block</button>`}
     </div>`}
     ${pane==='look' && html`<${LookPane} isDm=${isDm} look=${look}
       onSave=${async l=>{ if (isDm) await setDmLook(thread.id, l); else await setSysLook(sel.ref, l); setPane(null); }}
@@ -312,7 +312,7 @@ export function MediaPop({ onSend, onClose }) {
   </div>`;
   return html`<div class="chatpop glass">
     <div class="poptabs">
-      <button class=${tab==='img'?'on':''} onClick=${()=>setTab('img')}>🖼 Image link</button>
+      <button class=${tab==='img'?'on':''} onClick=${()=>setTab('img')}><${Glyph} k="image" size=${14}/> Image link</button>
       <button class=${tab==='gif'?'on':''} onClick=${()=>setTab('gif')}>GIF</button>
       <button style="margin-left:auto" onClick=${onClose} aria-label="Close"><${IcX} size=${13}/></button>
     </div>
@@ -346,7 +346,7 @@ export function LookPane({ isDm, look, onSave, onClose }) {
             onChange=${np=>setL(v=>({ ...v, bgPos:np }))} onDone=${()=>setFraming(false)}/>`
         : html`
       <div class="sheethead" style="margin-bottom:8px">
-        <div class="sheettitle" style="font-size:16px">🎨 Personalize this chat</div>
+        <div class="sheettitle" style="font-size:16px">Personalize this chat</div>
         <button class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
       </div>
       <div class="flabel">Theme · ${th.name}</div>
@@ -367,7 +367,7 @@ export function LookPane({ isDm, look, onSave, onClose }) {
       <div class="flabel">Or paste an image / GIF link</div>
       <input class="input" style="margin:0" placeholder="https:// — animated GIFs work too" value=${isImg?l.bg:''}
         onInput=${e=>setL(v=>({ ...v, bg:e.target.value, bgPos:{ x:0, y:0, z:1 } }))} inputmode="url" autocapitalize="none"/>
-      ${isImg && html`<button class="btn" style="margin-top:8px;width:100%" onClick=${()=>setFraming(true)}>🖼️ Frame background · drag & zoom</button>`}
+      ${isImg && html`<button class="btn" style="margin-top:8px;width:100%" onClick=${()=>setFraming(true)}><${Glyph} k="image" size=${15}/> Frame background · drag & zoom</button>`}
       <div class="lookdemo" style=${`font-family:${ff};${preset?`background:${preset}`:''}`}>
         ${isImg && html`<div class="chatbg shade" style=${posVars(l.bgPos)}>
           <img src=${l.bg.trim()} alt="" referrerpolicy="no-referrer" draggable=${false} onError=${e=>{ e.target.style.display='none'; }}/></div>`}
@@ -387,7 +387,7 @@ export function ReportMsgPane({ m, onSend, onClose }) {
   return html`<div class="chatover" onClick=${e=>{ if(e.target===e.currentTarget) onClose(); }}>
     <div class="chatovercard">
       <div class="sheethead" style="margin-bottom:8px">
-        <div class="sheettitle" style="font-size:16px">🚩 Report message</div>
+        <div class="sheettitle" style="font-size:16px">Report message</div>
         <button class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
       </div>
       <div class="modsnip" style="margin-top:0">${m.kind==='text' ? `“${m.body.slice(0,140)}”` : `[${m.kind}] ${m.body.slice(0,120)}`}</div>

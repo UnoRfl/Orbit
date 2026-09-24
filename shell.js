@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, evUpcoming, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcRadio, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, evUpcoming, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, Glyph, IcPin, IcRadio, IcShield, Sym, toGlyph, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
@@ -93,7 +93,7 @@ export function Shell({ session }) {
              || graphRef.current.incoming.find(r=>r.requester===id)
              || graphRef.current.outgoing.find(r=>r.addressee===id);
     if (rel){ await sb.from('friendships').delete().eq('id', rel.id); const f=await loadGraph(); loadClasses(f); loadPresence(f); }
-    toast('Blocked', '🚫');
+    toast('Blocked', 'block');
   };
   const unblockUser = id => setBlocks(b => { const n=b.filter(x=>x!==id); store.setBlocks(n); return n; });
 
@@ -258,10 +258,10 @@ export function Shell({ session }) {
       const customs = loadSystems().filter(s=>s.kind!=='campus');
       for (const c of customs) {
         const { data:row, error } = await sb.from('systems')
-          .insert({ name:c.name, glyph:c.glyph||'🪐', hue:c.hue??265, owner:uid }).select().single();
+          .insert({ name:c.name, glyph:toGlyph(c.glyph, 'planet'), hue:c.hue??265, owner:uid }).select().single();
         if (error) return;                               // migration SQL not run yet — try again next load
         if (row && (c.planets||[]).length)
-          await sb.from('planets').insert(c.planets.map(p=>({ system_id:row.id, name:p.name, icon:p.icon||'📍', lat:Number.isFinite(p.lat)?p.lat:null, lng:Number.isFinite(p.lng)?p.lng:null, created_by:uid })));
+          await sb.from('planets').insert(c.planets.map(p=>({ system_id:row.id, name:p.name, icon:toGlyph(p.icon, 'pin'), lat:Number.isFinite(p.lat)?p.lat:null, lng:Number.isFinite(p.lng)?p.lng:null, created_by:uid })));
       }
       saveSystems(loadSystems().filter(s=>s.kind==='campus'));
       localStorage.setItem('orbit.systems.migrated','1');
@@ -312,24 +312,24 @@ export function Shell({ session }) {
         setPings(x => x.some(q=>q.id===p.id) ? x : [p, ...x]);
         if (p.recipient===uid) {
           if (prefsRef.current.sounds) pingChime();
-          ensureProfiles([p.sender]).then(()=> toast(p.kind==='poke' ? `${nameOf(p.sender)} waved at you` : `${nameOf(p.sender)}: ${p.text}`, p.emoji||'👋'));
+          ensureProfiles([p.sender]).then(()=> toast(p.kind==='poke' ? `${nameOf(p.sender)} waved at you` : `${nameOf(p.sender)}: ${p.text}`, p.emoji||'wave'));
         }
       })
       .on('postgres_changes', { event:'*', schema:'public', table:'friendships' }, payload => {
         const n = payload.new || {};
         if (payload.eventType==='INSERT' && n.addressee===uid && !blockRef.current.includes(n.requester))
-          ensureProfiles([n.requester]).then(()=>toast(`Friend request from ${nameOf(n.requester)}`, '👥'));
+          ensureProfiles([n.requester]).then(()=>toast(`Friend request from ${nameOf(n.requester)}`, 'users'));
         if (payload.eventType==='UPDATE' && n.status==='accepted' && n.requester===uid)
-          toast(`${nameOf(n.addressee)} accepted your request`, '🎉');
+          toast(`${nameOf(n.addressee)} accepted your request`, 'party');
         later('graph', reloadGraphChain);
       })
       .on('postgres_changes', { event:'*', schema:'public', table:'events' }, () => later('events', loadEvents))
       .on('postgres_changes', { event:'*', schema:'public', table:'event_invitees' }, payload => {
         const n = payload.new || {};
-        if (payload.eventType==='INSERT' && n.invitee===uid) toast('New plan invite', '📨');
+        if (payload.eventType==='INSERT' && n.invitee===uid) toast('New plan invite', 'mail');
         if (payload.eventType==='UPDATE' && n.status==='accepted' && n.invitee!==uid) {
           const ev = evRef.current.find(e=>e.id===n.event_id);
-          if (ev && ev.host===uid) toast(`${nameOf(n.invitee)} is in`, '🎉');
+          if (ev && ev.host===uid) toast(`${nameOf(n.invitee)} is in`, 'party');
         }
         later('events', loadEvents);
       })
@@ -345,7 +345,7 @@ export function Shell({ session }) {
         if (!n || (n.actor && blockRef.current.includes(n.actor))) return;
         setNotifs(x => x.some(q=>q.id===n.id) ? x : [n, ...x]);
         if (prefsRef.current.sounds) pingChime();
-        ensureProfiles([n.actor]).then(()=> toast(n.title, '🔔'));
+        ensureProfiles([n.actor]).then(()=> toast(n.title, 'bell'));
         if (document.hidden && typeof Notification!=='undefined' && Notification.permission==='granted' && navigator.serviceWorker)
           navigator.serviceWorker.ready.then(r=>r.showNotification(n.title, { body:n.body||'', icon:'icon.png', badge:'icon.png' })).catch(()=>{});
       })
@@ -381,7 +381,7 @@ export function Shell({ session }) {
         const openNow = chatSelRef.current && chatKeyOf(chatSelRef.current)===key && !document.hidden;
         if (openNow || chatReadsRef.current[key]?.muted) return;
         if (prefsRef.current.sounds) pingChime();
-        ensureProfiles([n.sender]).then(()=> toast(`${nameOf(n.sender)}: ${n.kind==='text' ? (n.body||'').slice(0,60) : msgPreview(n)}`, '💬'));
+        ensureProfiles([n.sender]).then(()=> toast(`${nameOf(n.sender)}: ${n.kind==='text' ? (n.body||'').slice(0,60) : msgPreview(n)}`, 'chat'));
       })
       .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages' }, ({ new:n }) => {
         if (!n) return;
@@ -417,12 +417,12 @@ export function Shell({ session }) {
   async function sendRequest(otherId) {
     const { error } = await sb.from('friendships').insert({ requester:uid, addressee:otherId });
     if (error) { toast(/duplicate|unique/i.test(error.message) ? 'A request already exists between you two' : 'Could not send request'); }
-    else toast('Request sent', '📨');
+    else toast('Request sent', 'mail');
     const f = await loadGraph(); loadClasses(f); loadPresence(f);
   }
   async function acceptRequest(row) {
     const { error } = await sb.from('friendships').update({ status:'accepted' }).eq('id', row.id);
-    if (!error) toast(`You and ${nameOf(row.requester)} are now friends`, '🎉');
+    if (!error) toast(`You and ${nameOf(row.requester)} are now friends`, 'party');
     const f = await loadGraph(); loadClasses(f); loadPresence(f);
   }
   async function removeFriendship(id) {
@@ -441,7 +441,7 @@ export function Shell({ session }) {
     else {
       toast(kind==='poke' ? `Waved at ${nameOf(otherId)}` : `Sent "${text}"`, emoji);
       const nm = fname(me)||'Someone';
-      pushTo(otherId, kind==='poke' ? `${nm} waved at you 👋` : `${nm}: ${text}`);
+      pushTo(otherId, kind==='poke' ? `${nm} waved at you` : `${nm}: ${text}`);
     }
   }
   async function markSeen() {
@@ -477,7 +477,7 @@ export function Shell({ session }) {
       const j = sub.toJSON();
       const { error } = await sb.from('push_subscriptions').upsert({ user_id:uid, endpoint:sub.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth });
       if (error) { toast('Could not enable push on this device'); return; }
-      setPushOn(true); toast('Phone notifications on', '🔔');
+      setPushOn(true); toast('Phone notifications on', 'bell');
     }catch(e){ toast('Could not enable push on this device'); }
   }
   async function disablePush() {
@@ -539,19 +539,19 @@ export function Shell({ session }) {
       const { error:e2 } = await sb.from('event_invitees').insert(invitees.map(i=>({ event_id:ev.id, invitee:i })));
       if (e2) toast('Plan made, but some invites failed');
     }
-    toast(system_id ? 'Cosmic event created ☄️' : `Invite sent to ${invitees.map(nameOf).join(' & ')}`, system_id?'':'📨');
+    toast(system_id ? 'Cosmic event created' : `Invite sent to ${invitees.map(nameOf).join(' & ')}`, system_id?'comet':'mail');
     const nm = fname(me)||'Someone';
     invitees.forEach(i=> notify(i, system_id?'cosmic_invite':'event_invite',
-      system_id ? `${nm} set up a cosmic event ☄️` : `${nm} invited you to a plan`,
+      system_id ? `${nm} set up a cosmic event` : `${nm} invited you to a plan`,
       `${title} · ${DAYS[day]} ${fmt(start_min)}`, { event_id:ev.id, system_id }));
     loadEvents(); return true;
   }
   async function respondInvite(eventId, status) {
     await sb.from('event_invitees').update({ status }).eq('event_id', eventId).eq('invitee', uid);
-    toast(status==='accepted' ? "It's on your schedule" : 'Declined', status==='accepted'?'✓':'');
+    toast(status==='accepted' ? "It's on your schedule" : 'Declined', status==='accepted'?'check':'');
     if (status==='accepted') {
       const ev = evRef.current.find(e=>e.id===eventId);
-      if (ev && ev.host!==uid) notify(ev.host, 'event_going', `${fname(me)||'Someone'} is going 🎉`, ev.title, { event_id:eventId });
+      if (ev && ev.host!==uid) notify(ev.host, 'event_going', `${fname(me)||'Someone'} is going`, ev.title, { event_id:eventId });
     }
     loadEvents();
   }
@@ -563,7 +563,7 @@ export function Shell({ session }) {
   async function publishUpdate(row) {
     const { error } = await sb.from('updates').insert({ ...row, author:uid });
     if (error) { toast('Could not publish'); return false; }
-    toast('Published to everyone', '📡'); loadUpdates(); return true;
+    toast('Published to everyone', 'radio'); loadUpdates(); return true;
   }
   async function deleteUpdate(id) {
     await sb.from('updates').delete().eq('id', id);
@@ -603,7 +603,7 @@ export function Shell({ session }) {
         : 'Could not send the report');
       return false;
     }
-    toast('Reported — staff will take a look', '🚩'); return true;
+    toast('Reported — staff will take a look', 'flag'); return true;
   }
   async function resolveReport(r, status) {
     const { error } = await sb.from('reports').update({ status, handled_by:uid }).eq('id', r.id);
@@ -619,20 +619,20 @@ export function Shell({ session }) {
     const reason = (note||'').trim() || 'Breaking the Orbit rules';
     const { data, error } = await sb.rpc('admin_suspend', { p_target:target, p_hours:ban?0:hours, p_reason:reason });
     if (error) { toast(/founder|staff|yourself|Only/i.test(error.message||'') ? "Your role can't touch that account" : 'Could not apply that'); return false; }
-    toast(ban ? 'Banned' : 'Suspended '+hours+'h', '🔨');
+    toast(ban ? 'Banned' : 'Suspended '+hours+'h', 'gavel');
     loadStaffData(); refreshProfiles([target]);
     return data || true;
   }
   async function liftUser(target) {
     const { error } = await sb.rpc('admin_unsuspend', { p_target:target });
     if (error) { toast(/founder|staff|Only/i.test(error.message||'') ? "Your role can't touch that account" : 'Could not lift that'); return false; }
-    toast('Restrictions lifted', '🕊️'); loadStaffData(); refreshProfiles([target]);
+    toast('Restrictions lifted', 'unlock'); loadStaffData(); refreshProfiles([target]);
     return { suspended_until:null, ban_reason:null };
   }
   async function grantBadge(target, slug) {
     const { data, error } = await sb.rpc('admin_grant_badge', { p_target:target, p_badge:slug });
     if (error) { toast(/founder|Only/i.test(error.message||'') ? "Your role can't grant that one" : 'Could not grant the badge'); return false; }
-    toast('Badge granted', '🎖️'); loadStaffData(); refreshProfiles([target]);
+    toast('Badge granted', 'medal'); loadStaffData(); refreshProfiles([target]);
     return data;
   }
   async function revokeBadge(target, slug) {
@@ -644,7 +644,7 @@ export function Shell({ session }) {
   async function saveBadgeDef(row) {
     const { error } = await sb.from('badge_defs').insert(row);
     if (error) { toast(/duplicate|unique/i.test(error.message||'') ? 'A badge with that name already exists' : 'Could not create the badge'); return false; }
-    toast(`${row.emoji} ${row.label} created`, '🎖️'); loadBadgeDefs();
+    toast(`${row.label} created`, 'medal'); loadBadgeDefs();
     return true;
   }
   async function deleteBadgeDef(slug) {
@@ -656,7 +656,7 @@ export function Shell({ session }) {
   async function createSystem({ name, glyph, hue }) {
     const { data, error } = await sb.from('systems').insert({ name, glyph, hue, owner:uid }).select().single();
     if (error) { toast('Could not create the system'); return null; }
-    toast(`${glyph} ${name} created — you're the leader`, '👑');
+    toast(`${name} created — you're the leader`, 'crown');
     await loadShared(); return data;
   }
   async function deleteSystem(id) {
@@ -673,8 +673,8 @@ export function Shell({ session }) {
   async function respondSystemInvite(sys, accept) {
     if (accept) {
       const { error } = await sb.from('system_members').update({ status:'accepted' }).eq('system_id', sys.id).eq('user_id', uid);
-      if (!error) { toast(`Welcome to ${sys.name}`, sys.glyph||'🪐');
-        notify(sys.owner, 'system_joined', `${fname(me)||'Someone'} joined ${sys.name} 👋`, '', { system_id:sys.id }); }
+      if (!error) { toast(`Welcome to ${sys.name}`, sys.glyph||'planet');
+        notify(sys.owner, 'system_joined', `${fname(me)||'Someone'} joined ${sys.name}`, '', { system_id:sys.id }); }
     } else {
       await sb.from('system_members').delete().eq('system_id', sys.id).eq('user_id', uid);
     }
@@ -683,7 +683,7 @@ export function Shell({ session }) {
   async function inviteToSystem(sysId, friendId, sysName) {
     const { error } = await sb.from('system_members').insert({ system_id:sysId, user_id:friendId, role:'member', status:'invited', invited_by:uid });
     if (error) { toast(/duplicate|unique/i.test(error.message||'') ? 'Already invited' : 'Could not invite'); return; }
-    toast(`Invited ${nameOf(friendId)}`, '📨');
+    toast(`Invited ${nameOf(friendId)}`, 'mail');
     notify(friendId, 'system_invite', `${fname(me)||'Someone'} invited you to a system`, sysName, { system_id:sysId });
     loadShared();
   }
@@ -767,7 +767,7 @@ export function Shell({ session }) {
       return false;
     }
     applyIncoming(data);
-    if (sel.scope==='dm' && peerId) pushTo(peerId, `${fname(me)||'Someone'} 💬`, data.kind==='text' ? data.body.slice(0,90) : msgPreview(data));
+    if (sel.scope==='dm' && peerId) pushTo(peerId, fname(me)||'Someone', data.kind==='text' ? data.body.slice(0,90) : msgPreview(data));
     return true;
   }
   async function unsendMsg(m) {
@@ -785,23 +785,23 @@ export function Shell({ session }) {
     const key = chatKeyOf(sel);
     setChatReads(r=>({ ...r, [key]: { ...(r[key]||{ user_id:uid, scope:sel.scope, ref:sel.ref, last_read_at:new Date(0).toISOString() }), muted:on } }));
     try{ await sb.from('chat_reads').upsert({ user_id:uid, scope:sel.scope, ref:sel.ref, muted:on }); }catch{}
-    toast(on ? 'Chat muted' : 'Chat unmuted', on ? '🔕' : '🔔');
+    toast(on ? 'Chat muted' : 'Chat unmuted', on ? 'belloff' : 'bell');
   }
   async function setDmLook(threadId, look) {
     setDmThreads(t=>t.map(x=>x.id===threadId ? { ...x, look } : x));
     const { error } = await sb.from('dm_threads').update({ look }).eq('id', threadId);
-    if (error) toast('Could not save the look'); else toast('Chat look updated', '✨');
+    if (error) toast('Could not save the look'); else toast('Chat look updated', 'spark');
   }
   async function setSysLook(sysId, look) {
     const { error } = await sb.rpc('sys_set_chat_look', { p_sys:sysId, p_look:look });
     if (error) { toast(/leader/i.test(error.message||'') ? 'Only the leader can change that' : 'Could not save the look'); return; }
-    toast('System chat look updated', '✨'); loadShared();
+    toast('System chat look updated', 'spark'); loadShared();
   }
   async function reportMessage(m, sel, reason) {
     const ref = { message_id:m.id, scope:sel.scope, ref:sel.ref, msg_kind:m.kind, snippet:(m.body||'').slice(0,140) };
     const { error } = await sb.from('reports').insert({ reporter:uid, target:m.sender, kind:'message', reason, ref });
     if (error) { toast(/duplicate|unique/i.test(error.message||'') ? 'You already reported them today' : 'Could not send the report'); return false; }
-    toast('Reported — staff will take a look', '🚩'); return true;
+    toast('Reported — staff will take a look', 'flag'); return true;
   }
   async function loadModThread(threadId) {          // founder-only: pull a thread they're not in (RLS enforces)
     try{
@@ -854,7 +854,7 @@ export function Shell({ session }) {
        read it back through the view. Same shape, minus the columns nobody else
        is allowed to see — and for your own row the view redacts nothing. */
     ({ data } = await sb.from(PROFILE_VIEW).select('*').eq('id', uid).maybeSingle());
-    if (data) { setMe(data); if (!silent) toast('Saved', '✓'); }
+    if (data) { setMe(data); if (!silent) toast('Saved', 'check'); }
     return true;
   }
   async function importClasses(rows, { replace, profilePatch }) {
@@ -869,7 +869,7 @@ export function Shell({ session }) {
     }
     if (profilePatch) await saveProfile(profilePatch, true);
     await loadClasses(friendIdsOf(graphRef.current));
-    toast(`Imported ${rows.length} class${rows.length>1?'es':''}`, '📥');
+    toast(`Imported ${rows.length} class${rows.length>1?'es':''}`, 'import');
     return true;
   }
   async function deleteAccount() {
@@ -934,7 +934,7 @@ export function Shell({ session }) {
   if (isBanned || (suspUntil && suspUntil > new Date())) return html`<div class="authcol"><div style="width:min(420px,92vw)">
     <div class="brand-eyebrow">student network</div><div class="brand">Orbit</div>
     <div class="card" style="margin-top:18px;border-color:rgba(255,93,143,.4)">
-      <div style="font-weight:700;font-size:15px;font-family:'Space Grotesk',sans-serif">🔒 Account restricted</div>
+      <div class="gi" style="font-weight:700;font-size:15px;font-family:'Space Grotesk',sans-serif"><${Glyph} k="lock" size=${16}/> Account restricted</div>
       <div class="hint" style="margin-top:8px">${isBanned ? 'This account has been banned.' : `Suspended until ${suspUntil.toLocaleString()}.`}${me?.ban_reason ? ` Reason: ${me.ban_reason}` : ''}</div>
       <div class="hint">You can still sign in, but pinging, planning and posting are switched off. If this looks like a mistake, contact the Orbit team.</div>
       <button class="btn btn-block" style="margin-top:12px" onClick=${()=>signOutClean()}><${IcOut} size=${15}/> Sign out</button>
@@ -965,7 +965,7 @@ export function Shell({ session }) {
     <div class="content">
       ${friendOpen ? html`<${FriendDash} f=${friendOpen} uid=${uid} classesBy=${classesBy} events=${events} presence=${presence}
           onBack=${()=>setOpenFriend(null)}
-          onPoke=${()=>sendPing(friendOpen.id,'poke','waved at you','👋')}
+          onPoke=${()=>sendPing(friendOpen.id,'poke','waved at you','wave')}
           onPing=${()=>setSheet({t:'ping', id:friendOpen.id})}
           onPlan=${slot=>setSheet({t:'creator', pre:friendOpen.id, slot:(slot && typeof slot==='object' && 'start' in slot)?slot:undefined})}
           onReport=${()=>setSheet({t:'report', id:friendOpen.id})}
@@ -1056,7 +1056,7 @@ export function Shell({ session }) {
         onDeleteAccount=${deleteAccount} />`}
     <//>
 
-    <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast glass">${t.em && html`<span class="em">${t.em}</span>`}${t.text}</div>`)}</div>
+    <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast glass">${t.em && html`<span class="em"><${Sym} v=${t.em} size=${16}/></span>`}${t.text}</div>`)}</div>
   </div>`;
 }
 

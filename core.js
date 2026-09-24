@@ -1,6 +1,8 @@
 /* Orbit — auto-split module. Part of the Orbit single-page app.
    See ARCHITECTURE.md for how the pieces fit together. */
 import { createClient, h, html, render } from './lib.js';
+import { EVENT_SET, PLACE_SET, SYSTEM_SET } from './glyphs.js';
+export { Glyph, GlyphTile, GLYPHS, glyphKey, glyphLabel, glyphSVG, Sym, toGlyph, EVENT_SET, PLACE_SET, SYSTEM_SET, UPDATE_SET } from './glyphs.js';
 
 
 /* ============================================================
@@ -12,12 +14,12 @@ export const SUPABASE_KEY = 'sb_publishable_OB4qTnJFKnjO59R5BvkFTQ_AtKbtx2N';
 
 /* EDIT ME — campus zones for the map. id stays short, name is shown. */
 export const ZONES = [
-  { id:'main',      name:'Main Building', x:.24, y:.28, icon:'🏛️' },
-  { id:'ccs',       name:'Academic Hall', x:.72, y:.24, icon:'🏫' },
-  { id:'library',   name:'Library',       x:.50, y:.50, icon:'📚' },
-  { id:'cafeteria', name:'Cafeteria',     x:.22, y:.70, icon:'🍜' },
-  { id:'gym',       name:'Gymnasium',     x:.76, y:.66, icon:'🏀' },
-  { id:'quad',      name:'The Quad',      x:.50, y:.84, icon:'🌳' },
+  { id:'main',      name:'Main Building', x:.24, y:.28, icon:'hall' },
+  { id:'ccs',       name:'Academic Hall', x:.72, y:.24, icon:'school' },
+  { id:'library',   name:'Library',       x:.50, y:.50, icon:'book' },
+  { id:'cafeteria', name:'Cafeteria',     x:.22, y:.70, icon:'food' },
+  { id:'gym',       name:'Gymnasium',     x:.76, y:.66, icon:'ball' },
+  { id:'quad',      name:'The Quad',      x:.50, y:.84, icon:'tree' },
 ];
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -52,15 +54,15 @@ export const CAT = { major:'var(--major)', ge:'var(--ge)', pe:'var(--pe)', nstp:
 export const CATHEX = { major:'#b06bff', ge:'#2dd4bf', pe:'#34d399', nstp:'#f5b544' };
 export const CATNAME = { major:'Major', ge:'Gen Ed', pe:'PE', nstp:'NSTP' };
 export const KINDS = {
-  coffee:{ label:'Coffee', emoji:'☕', accent:'#f5b544' },
-  study:{ label:'Study group', emoji:'📚', accent:'#2dd4bf' },
-  lunch:{ label:'Lunch', emoji:'🍜', accent:'#34d399' },
-  hangout:{ label:'Hangout', emoji:'✨', accent:'#b06bff' },
-  sleepover:{ label:'Sleepover', emoji:'🌙', accent:'#7c8cff' },
+  coffee:{ label:'Coffee', emoji:'coffee', accent:'#f5b544' },
+  study:{ label:'Study group', emoji:'book', accent:'#2dd4bf' },
+  lunch:{ label:'Lunch', emoji:'food', accent:'#34d399' },
+  hangout:{ label:'Hangout', emoji:'spark', accent:'#b06bff' },
+  sleepover:{ label:'Sleepover', emoji:'moon', accent:'#7c8cff' },
 };
 export const PING_PRESETS = [
-  { t:'Study?', e:'📖' }, { t:'Coffee?', e:'☕' }, { t:'Lunch?', e:'🍜' },
-  { t:'Where u at?', e:'📍' }, { t:'Free rn?', e:'👋' }, { t:'Walk to class?', e:'🚶' },
+  { t:'Study?', e:'book' }, { t:'Coffee?', e:'coffee' }, { t:'Lunch?', e:'food' },
+  { t:'Where u at?', e:'pin' }, { t:'Free rn?', e:'wave' }, { t:'Walk to class?', e:'walk' },
 ];
 export const ACCENTS = [
   ['#b06bff','#2dd4bf'], ['#f5b544','#ff5d8f'], ['#2dd4bf','#34d399'],
@@ -96,16 +98,27 @@ export const flairOf = p => (p && p.flair && typeof p.flair === 'object' && !Arr
 
 /* profile identity — pronouns, hobbies, developer badges + event emojis */
 export const PRONOUN_PRESETS = ['he/him','she/her','they/them','he/they','she/they','it/its','any pronouns','ask me'];
-export const HOBBY_PRESETS = ['🎮 Gaming','📚 Reading','🎨 Art','🎵 Music','💻 Coding','📷 Photos','🍳 Cooking','☕ Coffee','🧋 Milk tea','⚽ Football','🏀 Basketball','🏐 Volleyball','🏋️ Gym','🚴 Biking','✈️ Travel','🎬 Movies','📺 Anime','✍️ Writing','🎤 Singing','💃 Dance','🌱 Plants','🐾 Animals','🛹 Skating','♟️ Chess','🎧 Podcasts','🧵 Crafts'];
-export const EVENT_EMOJIS = ['🎮','🎬','🎂','🎉','🛍️','🧋','🍕','🎳','🏖️','🏀','🏐','💻','🎤','📖','⛪','🚶'];
+export const HOBBY_PRESETS = ['Gaming','Reading','Art','Music','Coding','Photos','Cooking','Coffee','Milk tea','Football','Basketball','Volleyball','Gym','Biking','Travel','Movies','Anime','Writing','Singing','Dance','Plants','Animals','Skating','Chess','Podcasts','Crafts'];
+const HOBBY_GLYPH = { gaming:'game', reading:'book', art:'palette', music:'music', coding:'code', photos:'image', cooking:'food', coffee:'coffee',
+  'milk tea':'boba', football:'ball', basketball:'ball', volleyball:'volley', gym:'gym', biking:'walk', travel:'plane', movies:'film',
+  anime:'film', writing:'note', singing:'mic', dance:'music', plants:'leaf', animals:'heart', skating:'bolt', chess:'pawn', podcasts:'headph', crafts:'palette' };
+/* Hobbies used to be stored as "🎮 Gaming". Split any leading emoji off, keep
+   the words, and pick the glyph from the words — so old and new rows look alike. */
+export function hobbyOf(raw) {
+  const str = String(raw || '').trim();
+  const m = str.match(/^([^\p{L}\p{N}]+)\s*(.*)$/u);
+  const text = (m ? m[2] : str) || str;
+  return { text, g: HOBBY_GLYPH[text.toLowerCase()] || null };
+}
+export const EVENT_EMOJIS = EVENT_SET;
 export const LOG_TAGS = { new:{ l:'New', c:'#b06bff' }, improved:{ l:'Improved', c:'#2dd4bf' }, fixed:{ l:'Fixed', c:'#34d399' }, news:{ l:'News', c:'#f5b544' } };
 /* badge catalog — the three power roles are built in as a fallback; the full
    catalog (incl. recognition badges) streams in from the badge_defs table, so
    badges created in mission control need zero code changes to render. */
 export const BADGE_DEFS = {
-  founder:{ label:'Orbit Founder', icon:'✦', color:'#f5b544', tier:'power', sort:0 },
-  staff:{ label:'Orbit Staff', icon:'🛡️', color:'#b06bff', tier:'power', sort:1 },
-  support:{ label:'Orbit Support', icon:'🎧', color:'#2dd4bf', tier:'power', sort:2 },
+  founder:{ label:'Orbit Founder', icon:'star4', color:'#f5b544', tier:'power', sort:0 },
+  staff:{ label:'Orbit Staff', icon:'shield', color:'#b06bff', tier:'power', sort:1 },
+  support:{ label:'Orbit Support', icon:'headset', color:'#2dd4bf', tier:'power', sort:2 },
 };
 export const badgesOf = p => Array.isArray(p?.badges) ? p.badges : [];
 export const roleOf = p => badgesOf(p).includes('founder') ? 'founder'
@@ -155,38 +168,38 @@ export const ACT_KINDS = {
 };
 export const ACTIVITY_CATALOG = [
   { id:'roblox',    k:'playing', name:'Roblox',            ic:SOCIALS.roblox.Ic, c:['#393b3d','#17191b'], tc:'#d3d6d9' },
-  { id:'minecraft', k:'playing', name:'Minecraft',         g:'⛏️', c:['#5f9c3f','#3e6b2a'] },
-  { id:'valorant',  k:'playing', name:'Valorant',          g:'🎯', c:['#ff4655','#b3202e'] },
-  { id:'mlbb',      k:'playing', name:'Mobile Legends',    g:'⚔️', c:['#2b6cff','#12318f'] },
-  { id:'codm',      k:'playing', name:'CoD Mobile',        g:'🔫', c:['#3a3f47','#1e2126'], tc:'#aab2bd' },
-  { id:'pubgm',     k:'playing', name:'PUBG Mobile',       g:'🪖', c:['#f2a900','#a86f00'] },
-  { id:'genshin',   k:'playing', name:'Genshin Impact',    g:'✨', c:['#7cc7e8','#3f7fae'] },
-  { id:'lol',       k:'playing', name:'League of Legends', g:'🏆', c:['#c8aa6e','#8a6d3b'] },
-  { id:'dota',      k:'playing', name:'Dota 2',            g:'🛡️', c:['#b23c2e','#7a241b'] },
-  { id:'cs2',       k:'playing', name:'CS2',               g:'💣', c:['#e9a13b','#9c651c'] },
-  { id:'fortnite',  k:'playing', name:'Fortnite',          g:'🌪️', c:['#8e6fff','#5b3fd0'] },
-  { id:'gta',       k:'playing', name:'GTA V',             g:'🚗', c:['#66bb6a','#2e7d32'] },
-  { id:'apex',      k:'playing', name:'Apex Legends',      g:'🦾', c:['#d13438','#8f1d20'] },
-  { id:'ow2',       k:'playing', name:'Overwatch 2',       g:'🛰️', c:['#f79c27','#c56f10'] },
-  { id:'amongus',   k:'playing', name:'Among Us',          g:'🛸', c:['#c51111','#7a0a0a'] },
-  { id:'stardew',   k:'playing', name:'Stardew Valley',    g:'🌾', c:['#f2b04c','#b57b23'] },
-  { id:'tekken',    k:'playing', name:'Tekken 8',          g:'🥊', c:['#7c4dff','#4527a0'] },
-  { id:'chess',     k:'playing', name:'Chess.com',         g:'♟️', c:['#7fa650','#4d6e2f'] },
+  { id:'minecraft', k:'playing', name:'Minecraft',         g:'pickaxe', c:['#5f9c3f','#3e6b2a'] },
+  { id:'valorant',  k:'playing', name:'Valorant',          g:'target', c:['#ff4655','#b3202e'] },
+  { id:'mlbb',      k:'playing', name:'Mobile Legends',    g:'swords', c:['#2b6cff','#12318f'] },
+  { id:'codm',      k:'playing', name:'CoD Mobile',        g:'xhair', c:['#3a3f47','#1e2126'], tc:'#aab2bd' },
+  { id:'pubgm',     k:'playing', name:'PUBG Mobile',       g:'helmet', c:['#f2a900','#a86f00'] },
+  { id:'genshin',   k:'playing', name:'Genshin Impact',    g:'spark', c:['#7cc7e8','#3f7fae'] },
+  { id:'lol',       k:'playing', name:'League of Legends', g:'trophy', c:['#c8aa6e','#8a6d3b'] },
+  { id:'dota',      k:'playing', name:'Dota 2',            g:'shield', c:['#b23c2e','#7a241b'] },
+  { id:'cs2',       k:'playing', name:'CS2',               g:'burst', c:['#e9a13b','#9c651c'] },
+  { id:'fortnite',  k:'playing', name:'Fortnite',          g:'wind', c:['#8e6fff','#5b3fd0'] },
+  { id:'gta',       k:'playing', name:'GTA V',             g:'car', c:['#66bb6a','#2e7d32'] },
+  { id:'apex',      k:'playing', name:'Apex Legends',      g:'robot', c:['#d13438','#8f1d20'] },
+  { id:'ow2',       k:'playing', name:'Overwatch 2',       g:'satlite', c:['#f79c27','#c56f10'] },
+  { id:'amongus',   k:'playing', name:'Among Us',          g:'ufo', c:['#c51111','#7a0a0a'] },
+  { id:'stardew',   k:'playing', name:'Stardew Valley',    g:'leaf', c:['#f2b04c','#b57b23'] },
+  { id:'tekken',    k:'playing', name:'Tekken 8',          g:'glove', c:['#7c4dff','#4527a0'] },
+  { id:'chess',     k:'playing', name:'Chess.com',         g:'pawn', c:['#7fa650','#4d6e2f'] },
   { id:'spotify',   k:'listening', name:'Spotify',         ic:SOCIALS.spotify.Ic, c:['#1db954','#12833c'] },
-  { id:'ytmusic',   k:'listening', name:'YT Music',        g:'🎵', c:['#ff0033','#b30024'] },
-  { id:'applemusic',k:'listening', name:'Apple Music',     g:'🎧', c:['#fa2d48','#c01f36'] },
-  { id:'soundcloud',k:'listening', name:'SoundCloud',      g:'☁️', c:['#ff5500','#c24100'] },
+  { id:'ytmusic',   k:'listening', name:'YT Music',        g:'music', c:['#ff0033','#b30024'] },
+  { id:'applemusic',k:'listening', name:'Apple Music',     g:'headph', c:['#fa2d48','#c01f36'] },
+  { id:'soundcloud',k:'listening', name:'SoundCloud',      g:'cloud', c:['#ff5500','#c24100'] },
   { id:'youtube',   k:'watching', name:'YouTube',          ic:SOCIALS.youtube.Ic, c:['#ff0033','#c60026'] },
-  { id:'netflix',   k:'watching', name:'Netflix',          g:'🍿', c:['#e50914','#8f050c'] },
+  { id:'netflix',   k:'watching', name:'Netflix',          g:'popcorn', c:['#e50914','#8f050c'] },
   { id:'twitch',    k:'watching', name:'Twitch',           ic:SOCIALS.twitch.Ic, c:['#9146ff','#6a2fd6'] },
-  { id:'crunchy',   k:'watching', name:'Crunchyroll',      g:'🍥', c:['#f47521','#bd5514'] },
-  { id:'study',     k:'study', name:'Studying',            g:'📚', c:['#2dd4bf','#178f80'] },
-  { id:'vscode',    k:'study', name:'VS Code',             g:'💻', c:['#3b9df2','#1f6ec2'] },
-  { id:'rbxstudio', k:'study', name:'Roblox Studio',       g:'🛠️', c:['#00a2ff','#0069a8'] },
-  { id:'canva',     k:'study', name:'Canva',               g:'🎨', c:['#7d2ae8','#00c4cc'] },
-  { id:'figma',     k:'study', name:'Figma',               g:'🧩', c:['#a259ff','#f24e1e'] },
-  { id:'photoshop', k:'study', name:'Photoshop',           g:'🖌️', c:['#31a8ff','#1471b8'] },
-  { id:'notion',    k:'study', name:'Notion',              g:'📝', c:['#3a3a3a','#1c1c1c'], tc:'#cfcfcf' },
+  { id:'crunchy',   k:'watching', name:'Crunchyroll',      g:'film', c:['#f47521','#bd5514'] },
+  { id:'study',     k:'study', name:'Studying',            g:'book', c:['#2dd4bf','#178f80'] },
+  { id:'vscode',    k:'study', name:'VS Code',             g:'code', c:['#3b9df2','#1f6ec2'] },
+  { id:'rbxstudio', k:'study', name:'Roblox Studio',       g:'wrench', c:['#00a2ff','#0069a8'] },
+  { id:'canva',     k:'study', name:'Canva',               g:'palette', c:['#7d2ae8','#00c4cc'] },
+  { id:'figma',     k:'study', name:'Figma',               g:'puzzle', c:['#a259ff','#f24e1e'] },
+  { id:'photoshop', k:'study', name:'Photoshop',           g:'brush', c:['#31a8ff','#1471b8'] },
+  { id:'notion',    k:'study', name:'Notion',              g:'note', c:['#3a3a3a','#1c1c1c'], tc:'#cfcfcf' },
 ];
 // resolve a stored status against the catalog — unknown ids and expired
 // statuses render as nothing, so tampered rows can't show anything odd
@@ -345,8 +358,8 @@ export const store = {
 export const SYS_KEY = 'orbit.systems.v2';
 try{ localStorage.removeItem('orbit.systems.v1'); }catch{}
 export const SYSTEM_HUES = [265, 190, 150, 330, 40, 210, 300, 95];
-export const EMOJI_SUGGESTIONS = ['🏠','🏫','🛍️','☕','🍜','🍔','🏀','🎮','🏋️','📚','🎬','🚉','🌳','🏖️','⛪','🏥','💻','🎤','🎨','🍦','🧋','🏬','🚗','✈️'];
-export const SYSTEM_GLYPHS = ['🪐','🌌','🌠','⭐','☄️','🌟','🔭','🚀','🛸','✨'];
+export const EMOJI_SUGGESTIONS = PLACE_SET;
+export const SYSTEM_GLYPHS = SYSTEM_SET;
 
 /* ---------- chat: themes, fonts, emoji, media ----------
    Everything link-based — Orbit never stores files. TENOR_KEY is optional:
@@ -400,7 +413,7 @@ export const genId = p => p + Math.random().toString(36).slice(2,8) + Date.now()
 export const normName = s => (s||'').trim().toLowerCase();
 export const hueCss = (h, l=62, s=72, a=1) => `hsl(${h} ${s}% ${l}%${a<1?` / ${a}`:''})`;
 
-export function seedSystems(){ return [{ key:'campus', name:'Campus', kind:'campus', hue:265, glyph:'🏫', planets:[] }]; }
+export function seedSystems(){ return [{ key:'campus', name:'Campus', kind:'campus', hue:265, glyph:'school', planets:[] }]; }
 export function loadSystems(){
   try{ const a = JSON.parse(localStorage.getItem(SYS_KEY)||'null'); if(Array.isArray(a) && a.length) return a; }catch{}
   return seedSystems();
@@ -416,15 +429,15 @@ export function planetsOf(sys){
 
 // pack/unpack the rich location that rides inside presence.zone
 export function encodePlace({ placeLabel, emoji, systemLabel, systemKey, planetId }){
-  return JSON.stringify({ p:placeLabel||'', e:emoji||'📍', s:systemLabel||'', k:systemKey||'', pi:planetId||'' });
+  return JSON.stringify({ p:placeLabel||'', e:emoji||'pin', s:systemLabel||'', k:systemKey||'', pi:planetId||'' });
 }
 export function decodePlace(zone){
   if(!zone) return null;
   if(typeof zone==='string' && zone.charAt(0)==='{'){
-    try{ const o=JSON.parse(zone); if(o && (o.p||o.s)) return { place:o.p||null, emoji:o.e||'📍', system:o.s||null, key:o.k||null, pi:o.pi||null }; }catch{}
+    try{ const o=JSON.parse(zone); if(o && (o.p||o.s)) return { place:o.p||null, emoji:o.e||'pin', system:o.s||null, key:o.k||null, pi:o.pi||null }; }catch{}
   }
   const z = ZONES.find(x=>x.id===zone);            // legacy bare zone id → campus
-  return { place: z?z.name:String(zone), emoji: z?z.icon:'📍', system:'Campus', key:'campus' };
+  return { place: z?z.name:String(zone), emoji: z?z.icon:'pin', system:'Campus', key:'campus' };
 }
 // a friend's location, but only if they're actually sharing (respects the toggle + ghost)
 export function presencePlace(pr){ return (pr && pr.sharing && !pr.ghost && pr.zone) ? decodePlace(pr.zone) : null; }
