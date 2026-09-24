@@ -2,9 +2,11 @@
 import { html, useState } from './lib.js';
 import { actOf, ago, DAYS, Glyph, GlyphTile, Sym, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
 import { LiveConnections, LiveLine } from './connect.js';
+import { StoryRing } from './stories.js';
+import { AdCard } from './ads.js';
 import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, HobbyChip, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
-export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
+export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy, storyBy={}, onOpenStory, onNewStory, ads, onPlus, storiesOn=true }) {
   const nd = nowInfo();
   const withStatus = friends.map(f=>({ f, st: statusOf(f.id, classesBy, events) }));
   const inClass = withStatus.filter(x=>x.st.kind!=='free');
@@ -26,27 +28,39 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
 
   // "in the <system> galaxy" bubble that floats over an avatar when they're sharing a spot
   const myHere = myPres?.sharing && !myPres?.ghost ? decodePlace(myPres?.zone) : null;
+  // unwatched stories first on the rail, then watched, then everyone else
+  const storyRank = id => storyBy[id] ? (storyBy[id].unseen ? 2 : 1) : 0;
   const Bubble = ({ d, salt, color }) => d && d.system ? html`<div class="storybubble" style=${`color:${color}`}>
     <span class="bdot" style=${`background:${color}`}></span>${systemPhrase(d.system, salt)}</div>` : null;
 
   return html`<div>
     <${Eyebrow}>Your orbit<//>
     <div class="stories">
-      <button class="story" onClick=${onYou}>
+      <div class="story">
         <${Bubble} d=${myHere} salt=${'me'} color="var(--ge)"/>
-        <div class="ring" style=${`background:linear-gradient(140deg,${safeColor(me?.accent1,'#b06bff')},${safeColor(me?.accent2,'#2dd4bf')})`}><div><${Avatar} p=${me} size=${48}/></div></div>
-        <div class="story-label">You</div>
-      </button>
+        <button class="story-hit" aria-label=${storyBy[uid] ? 'Watch your story' : 'Add to your story'}
+          onClick=${()=> storyBy[uid] ? onOpenStory(uid) : (storiesOn ? onNewStory() : onYou())}>
+          ${storyBy[uid]
+            ? html`<${StoryRing} p=${me} g=${storyBy[uid]} size=${48}/>`
+            : html`<div class="ring" style=${`background:linear-gradient(140deg,${safeColor(me?.accent1,'#b06bff')},${safeColor(me?.accent2,'#2dd4bf')})`}><div><${Avatar} p=${me} size=${48}/></div></div>`}
+        </button>
+        ${storiesOn && html`<button class="story-add" aria-label="New story" onClick=${onNewStory}><${IcPlus} size=${12}/></button>`}
+        <div class="story-label">${storyBy[uid] ? 'Your story' : 'You'}</div>
+      </div>
       <button class="story" onClick=${onAdd}>
         <div class="addbubble"><${IcPlus} size=${20}/></div>
         <div class="story-label">Add</div>
       </button>
-      ${withStatus.map(({f,st})=>{
+      ${[...withStatus].sort((a,b)=> (storyRank(b.f.id)-storyRank(a.f.id))).map(({f,st})=>{
         const here = presencePlace(presence[f.id]);
-        return html`<button key=${f.id} class="story" onClick=${()=>onOpenFriend(f.id)}>
+        const g = storyBy[f.id];
+        return html`<button key=${f.id} class="story" onClick=${()=> g ? onOpenStory(f.id) : onOpenFriend(f.id)}
+          aria-label=${g ? `Watch ${fname(f)}'s story` : `Open ${fname(f)}`}>
         <${Bubble} d=${here} salt=${f.id} color="var(--major)"/>
-        <${Avatar} p=${f} size=${48} ring=${st.kind!=='free'?'live':'seen'}
-          badge=${st.kind!=='free' ? html`<${StatusDot} color=${st.color}/>` : (here ? html`<${PinBadge}/>` : null)} />
+        ${g
+          ? html`<div class="avwrap"><${StoryRing} p=${f} g=${g} size=${48}/>${st.kind!=='free' ? html`<${StatusDot} color=${st.color}/>` : (here ? html`<${PinBadge}/>` : null)}</div>`
+          : html`<${Avatar} p=${f} size=${48} ring=${st.kind!=='free'?'live':'seen'}
+              badge=${st.kind!=='free' ? html`<${StatusDot} color=${st.color}/>` : (here ? html`<${PinBadge}/>` : null)} />`}
         <div class="story-label">${fname(f)||'—'}</div>
       </button>`;})}
     </div>
@@ -141,6 +155,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
         </div>
       </div>`}
 
+      <div class="adslot"><${AdCard} ads=${ads} placement="home" me=${me} onPlus=${onPlus}/></div>
       ${upcoming.length>0 && html`<div class="upframe">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
           <${Eyebrow} color="var(--nstp)">Coming up<//>

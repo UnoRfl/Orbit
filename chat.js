@@ -2,9 +2,12 @@
 import { html, useEffect, useRef, useState } from './lib.js';
 import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, Glyph, Sym, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, posVars, resumeBg, sb, ui } from './core.js';
 import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
+import { MediaComposer, SnapBubble } from './media.js';
+import { AdCard } from './ads.js';
+import { isPlus } from './core.js';
 
 export function ChatsScreen({ kit }) {
-  const { uid, threads, reads, ov, sel, setSel, systems, profiles, nameOf, blocks, openDm, ensureProfiles, friends, db, isFounder } = kit;
+  const { uid, me, threads, reads, ov, sel, setSel, systems, profiles, nameOf, blocks, openDm, ensureProfiles, friends, db, isFounder, streaks={}, ads, onPlus } = kit;
   const [pick, setPick] = useState(false);
   const peerOf = t => t.a===uid ? t.b : t.a;
   useEffect(()=>{ ensureProfiles(threads.map(peerOf)); }, [threads.length]);
@@ -12,7 +15,7 @@ export function ChatsScreen({ kit }) {
   const kSel = chatKeyOf(sel);
   const pv = k => { const o = ov[k]; if (!o || !o.last_at) return null;
     const who = o.last_sender===uid ? 'You: ' : '';
-    return who + (o.last_deleted ? 'unsent a message' : o.last_kind==='text' ? (o.last_body||'') : o.last_kind==='gif' ? 'sent a GIF' : 'sent a photo'); };
+    return who + (o.last_deleted ? 'unsent a message' : o.last_kind==='text' ? (o.last_body||'') : o.last_kind==='gif' ? 'sent a GIF' : o.last_kind==='media' ? 'sent a snap' : 'sent a photo'); };
 
   return html`<div class="chatsplit" style="animation:pop .2s ease">
     <div class="chatlist">
@@ -40,6 +43,7 @@ export function ChatsScreen({ kit }) {
           </button>`;})}
       </div>`}
 
+      <${AdCard} ads=${ads} placement="chats" me=${me} onPlus=${onPlus}/>
       <div class="flabel" style="margin-top:14px">Direct messages</div>
       ${db!==false && !visible.length && html`<div class="small" style="padding:8px 2px;line-height:1.5">No DMs yet — hit <b>New</b>, or <b>Message</b> on a friend's profile.</div>`}
       <div class="stack" style="margin-top:8px">
@@ -47,7 +51,8 @@ export function ChatsScreen({ kit }) {
           return html`<button key=${t.id} class=${'convrow'+(kSel===k?' on':'')} onClick=${()=>setSel({ scope:'dm', ref:t.id })}>
             <${Avatar} p=${p||{ id:pid }} size=${40}/>
             <div style="min-width:0;flex:1">
-              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${p?fname(p):'…'}${mut?html`<span style="opacity:.5;font-weight:400"> · <${Glyph} k="belloff" size=${12}/></span>`:''}</div>
+              <div class="rowname" style=${un&&!mut?'color:#fff':''}>${p?fname(p):'…'}${mut?html`<span style="opacity:.5;font-weight:400"> · <${Glyph} k="belloff" size=${12}/></span>`:''}
+                ${streaks[t.id] && html`<span class=${'streak'+(streaks[t.id].today?'':' risk')} title=${streaks[t.id].today ? `${streaks[t.id].streak}-day streak` : 'Streak ends at midnight — send something today'}><${Glyph} k="flame" size=${11}/>${streaks[t.id].streak}</span>`}</div>
               <div class="rowsub">${pv(k) || 'Say hi'}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none">
@@ -56,7 +61,7 @@ export function ChatsScreen({ kit }) {
             </div>
           </button>`;})}
       </div>
-      <div class="small" style="margin-top:16px;line-height:1.6">Friends-only DMs · links instead of uploads · chats auto-clear after 3 months. Reported chats can be reviewed by Orbit founders.</div>
+      <div class="small" style="margin-top:16px;line-height:1.6">Friends-only DMs · photos and videos disappear after 24 hours · chats auto-clear after 3 months. Reported chats can be reviewed by Orbit founders.</div>
     </div>
 
     ${sel ? html`<${ChatView} key=${kSel} kit=${kit} sel=${sel} onClose=${()=>setSel(null)}/>`
@@ -72,7 +77,9 @@ export function ChatsScreen({ kit }) {
 
 export function ChatView({ kit, sel, onClose, dock=false }) {
   const { uid, me, profiles, ensureProfiles, threads, systems, reads, msgs, loadMsgs, sendMsg, unsendMsg,
-          markRead, muteChat, setDmLook, setSysLook, reportMsg, blockUser, isFounder, statusOf, onOpenFriend, loadModThread } = kit;
+          markRead, muteChat, setDmLook, setSysLook, reportMsg, blockUser, isFounder, statusOf, onOpenFriend, loadModThread,
+          mediaRows={}, ensureMedia, sendSnap, openOnce, scheduled=[], scheduleMsg, cancelScheduled, onPlus, flags={}, streaks={} } = kit;
+  const plus = isPlus(me);
   const key = chatKeyOf(sel);
   const isDm = sel.scope==='dm';
   const [modThread, setModThread] = useState(null);
@@ -104,6 +111,8 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const bucket = msgs[key] || { rows:[], hasMore:false, loaded:false, peerRead:null };
   const rows = bucket.rows;
   useEffect(()=>{ loadMsgs(sel); }, [key]);
+  useEffect(()=>{ const ids = rows.filter(m=>m.kind==='media' && !m.deleted).map(m=>m.body); if (ids.length && ensureMedia) ensureMedia(ids); }, [rows.length, key]);
+  const myQueue = scheduled.filter(q => (isDm ? q.thread_id===sel.ref : q.system_id===sel.ref));
 
   // mark read on open / new messages / returning to the tab
   const seenLast = useRef(0);
@@ -208,7 +217,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
         ? html`<${Avatar} p=${peer||{ id:peerId||'x' }} size=${34}/>`
         : html`<div class="convglyph" style=${`width:34px;height:34px;font-size:16px;${sys?`--sh:${hueCss(sys.hue)}`:''}`}><${Sym} v=${sys?.glyph} size=${17} fallback="satlite"/></div>`}
       <div style=${`min-width:0;flex:1;${isDm&&peerId&&!mod?'cursor:pointer':''}`} onClick=${()=>{ if (isDm && peerId && !mod) onOpenFriend(peerId); }}>
-        <div class="rowname" style="font-size:14px">${title}</div>
+        <div class="rowname" style="font-size:14px">${title}${isDm && thread && streaks[thread.id] && html` <span class=${'streak'+(streaks[thread.id].today?'':' risk')}><${Glyph} k="flame" size=${11}/>${streaks[thread.id].streak}</span>`}</div>
         <div class="rowsub" style=${peerTyping ? 'color:var(--ge)' : ''}>${subtitle}</div>
       </div>
       ${!mod && html`<button class="xbtn" style="width:32px;height:32px" onClick=${()=>setPane(pane==='menu'?null:'menu')} aria-label="Chat options"><${IcMore} size=${15}/></button>`}
@@ -236,20 +245,39 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
             onUnsend=${()=>{ unsendMsg(it.m); setSelMsg(null); }}
             onReport=${()=>{ setSelMsg(null); setPane('report:'+it.m.id); }}
             canModRemove=${isFounder} onImg=${u=>setLightbox(u)} onImgLoad=${onMedia}
+            renderMedia=${m=>html`<${SnapBubble} m=${m} mine=${m.sender===uid} row=${mediaRows[m.body]} onLoad=${onMedia} onOpenOnce=${openOnce}/>`}
             onOpenSender=${()=>{ if(!mod) onOpenFriend(it.m.sender); }} />`)}
       ${seen && html`<div class="seen">Seen</div>`}
       </div>
     </div>
 
+    ${!mod && myQueue.length>0 && html`<button class="queuechip" onClick=${()=>setPane(pane==='queue'?null:'queue')}><${Glyph} k="clock" size=${13}/> ${myQueue.length} scheduled</button>`}
+    ${pane==='queue' && html`<div class="chatover" onClick=${e=>{ if(e.target===e.currentTarget) setPane(null); }}><div class="chatovercard">
+      <div class="sheethead" style="margin-bottom:8px"><div class="sheettitle" style="font-size:16px">Scheduled here</div>
+        <button aria-label="Close" class="xbtn" onClick=${()=>setPane(null)}><${IcX} size=${15}/></button></div>
+      <div class="stack">${myQueue.map(q=>html`<div key=${q.id} class="cardrow" style="cursor:default">
+        <span style="color:var(--ge);display:flex"><${Glyph} k="clock" size=${16}/></span>
+        <div style="min-width:0;flex:1"><div class="rowname" style="white-space:normal">${q.body.slice(0,120)}</div>
+          <div class="rowsub">${new Date(q.send_at).toLocaleString(undefined,{ weekday:'short', hour:'numeric', minute:'2-digit' })}</div></div>
+        <button class="pill" onClick=${()=>cancelScheduled(q.id)}>Cancel</button></div>`)}</div>
+      <div class="small" style="margin-top:10px">Orbit sends these for you, even if your phone is off.</div>
+    </div></div>`}
+    ${pane==='later' && html`<${LaterPane} onClose=${()=>setPane(null)} onPick=${async at=>{ const body=text.trim(); if(!body) return;
+      if (await scheduleMsg(sel, body, at)) { setText(''); requestAnimationFrame(grow); setPane(null); } }}/>`}
+    ${pane==='snap' && html`<div class="mcomp-wrap"><${MediaComposer} uid=${uid} me=${me} purpose="chat" allowViewOnce=${isDm}
+      onPlus=${onPlus} onClose=${()=>setPane(null)}
+      onPosted=${async (enc, extra)=>{ const ok = await sendSnap(sel, enc, extra, peerId); if (ok) { stick.current = true; setPane(null); } }}/></div>`}
     ${!mod && html`<div class="composer glass">
       <button class="cbtn" aria-label="Emoji" onClick=${()=>setPane(pane==='emoji'?null:'emoji')}><${IcSmile} size=${19}/></button>
-      <button class="cbtn" aria-label="Image or GIF" onClick=${()=>setPane(pane==='media'?null:'media')}><${IcImage} size=${19}/></button>
+      ${flags.snaps!==false && html`<button class="cbtn" aria-label="Send a photo or video (gone in 24h)" onClick=${()=>setPane('snap')}><${Glyph} k="camera" size=${19}/></button>`}
+      <button class="cbtn" aria-label="GIF or image link" onClick=${()=>setPane(pane==='media'?null:'media')}><${IcImage} size=${19}/></button>
       <div class="cfield">
         ${text.length>1800 && html`<span class="ccount">${2000-text.length}</span>`}
         <textarea ref=${taRef} rows="1" value=${text} maxlength="2000" placeholder="Message…"
           onInput=${e=>{ setText(e.target.value); grow(); pingTyping(); }}
           onKeyDown=${e=>{ if (e.key==='Enter' && !e.shiftKey && window.innerWidth>=900) { e.preventDefault(); if (canSend) doSend(); } }}></textarea>
       </div>
+      ${canSend && flags.scheduled!==false && html`<button class="cbtn" aria-label="Send later" title=${plus ? 'Send later' : 'Send later · Orbit+'} onClick=${()=> plus ? setPane('later') : onPlus && onPlus()}><${Glyph} k="clock" size=${18}/></button>`}
       <button class="csend" disabled=${!canSend} onClick=${()=>doSend()} aria-label="Send"><${IcSend} size=${16}/></button>
       ${pane==='emoji' && html`<${EmojiPop} onPick=${em=>{ setText(t=>t+em); requestAnimationFrame(grow); }} onClose=${()=>{ setPane(null); taRef.current?.focus(); }}/>`}
       ${pane==='media' && html`<${MediaPop} onSend=${(kind,u)=>doSend(kind,u)} onClose=${()=>setPane(null)}/>`}
@@ -262,7 +290,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       ${isDm && peerId && html`<button style="color:#ff9db8" onClick=${async()=>{ setPane(null);
         if (await ui.confirm({ title:`Block ${title}?`, body:"They won't be able to message you, and you won't see their messages.", confirmLabel:'Block', danger:true })) { blockUser(peerId); onClose(); } }}><${Glyph} k="block" size=${15}/> Block</button>`}
     </div>`}
-    ${pane==='look' && html`<${LookPane} isDm=${isDm} look=${look}
+    ${pane==='look' && html`<${LookPane} isDm=${isDm} look=${look} plus=${plus} onPlus=${onPlus}
       onSave=${async l=>{ if (isDm) await setDmLook(thread.id, l); else await setSysLook(sel.ref, l); setPane(null); }}
       onClose=${()=>setPane(null)}/>`}
     ${String(pane).startsWith('report:') && (()=>{ const m = rows.find(x=>x.id===String(pane).slice(7));
@@ -330,7 +358,7 @@ export function MediaPop({ onSend, onClose }) {
   </div>`;
 }
 
-export function LookPane({ isDm, look, onSave, onClose }) {
+export function LookPane({ isDm, look, onSave, onClose, plus=false, onPlus }) {
   const [l, setL] = useState({
     theme: look.theme||'nebula', font: look.font||'inter', bg: look.bg||'',
     bgPos: (look.bgPos && typeof look.bgPos==='object') ? look.bgPos : { x:0, y:0, z:1 },
@@ -352,8 +380,9 @@ export function LookPane({ isDm, look, onSave, onClose }) {
       </div>
       <div class="flabel">Theme · ${th.name}</div>
       <div class="chiprow">${Object.entries(CHAT_THEMES).map(([id,t])=>html`<button key=${id}
-        class=${'lookswatch'+(l.theme===id?' on':'')} style=${`background:${t.my}`} aria-label=${t.name}
-        onClick=${()=>setL(v=>({ ...v, theme:id }))}></button>`)}</div>
+        class=${'lookswatch'+(l.theme===id?' on':'')+(t.plus?' plusw':'')+(t.plus&&!plus?' plock':'')} style=${`background:${t.my}`} aria-label=${t.name+(t.plus?' (Orbit+)':'')}
+        title=${t.plus && !plus ? t.name+' · Orbit+' : t.name}
+        onClick=${()=>{ if (t.plus && !plus) { onPlus && onPlus(); return; } setL(v=>({ ...v, theme:id })); }}></button>`)}</div>
       <div class="flabel">Font</div>
       <div class="chiprow">${Object.entries(CHAT_FONTS).map(([id,f])=>html`<button key=${id}
         class=${'pill'+(l.font===id?' on':'')} style=${`font-family:${f.css}`} onClick=${()=>setL(v=>({ ...v, font:id }))}>${f.name}</button>`)}</div>
@@ -420,6 +449,40 @@ export function FriendPickPop({ friends, onPick, onClose }) {
           <div style="min-width:0;flex:1"><div class="rowname">${fname(f)}</div><div class="rowsub">@${f.handle}</div></div>
           <${IcChat} size=${15}/></button>`)}
       </div>
+    </div>
+  </div>`;
+}
+
+/* "Send later" — an Orbit+ perk. The message waits in scheduled_messages and a
+   pg_cron job delivers it within a minute of the time, through the same
+   trigger as a normal send, so blocks and unfriending still stop it. */
+export function LaterPane({ onPick, onClose }) {
+  const at = (d, h, m=0) => { const x = new Date(); x.setDate(x.getDate()+d); x.setHours(h, m, 0, 0); return x; };
+  const now = new Date();
+  const opts = [
+    ['In 1 hour', new Date(Date.now()+3600e3)],
+    ...(now.getHours() < 19 ? [['Tonight · 8PM', at(0,20)]] : []),
+    ['Tomorrow · 7AM', at(1,7)],
+    ['Tomorrow · 12PM', at(1,12)],
+  ];
+  const [custom, setCustom] = useState('');
+  const [busy, setBusy] = useState(false);
+  const go = async d => { if (!(d > new Date(Date.now()+60e3))) { ui.toast('Pick a time at least a minute from now'); return; } setBusy(true); await onPick(d); setBusy(false); };
+  const minLocal = (()=>{ const d=new Date(Date.now()+2*60e3); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); })();
+  return html`<div class="chatover" onClick=${e=>{ if(e.target===e.currentTarget) onClose(); }}>
+    <div class="chatovercard">
+      <div class="sheethead" style="margin-bottom:8px">
+        <div class="sheettitle" style="font-size:16px;display:flex;align-items:center;gap:7px"><${Glyph} k="clock" size=${16}/> Send later</div>
+        <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${15}/></button>
+      </div>
+      <div class="stack">${opts.map(([l,d])=>html`<button key=${l} class="cardrow" disabled=${busy} onClick=${()=>go(d)}>
+        <span class="rowname" style="flex:1">${l}</span><span class="rowsub">${d.toLocaleString(undefined,{ weekday:'short', hour:'numeric', minute:'2-digit' })}</span></button>`)}</div>
+      <div class="flabel">Pick a time</div>
+      <div style="display:flex;gap:8px">
+        <input class="input" type="datetime-local" min=${minLocal} value=${custom} onInput=${e=>setCustom(e.target.value)}/>
+        <button class="btn btn-grad" style="flex:none" disabled=${!custom||busy} onClick=${()=>go(new Date(custom))}>Schedule</button>
+      </div>
+      <div class="small" style="margin-top:10px">Up to 30 days ahead. Cancel any time from the “scheduled” chip above the message box.</div>
     </div>
   </div>`;
 }

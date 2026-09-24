@@ -1,15 +1,19 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, evUpcoming, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, Glyph, IcPin, IcRadio, IcShield, Sym, toGlyph, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, isPlus, THEMES, pauseBg, resumeBg, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, evUpcoming, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, Glyph, IcPin, IcRadio, IcShield, Sym, toGlyph, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
 import { MapScreen } from './map.js';
 import { UpdatesPanel, unseenUpdates } from './updates.js';
-import { Creator, Detail, ImportSheet, Inbox, PingSheet, Plans } from './plans.js';
+import { Creator, Detail, FindTime, ImportSheet, Inbox, PingSheet, Plans } from './plans.js';
 import { ChatsScreen } from './chat.js';
 import { Settings } from './settings.js';
 import { ReportSheet, StaffPanel } from './staff.js';
+import { StoryViewer, groupStories, withAds } from './stories.js';
+import { MediaComposer, forgetMedia, mediaError, publishMedia } from './media.js';
+import { PlusPage } from './plus.js';
+import { trackAd } from './ads.js';
 
 export function Shell({ session }) {
   const uid = session.user.id;
@@ -36,6 +40,20 @@ export function Shell({ session }) {
   const [pushOn, setPushOn] = useState(false);
   const [updates, setUpdates] = useState(null);          // null = updates table not migrated yet
   const [staff, setStaff] = useState({ reports: [], log: [] });
+  /* ---------- stories, 24h media, Orbit+, ads, app config ---------- */
+  const [stories, setStories] = useState([]);          // live story rows RLS lets me see (mine included)
+  const [storySeen, setStorySeen] = useState(()=>new Set());
+  const [storyOpen, setStoryOpen] = useState(null);    // { groups, start } — a snapshot, so the rail can't reorder under the viewer
+  const [storyNew, setStoryNew] = useState(false);
+  const [closeIds, setCloseIds] = useState([]);
+  const [mediaRows, setMediaRows] = useState({});      // media id -> row | false (gone)
+  const [appCfg, setAppCfg] = useState({ banner:{}, flags:{} });
+  const [ads, setAds] = useState([]);
+  const [streaks, setStreaks] = useState({});
+  const [scheduled, setScheduled] = useState([]);
+  const [bannerHidden, setBannerHidden] = useState(()=>{ try{ return localStorage.getItem('orbit.bannerHidden')||''; }catch{ return ''; } });
+  const mediaRef = useRef(mediaRows); mediaRef.current = mediaRows;
+  const mediaAsked = useRef(new Set());
   /* ---------- chat state ---------- */
   const [dmThreads, setDmThreads] = useState([]);
   const [chatReads, setChatReads] = useState({});      // key -> my chat_reads row (read state + mute)
@@ -212,6 +230,47 @@ export function Shell({ session }) {
       ensureProfiles((data||[]).map(u=>u.author));
     }catch{ setUpdates(null); }
   }
+  async function loadStories() {
+    try{
+      const { data, error } = await sb.from('media').select('*').eq('purpose','story')
+        .gt('expires_at', new Date().toISOString()).order('created_at');
+      if (error) return;
+      setStories(data||[]);
+      ensureProfiles((data||[]).map(r=>r.owner));
+      const ids = (data||[]).filter(r=>r.owner!==uid).map(r=>r.id);
+      if (ids.length) {
+        const { data:v } = await sb.from('media_views').select('media_id').eq('viewer', uid).in('media_id', ids);
+        setStorySeen(new Set((v||[]).map(x=>x.media_id)));
+      }
+    }catch{}
+  }
+  async function loadCloseFriends() {
+    try{ const { data } = await sb.from('close_friends').select('friend').eq('owner', uid); setCloseIds((data||[]).map(r=>r.friend)); }catch{}
+  }
+  async function loadAppCfg() {
+    try{ const { data } = await sb.from('app_config').select('key,value');
+      if (data) setAppCfg(c=>({ ...c, ...Object.fromEntries(data.map(r=>[r.key, r.value||{}])) })); }catch{}
+  }
+  // staff can read paused and scheduled ads too — only live ones are ever shown
+  const adLive = a => a.active && (!a.starts_at || Date.parse(a.starts_at) <= Date.now()) && (!a.ends_at || Date.parse(a.ends_at) > Date.now());
+  async function loadAds() {
+    try{ const { data } = await sb.from('ads').select('*'); setAds((data||[]).filter(adLive)); }catch{}
+  }
+  async function loadStreaks() {
+    try{ const { data } = await sb.rpc('dm_streaks'); setStreaks(Object.fromEntries((data||[]).map(r=>[r.thread_id, r]))); }catch{}
+  }
+  async function loadScheduled() {
+    try{ const { data } = await sb.from('scheduled_messages').select('*').is('sent_at', null).is('failed', null).order('send_at'); setScheduled(data||[]); }catch{}
+  }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  async function ensureMedia(ids) {
+    const need = [...new Set(ids)].filter(id => UUID_RE.test(id) && !(id in mediaRef.current) && !mediaAsked.current.has(id));
+    if (!need.length) return;
+    need.forEach(id=>mediaAsked.current.add(id));
+    const { data } = await sb.from('media').select('*').in('id', need);
+    const got = Object.fromEntries((data||[]).map(r=>[r.id, r]));
+    setMediaRows(m=>({ ...m, ...Object.fromEntries(need.map(id=>[id, got[id] || false])) }));
+  }
   async function loadChats() {
     try{
       const [t, r, o] = await Promise.all([
@@ -292,7 +351,8 @@ export function Shell({ session }) {
     stepSet('bg','run');
     setReady(true);
     booted.current = true;
-    Promise.allSettled([loadEvents(), loadPings(), loadPresence(fids), loadShared(), loadNotifs(), loadSettings(), loadUpdates(), loadBadgeDefs(), loadChats()]
+    Promise.allSettled([loadEvents(), loadPings(), loadPresence(fids), loadShared(), loadNotifs(), loadSettings(), loadUpdates(), loadBadgeDefs(), loadChats(),
+                        loadStories(), loadCloseFriends(), loadAppCfg(), loadAds(), loadStreaks(), loadScheduled()]
       .map(p=>withTimeout(p, 12000)))
       .then(()=>{ stepSet('bg','ok'); migrateLocalSystems(); initPush(); if (roleOf(meRow)) loadStaffData();
       });
@@ -402,6 +462,32 @@ export function Shell({ session }) {
       .subscribe();
 
 
+    // stories, 24h media, broadcast config and Plus ride their own channel too
+    const ch4 = sb.channel('orbit-media')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'media' }, ({ new:n }) => {
+        if (!n || !n.id) return;
+        if (n.purpose==='story') {
+          if (blockRef.current.includes(n.owner)) return;
+          setStories(x => x.some(r=>r.id===n.id) ? x : [...x, n]);
+          ensureProfiles([n.owner]);
+        } else setMediaRows(m=>({ ...m, [n.id]: n }));
+      })
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'media' }, ({ new:n }) => {
+        if (!n || !n.id) return;
+        const gone = Date.parse(n.expires_at) <= Date.now() || (n.view_once && n.opened_at && n.owner!==uid);
+        if (n.purpose==='story') setStories(x => gone ? x.filter(r=>r.id!==n.id) : x.map(r=>r.id===n.id?n:r));
+        else setMediaRows(m=>({ ...m, [n.id]: gone ? false : n }));
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'app_config' }, ({ new:n }) => {
+        if (n && n.key) setAppCfg(c=>({ ...c, [n.key]: n.value||{} }));
+      })
+      .on('postgres_changes', { event:'*', schema:'public', table:'subscriptions' }, ({ new:n }) => {
+        if (!n || !n.user_id) return;
+        if (n.user_id===uid) later('me', loadMe, 300);
+        else if (profRef.current[n.user_id]) later('plus:'+n.user_id, ()=>refreshProfiles([n.user_id]), 300);
+      })
+      .subscribe();
+
     const tick = setInterval(() => {
       setTick(t=>t+1);
       // refresh friend presence periodically (covers friends turning sharing off)
@@ -409,9 +495,10 @@ export function Shell({ session }) {
     }, 45000);
     // back from the background: refresh friends AND our own row, which another
     // device may have changed while this tab's socket was asleep
-    const vis = () => { if(!document.hidden){ setTick(t=>t+1); loadPresence(friendIdsOf(graphRef.current)); loadMyPresence(); } };
+    const vis = () => { if(!document.hidden){ setTick(t=>t+1); loadPresence(friendIdsOf(graphRef.current)); loadMyPresence(); loadStories(); loadStreaks(); } };
+    const slow = setInterval(() => { if (!document.hidden) { loadStories(); loadScheduled(); } }, 180000);
     document.addEventListener('visibilitychange', vis);
-    return () => { sb.removeChannel(ch); sb.removeChannel(ch2); sb.removeChannel(ch3); clearInterval(tick); document.removeEventListener('visibilitychange', vis); };
+    return () => { sb.removeChannel(ch); sb.removeChannel(ch2); sb.removeChannel(ch3); sb.removeChannel(ch4); clearInterval(tick); clearInterval(slow); document.removeEventListener('visibilitychange', vis); };
   }, [uid]);
 
   /* ---------- mutations ---------- */
@@ -793,6 +880,82 @@ export function Shell({ session }) {
   }
 
 
+  /* ---------- stories ---------- */
+  async function postStory(enc, extra) {
+    const row = await publishMedia({ uid, enc, purpose:'story', extra });    // throws → the composer shows why
+    setStories(x=>[...x, row]); setStoryNew(false);
+    toast(extra.audience==='close' ? 'Shared with close friends · gone in 24h' : 'Story shared · gone in 24h', 'camera');
+    return true;
+  }
+  function markStorySeen(item) {
+    setStorySeen(s=>{ if (s.has(item.id)) return s; const n=new Set(s); n.add(item.id); return n; });
+    sb.rpc('media_seen', { p_id:item.id }).then(()=>{}, ()=>{});
+  }
+  async function dmText(otherId, body) {
+    try{
+      const { data, error } = await sb.rpc('dm_open', { p_other: otherId });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      setDmThreads(t=> t.some(x=>x.id===row.id) ? t : [row, ...t]);
+      return await sendMsg({ scope:'dm', ref:row.id }, { kind:'text', body }, otherId);
+    }catch{ toast("Couldn't send that"); return false; }
+  }
+  async function reactStory(owner, item, emoji) {
+    sb.rpc('media_seen', { p_id:item.id, p_reaction:emoji }).then(()=>{}, ()=>{});
+    dmText(owner, `${emoji} reacted to your story${item.caption ? ` “${item.caption.slice(0,60)}”` : ''}`);
+  }
+  async function replyStory(owner, item, text) {
+    if (await dmText(owner, `Replied to your story${item.caption ? ` “${item.caption.slice(0,60)}”` : ''}: ${text}`)) toast('Reply sent', 'chat');
+  }
+  async function deleteStory(item) {
+    const { error } = await sb.rpc('media_remove', { p_id:item.id });
+    if (error) { toast('Could not delete that story'); return; }
+    setStories(x=>x.filter(r=>r.id!==item.id)); forgetMedia(item.path); toast('Story deleted');
+  }
+  async function reportStory(item, reason) {
+    const { error } = await sb.from('reports').insert({ reporter:uid, target:item.owner, kind:'story', reason, ref:{ media_id:item.id } });
+    if (error) { toast(/duplicate|unique/i.test(error.message||'') ? 'You already reported them today' : 'Could not send the report'); return false; }
+    toast('Reported — staff will take a look', 'flag'); return true;
+  }
+  async function loadStoryViews(id) {
+    const { data } = await sb.from('media_views').select('*').eq('media_id', id).order('viewed_at', { ascending:false });
+    ensureProfiles((data||[]).map(v=>v.viewer));
+    return data||[];
+  }
+  async function setClose(fid, on) {
+    setCloseIds(c=> on ? [...new Set([...c, fid])] : c.filter(x=>x!==fid));
+    const { error } = on ? await sb.from('close_friends').insert({ friend:fid })
+                         : await sb.from('close_friends').delete().eq('owner', uid).eq('friend', fid);
+    if (error) { toast('Could not update close friends'); loadCloseFriends(); }
+  }
+  /* ---------- 24h media in chat ---------- */
+  async function sendSnap(sel, enc, extra, peerId) {
+    let row;
+    try{ row = await publishMedia({ uid, enc, purpose:'chat', extra:{ ...extra, [sel.scope==='dm' ? 'thread_id' : 'system_id']: sel.ref } }); }
+    catch(e){ toast(mediaError(e)); return false; }
+    setMediaRows(m=>({ ...m, [row.id]: row }));
+    return await sendMsg(sel, { kind:'media', body:row.id }, peerId);
+  }
+  function openOnce(row) { sb.rpc('media_open', { p_id:row.id }).then(()=>{}, ()=>{}); }
+  /* ---------- send later (Orbit+; RLS re-checks Plus) ---------- */
+  async function scheduleMsg(sel, body, at) {
+    const { error } = await sb.from('scheduled_messages').insert({ sender:uid, body, send_at:at.toISOString(), [sel.scope==='dm' ? 'thread_id' : 'system_id']: sel.ref });
+    if (error) { toast(/row-level|policy/i.test(error.message||'') ? 'Send later is an Orbit+ perk' : /limit/i.test(error.message||'') ? error.message : 'Could not schedule that'); return false; }
+    toast(`Scheduled · ${at.toLocaleString(undefined,{ weekday:'short', hour:'numeric', minute:'2-digit' })}`, 'clock');
+    loadScheduled(); return true;
+  }
+  async function cancelScheduled(id) {
+    setScheduled(q=>q.filter(x=>x.id!==id));
+    await sb.from('scheduled_messages').delete().eq('id', id);
+    toast('Cancelled');
+  }
+  /* ---------- founder knobs (RLS: founder only) ---------- */
+  async function saveCfg(key, value) {
+    const { error } = await sb.from('app_config').update({ value, updated_by:uid, updated_at:new Date().toISOString() }).eq('key', key);
+    if (error) { toast('Could not save that'); return; }
+    setAppCfg(c=>({ ...c, [key]:value })); toast('Saved for everyone', 'radio');
+  }
+
   async function addClass(row) {
     const { data, error } = await sb.from('classes').insert({ ...row, owner:uid }).select().single();
     if (error) { toast('Could not add that class'); return false; }
@@ -881,13 +1044,30 @@ export function Shell({ session }) {
   const myRole = roleOf(me);
   const staffOpenN = myRole && Array.isArray(staff.reports) ? staff.reports.filter(r=>r.status==='open').length : 0;
   const chatsBadge = Object.entries(chatOv).reduce((s,[k,v])=> s + ((chatReads[k]?.muted) ? 0 : (v.n||0)), 0);
+  const flags = appCfg.flags || {};
+  const storiesOn = flags.stories !== false;
+  const shownAds = (flags.ads === false || isPlus(me)) ? [] : ads;
+  const openPlus = () => setSheet({ t:'plus' });
+  const visStories = stories.filter(r => !blocks.includes(r.owner) && (r.owner===uid || friendIdsOf(graph).includes(r.owner)));
+  const storyGroups = groupStories(visStories, uid, storySeen);
+  const storyBy = Object.fromEntries(storyGroups.map(g=>[g.owner, g]));
+  const openStory = owner => {
+    const gs = withAds(storyGroups, shownAds.filter(a=>(a.placements||[]).includes('stories')));
+    const start = Math.max(0, gs.findIndex(g=>g.owner===owner));
+    setStoryOpen({ groups:gs, start });
+  };
   const chatKit = { uid, me, profiles, nameOf, ensureProfiles, blocks, friends, toast, isFounder, db:chatDb,
+    mediaRows, ensureMedia, sendSnap, openOnce, scheduled, scheduleMsg, cancelScheduled, onPlus:openPlus, flags, streaks, ads:shownAds,
     threads:dmThreads, reads:chatReads, ov:chatOv, msgs:chatMsgs, sel:chatSel, setSel:setChatSel,
     systems:sharedAccepted, loadMsgs, openDm, sendMsg, unsendMsg, markRead:markChatRead, muteChat,
     setDmLook, setSysLook, reportMsg:reportMessage, blockUser, loadModThread,
     statusOf: id => statusOf(id, classesBy, events),
     onOpenFriend: id => { ensureProfiles([id]); setChatSel(null); setOpenFriend(id); } };
 
+
+  useEffect(()=>{ if (me && THEMES[theme]?.plus && !isPlus(me)) setTheme('nebula'); }, [me?.plus_until, theme]);
+  const fullOn = !!storyOpen || storyNew;
+  useEffect(()=>{ if (!fullOn) return; pauseBg(); return ()=>resumeBg(); }, [fullOn]);
 
   if (fatal==='db') return html`<div class="authcol"><div class="authwrap">
     <div class="brand">Orbit</div>
@@ -918,6 +1098,7 @@ export function Shell({ session }) {
     <div class="topbar">
       <div><div class="brand-eyebrow">student network</div><div class="brand">Orbit</div></div>
       <div style="display:flex;gap:8px">
+        <button class=${'iconbtn plusbtn'+(isPlus(me)?' on':'')} aria-label="Orbit+" onClick=${openPlus}><${Glyph} k="plus" size=${18}/></button>
         <button class="iconbtn" aria-label="Updates" onClick=${()=>setSheet({t:'updates'})}>
           <${IcRadio} size=${18}/>${updatesBadge>0 && html`<span class="nbadge">${updatesBadge}</span>`}
         </button>
@@ -934,6 +1115,12 @@ export function Shell({ session }) {
     </div>
 
     <div class="content">
+    ${(()=>{ const b = appCfg.banner || {};
+        if (!b.text || (b.until && Date.parse(b.until) <= Date.now()) || String(b.id||b.text)===bannerHidden) return null;
+        return html`<div class=${'obanner '+(['info','party','warn'].includes(b.tone)?b.tone:'info')} role="status">
+          <${Glyph} k=${b.tone==='warn' ? 'bell' : b.tone==='party' ? 'party' : 'radio'} size=${15}/><span>${b.text}</span>
+          <button aria-label="Dismiss" onClick=${()=>{ const k=String(b.id||b.text); setBannerHidden(k); try{ localStorage.setItem('orbit.bannerHidden', k); }catch{} }}><${Glyph} k="check" size=${13}/></button>
+        </div>`; })()}
       ${friendOpen ? html`<${FriendDash} f=${friendOpen} uid=${uid} classesBy=${classesBy} events=${events} presence=${presence}
           onBack=${()=>setOpenFriend(null)}
           onPoke=${()=>sendPing(friendOpen.id,'poke','waved at you','wave')}
@@ -945,7 +1132,8 @@ export function Shell({ session }) {
       : tab==='home' ? html`<${Home} uid=${uid} me=${me} friends=${friends} classesBy=${classesBy} events=${events} presence=${presence} myPres=${myPres}
           myInvites=${myInvites} onRespond=${respondInvite} sysInvites=${sharedInvited} onSysInvite=${respondSystemInvite} nameOf=${nameOf} systems=${sharedAccepted}
           onOpenFriend=${id=>setOpenFriend(id)} onYou=${()=>setTab('you')} onAdd=${()=>setSheet({t:'friends'})}
-          onMessage=${id=>openDm(id)} onStudy=${(fid,slot)=>setSheet({t:'creator', pre:fid, slot})} />`
+          onMessage=${id=>openDm(id)} onStudy=${(fid,slot)=>setSheet({t:'creator', pre:fid, slot})}
+          storyBy=${storyBy} onOpenStory=${openStory} onNewStory=${()=>setStoryNew(true)} ads=${shownAds} onPlus=${openPlus} storiesOn=${storiesOn} />`
       : tab==='map' ? html`<${MapScreen} uid=${uid} me=${me} friends=${friends} profiles=${profiles} nameOf=${nameOf}
           presence=${presence} myPres=${myPres} setPres=${setPres} live=${live} classesBy=${classesBy} events=${events}
           respondInvite=${respondInvite} shared=${{ accepted:sharedAccepted, invited:sharedInvited }} actions=${sysActions}
@@ -954,11 +1142,12 @@ export function Shell({ session }) {
       : tab==='chats' ? html`<${ChatsScreen} kit=${chatKit} />`
       : tab==='plans' ? html`<${Plans} uid=${uid} events=${events} myInvites=${myInvites} classesBy=${classesBy}
           nameOf=${nameOf} profiles=${profiles} me=${me}
-          onRespond=${respondInvite} onNew=${()=>setSheet({t:'creator'})} onOpen=${e=>setSheet({t:'detail', d:{type:'event',row:e}})} />`
+          onRespond=${respondInvite} onNew=${()=>setSheet({t:'creator'})} onOpen=${e=>setSheet({t:'detail', d:{type:'event',row:e}})}
+          onFind=${()=>setSheet({t:'find'})} />`
       : tab==='staff' && myRole ? html`<${StaffPanel} uid=${uid} me=${me} myRole=${myRole} data=${staff} profiles=${profiles} nameOf=${nameOf}
           reload=${loadStaffData} actions=${{ resolveReport, suspendUser, liftUser, grantBadge, revokeBadge, saveBadgeDef, deleteBadgeDef, notify:toast }}
           openMod=${ref=>{ setChatSel({ scope:ref.scope, ref:ref.ref, mod:true }); setOpenFriend(null); setTab('chats'); }}
-          onOpenProfile=${id=>{ ensureProfiles([id]); setOpenFriend(id); }} />`
+          onOpenProfile=${id=>{ ensureProfiles([id]); setOpenFriend(id); }} cfg=${appCfg} saveCfg=${saveCfg} />`
       : html`<${You} me=${me} uid=${uid} classesBy=${classesBy} events=${events} saveProfile=${saveProfile} myPres=${myPres} setPres=${setPres}
           addClass=${addClass} delClass=${delClass} onPick=${d=>setSheet({t:'detail', d})} onImport=${()=>setSheet({t:'import'})} />`}
     </div>
@@ -1003,7 +1192,8 @@ export function Shell({ session }) {
       ${sheet?.t==='ping' && html`<${PingSheet} f=${profiles[sheet.id]} onSend=${(t,e)=>{sendPing(sheet.id,'ping',t,e);setSheet(null)}} />`}
     <//>
     <${Sheet} open=${sheet?.t==='report'} onClose=${()=>setSheet(null)} accent="var(--now)">
-      ${sheet?.t==='report' && html`<${ReportSheet} f=${profiles[sheet.id]} onSend=${r=>sendReport(sheet.id, r)} onClose=${()=>setSheet(null)} />`}
+      ${sheet?.t==='report' && html`<${ReportSheet} f=${profiles[sheet.id]} what=${sheet.story ? 'story' : 'person'}
+        onSend=${r=> sheet.story ? reportStory(sheet.story, r) : sendReport(sheet.id, r)} onClose=${()=>setSheet(null)} />`}
     <//>
     <${Sheet} open=${sheet?.t==='creator'} onClose=${()=>setSheet(null)} accent="var(--major)">
       ${sheet?.t==='creator' && html`<${Creator} uid=${uid} pre=${sheet.pre} sys=${sheet.sys} slot=${sheet.slot} friends=${friends} profiles=${profiles} nameOf=${nameOf}
@@ -1024,8 +1214,25 @@ export function Shell({ session }) {
         blocks=${blocks} profiles=${profiles} friends=${friends} unblock=${unblockUser} block=${blockUser}
         pushOn=${pushOn} enablePush=${enablePush} disablePush=${disablePush}
         onClose=${()=>setSheet(null)} onSignOut=${()=>signOutClean()}
-        onDeleteAccount=${deleteAccount} />`}
+        onDeleteAccount=${deleteAccount} onPlus=${openPlus} closeIds=${closeIds} setClose=${setClose} />`}
     <//>
+
+    <${Sheet} open=${sheet?.t==='plus'} onClose=${()=>setSheet(null)} accent="var(--major)">
+      ${sheet?.t==='plus' && html`<${PlusPage} me=${me} saveProfile=${saveProfile} onClose=${()=>setSheet(null)}
+        onRedeemed=${until=>{ toast(`Orbit+ until ${new Date(until).toLocaleDateString()}`, 'plus'); loadMe(); }}/>`}
+    <//>
+    <${Sheet} open=${sheet?.t==='find'} onClose=${()=>setSheet(null)} accent="var(--ge)">
+      ${sheet?.t==='find' && html`<${FindTime} uid=${uid} friends=${friends} classesBy=${classesBy} events=${events}
+        onClose=${()=>setSheet(null)} onPlan=${(pick, slot)=>setSheet({ t:'creator', pre:pick, slot })}/>`}
+    <//>
+    ${storyNew && html`<div class="mcomp-wrap"><${MediaComposer} uid=${uid} me=${me} purpose="story"
+      place=${(()=>{ const d = myPres?.sharing && !myPres?.ghost ? decodePlace(myPres?.zone) : null; return d?.place || null; })()}
+      hasClose=${closeIds.length>0} onPlus=${openPlus} onClose=${()=>setStoryNew(false)} onPosted=${postStory}/></div>`}
+    ${storyOpen && html`<${StoryViewer} groups=${storyOpen.groups} startGroup=${storyOpen.start} uid=${uid} me=${me} profiles=${profiles}
+      seen=${storySeen} statusOf=${id=>statusOf(id, classesBy, events)} onSeen=${markStorySeen} onClose=${()=>setStoryOpen(null)}
+      onReply=${replyStory} onReact=${reactStory} onDelete=${deleteStory} loadViews=${loadStoryViews}
+      onReport=${item=>{ setStoryOpen(null); setSheet({ t:'report', id:item.owner, story:item }); }}
+      onAdView=${ad=>trackAd(ad,'view')} onAdClick=${ad=>trackAd(ad,'click')}/>`}
 
     <div class="toasts">${toasts.map(t=>html`<div key=${t.id} class="toast glass">${t.em && html`<span class="em"><${Sym} v=${t.em} size=${16}/></span>`}${t.text}</div>`)}</div>
   </div>`;

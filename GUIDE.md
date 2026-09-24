@@ -41,9 +41,13 @@ Keep that split in mind and most bug reports point themselves at a file.
 | `galaxy.js` | The interactive galaxy on the Map tab (rAF-driven; no CSS transitions on nodes) | `Galaxy` |
 | `updates.js` | Updates panel behind the top-bar button, unread per device | `UpdatesPanel`, `PublishUpdate` |
 | `plans.js` | Plans tab — events, invites, pings, **schedule import** | `Plans`, `Creator`, `ImportSheet`, `parseScheduleFile` |
-| `chat.js` | Chat tab — threads, messages, media/emoji, typing | `ChatsScreen`, `ChatView`, `MediaPop` |
+| `chat.js` | Chat tab — threads, messages, media/emoji, typing, streaks, send later | `ChatsScreen`, `ChatView`, `MediaPop`, `LaterPane` |
+| `media.js` | 24-hour photos/videos: camera, on-device re-encode + trim, upload to the `ephemeral` bucket, viewing | `MediaComposer`, `Camera`, `SnapBubble`, `publishMedia`, `transcodeVideo` |
+| `stories.js` | Stories: rail rings, full-screen viewer, reactions/replies, seen-by | `StoryViewer`, `StoryRing`, `groupStories` |
+| `plus.js` | Orbit+ page — perks, redeem a code, aura picker | `PlusPage`, `PERKS` |
+| `ads.js` | Ad slots and the staff Ads manager | `AdCard`, `AdsManager`, `pickAd` |
 | `settings.js` | Settings tab — theme, background, account email/password | `Settings` |
-| `staff.js` | Moderation panel + report handling | `StaffPanel`, `ReportSheet` |
+| `staff.js` | Mission Control — live dashboard, reports (with story evidence), members, content, Orbit+ codes, ads, banner + kill switches, badges, log | `StaffPanel`, `ReportSheet` |
 | `main.js` | App root, session boot, mount, and the ambient background canvas | `App` |
 
 Dependencies only point **downward** — no cycles:
@@ -79,6 +83,12 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | Background animation laggy / glitchy | `main.js` (canvas section) | Settings "asteroids" toggle |
 | Push notifications | `shell.js` (`push_subscriptions`) | `core.js` (`PUSH_PUBLIC_KEY`) |
 | Moderation / reports | `staff.js` | `shell.js` (`reports`, `mod_actions`) |
+| Story won't post / snap won't send | `media.js` (`mediaError` says why) | `media_before_insert` trigger; Controls → kill switches |
+| A story or snap didn't disappear | nothing to fix in the app — RLS hides it at 24h | Mission Control → Background jobs → Media sweep; `ephemeral-sweep` function logs |
+| Story rings / viewer wrong | `stories.js` | `shell.js` (`loadStories`, `orbit-media` channel) |
+| Orbit+ didn't unlock after a code | `plus.js` | `redeem_code` RPC; `profiles_view.plus_until` |
+| Send later never arrived | `chat.js` (`LaterPane`) | `scheduled_messages.failed` column; cron `orbit-scheduled-msgs` |
+| Ads not showing | `ads.js` | the viewer is Orbit+? ad inactive / outside dates? Controls → Ads switch |
 | Any color / font / spacing / size issue | `styles.css` | — |
 | Wrong icon anywhere | `core.js` (`Ic*` set) | — |
 
@@ -100,7 +110,11 @@ Find the row that matches the report. "Also check" is usually the backend/data s
   `presence`, `systems` / `system_members` / `planets` (map), `classes` (schedule),
   `events` / `event_invitees` / `pings` / `notifications` (plans), `dm_threads` / `messages` /
   `chat_reads` (chat), `user_settings` (settings sync), `reports` / `mod_actions` (staff),
-  `push_subscriptions`, `updates`, `badge_defs`.
+  `push_subscriptions`, `updates`, `badge_defs`, `media` / `media_views` / `close_friends` (stories + snaps),
+  `subscriptions` / `redeem_codes` (Orbit+), `scheduled_messages`, `ads` / `ad_events`, `app_config`.
+- **24-hour media** lives in the private Storage bucket `ephemeral`. The database hides anything past
+  `expires_at`; the `ephemeral-sweep` edge function (pg_cron every 15 min, token in Vault) deletes the files.
+  SQL cannot delete storage objects (Supabase blocks it), which is why that function exists.
 
 ---
 

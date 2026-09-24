@@ -94,3 +94,92 @@ test('Lanyard presence parsing keeps only safe image URLs', () => {
   assert.equal(connect.liveLine(p), 'Listening to Song — A, B');
   assert.equal(connect.presenceOf({ discord_status: 'weird', activities: [] }).status, 'offline');
 });
+
+/* ---- 2026-09-24: stories, 24h media, Orbit+, ads, find-a-time ---- */
+const media = await import('../media.js');
+const stories = await import('../stories.js');
+const ads = await import('../ads.js');
+const comps = await import('../components.js');
+
+test('Orbit+ is read from plus_until, and the aura only renders while it is live', () => {
+  const soon = new Date(Date.now() + 864e5).toISOString(), past = new Date(Date.now() - 1000).toISOString();
+  assert.equal(core.isPlus({ plus_until: soon }), true);
+  assert.equal(core.isPlus({ plus_until: past }), false);
+  assert.equal(core.isPlus(null), false);
+  assert.equal(core.auraOf({ plus_until: soon, flair: { aura: 'halo' } }), 'halo');
+  assert.equal(core.auraOf({ plus_until: past, flair: { aura: 'halo' } }), null, 'a lapsed member keeps the setting but loses the aura');
+  assert.equal(core.auraOf({ plus_until: soon, flair: { aura: 'constructor' } }), null, 'only known aura keys');
+});
+
+test('media helpers: extensions, even sizes, when to re-encode', () => {
+  assert.equal(media.extOf('video/mp4;codecs=avc1'), 'mp4');
+  assert.equal(media.extOf('video/quicktime'), 'mov');
+  assert.equal(media.extOf('image/webp'), 'webp');
+  assert.equal(media.extOf(''), 'jpg');
+  assert.deepEqual(media.fitSize(4032, 3024, 1440), [1440, 1080]);
+  assert.deepEqual(media.fitSize(1081, 721, 2000), [1082, 722], 'odd sizes round to even, never upscale');
+  assert.deepEqual(media.fitShort(1280, 720, 720), [1280, 720], '720p landscape stays 720p');
+  assert.deepEqual(media.fitShort(1080, 1920, 720), [720, 1280], 'portrait phone video keeps its 720 short side');
+  assert.equal(media.needsTranscode({ duration: 9, bytes: 3e6, type: 'video/mp4' }, 10, false), false);
+  assert.equal(media.needsTranscode({ duration: 14, bytes: 3e6, type: 'video/mp4' }, 10, false), true, 'too long for a story');
+  assert.equal(media.needsTranscode({ duration: 5, bytes: 3e6, type: 'video/quicktime' }, 10, false), true, 'iPhone .mov gets normalised');
+  assert.equal(media.needsTranscode({ duration: 5, bytes: 20 * 1024 * 1024, type: 'video/mp4' }, 10, true), false, 'Plus has a higher raw ceiling');
+  const k = media.randomKey(); assert.match(k, /^[A-Za-z0-9_-]{16}$/, 'keys fit the DB path CHECK');
+});
+
+test('time-left labels and byte formatting', () => {
+  const now = Date.parse('2026-09-24T10:00:00Z');
+  assert.equal(core.leftLabel('2026-09-25T09:30:00Z', now), '23h left');
+  assert.equal(core.leftLabel('2026-09-24T10:40:00Z', now), '40m left');
+  assert.equal(core.leftLabel('2026-09-24T09:00:00Z', now), 'gone');
+  assert.equal(core.fmtBytes(512), '512 B');
+  assert.equal(core.fmtBytes(1536), '1.5 KB');
+  assert.equal(core.fmtBytes(1024 ** 3), '1.0 GB');
+  assert.equal(core.msgPreview({ kind: 'media', body: 'x' }), 'sent a snap');
+});
+
+test('stories group per person: yours first, unwatched next, expired dropped', () => {
+  const t = Date.parse('2026-09-24T10:00:00Z'), iso = m => new Date(t + m * 6e4).toISOString(), exp = new Date(t + 864e5).toISOString();
+  const rows = [
+    { id: 'a1', owner: 'amy', created_at: iso(-50), expires_at: exp, audience: 'friends' },
+    { id: 'a2', owner: 'amy', created_at: iso(-10), expires_at: exp, audience: 'close' },
+    { id: 'b1', owner: 'bo', created_at: iso(-5), expires_at: exp, audience: 'friends' },
+    { id: 'm1', owner: 'me', created_at: iso(-30), expires_at: exp, audience: 'friends' },
+    { id: 'x1', owner: 'cy', created_at: iso(-2000), expires_at: iso(-1), audience: 'friends' },
+  ];
+  const g = stories.groupStories(rows, 'me', new Set(['b1', 'a1']), t);
+  assert.deepEqual(g.map(x => x.owner), ['me', 'amy', 'bo'], 'expired cy is gone; amy has an unwatched story so she beats newer-but-watched bo');
+  assert.equal(g[1].start, 1, 'opens on the first unwatched story');
+  assert.equal(g[1].close, true);
+  assert.equal(g[0].unseen, false, 'your own story never counts as unwatched');
+  const withA = stories.withAds(g, [{ id: 'ad' }], 1);
+  assert.deepEqual(withA.map(x => x.ad ? 'AD' : x.owner), ['me', 'amy', 'AD', 'bo', 'AD'], 'ads slot between friends, never after your own');
+  assert.equal(stories.withAds(g, [], 1).length, 3);
+});
+
+test('ads: weighted pick respects placement; links must be https', () => {
+  const list = [{ id: 'a', placements: ['home'], weight: 1 }, { id: 'b', placements: ['home', 'chats'], weight: 3 }];
+  assert.equal(ads.pickAd(list, 'stories'), null);
+  assert.equal(ads.pickAd(list, 'chats', .01).id, 'b');
+  assert.equal(ads.pickAd(list, 'home', .1).id, 'a');
+  assert.equal(ads.pickAd(list, 'home', .5).id, 'b');
+  assert.equal(ads.isSafeLink('https://x.y/z'), true);
+  assert.equal(ads.isSafeLink('javascript:alert(1)'), false);
+  assert.equal(ads.isSafeLink('http://x.y'), false);
+});
+
+test('find a time intersects everyone, skips Sunday, starts from now today', () => {
+  const classesBy = {
+    me:  [{ day: 0, start_min: 540, end_min: 660 }],       // Mon 9-11
+    amy: [{ day: 0, start_min: 720, end_min: 840 }],       // Mon 12-2
+    bo:  [{ day: 0, start_min: 600, end_min: 780 }],       // Mon 10-1
+  };
+  const w = comps.groupWindows(['me', 'amy', 'bo'], classesBy, [], { minLen: 60, from: 480, to: 1080, days: 2, now: { day: 0, min: 400 } });
+  // Monday: me free 8-9, 11-18 · amy 8-12, 14-18 · bo 8-10, 13-18 → shared 8-9 and 14-18
+  assert.deepEqual(w.filter(x => x.day === 0).map(x => [x.s, x.e]), [[480, 540], [840, 1080]]);
+  assert.deepEqual(w.filter(x => x.day === 1).map(x => [x.s, x.e]), [[480, 1080]], 'Tuesday is wide open');
+  const sat = comps.groupWindows(['me'], classesBy, [], { days: 2, now: { day: 5, min: 1300 } });
+  assert.equal(sat.length, 0, 'late Saturday then Sunday: nothing to offer');
+  const mid = comps.groupWindows(['me'], classesBy, [], { minLen: 30, from: 480, to: 1080, days: 1, now: { day: 0, min: 700 } });
+  assert.deepEqual(mid.map(x => [x.s, x.e]), [[705, 1080]], 'today starts at the next quarter hour, not at 8AM');
+});

@@ -125,6 +125,45 @@ export const roleOf = p => badgesOf(p).includes('founder') ? 'founder'
                   : badgesOf(p).includes('staff') ? 'staff'
                   : badgesOf(p).includes('support') ? 'support' : null;
 
+/* ---------- Orbit+ ----------
+   plus_until arrives on every profile through profiles_view, already null
+   once it has lapsed — so "is this person Plus" is one field, read the same
+   way for yourself, a friend's avatar or a chat bubble. The database is what
+   actually grants anything that matters (scheduled messages check it in RLS);
+   everything gated here is cosmetic. */
+export const isPlus = p => !!p?.plus_until && Date.parse(p.plus_until) > Date.now();
+// the aura is picked in Orbit+ and stored in flair, but only drawn while Plus is live
+export const AURAS = {
+  orbit:  { name:'Orbit',  blurb:'a moon circles your avatar' },
+  halo:   { name:'Halo',   blurb:'a slow rotating light ring' },
+  pulse:  { name:'Pulse',  blurb:'a soft heartbeat glow' },
+  comet:  { name:'Comet',  blurb:'a comet chases its tail around you' },
+};
+export const auraOf = p => { const a = flairOf(p).aura; return isPlus(p) && Object.hasOwn(AURAS, a) ? a : null; };
+
+/* ---------- 24-hour media ----------
+   Photos and videos live in the private `ephemeral` bucket for 24 hours and
+   are then deleted — row, file and all (see sql/stories-plus-2026-09-24.sql).
+   Everything is re-encoded on the device first: smaller files are what keep
+   Orbit inside the free tier's 1 GB, and a re-encode strips photo metadata
+   (GPS included) as a side effect. Plus only raises the quality ceiling. */
+export const MEDIA = {
+  storyMaxSec: 10,
+  chatMaxSec: 60,
+  maxBytes: 30 * 1024 * 1024,       // the bucket refuses anything larger
+  img:   { free:1440, plus:2160, q:.84 },
+  vid:   { free:{ side:720, bps:1_600_000 }, plus:{ side:1080, bps:4_000_000 } },
+  photoSec: 5,                        // how long a photo story stays on screen
+};
+export const fmtBytes = n => { n = Number(n)||0;
+  if (n < 1024) return n + ' B';
+  const u = ['KB','MB','GB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 2);
+  return (n >= 100 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i]; };
+// "23h left" / "40m left" / "gone"
+export const leftLabel = (iso, now = Date.now()) => {
+  const ms = Date.parse(iso) - now; if (!(ms > 0)) return 'gone';
+  const m = Math.ceil(ms / 6e4); return m >= 60 ? `${Math.floor(m/60)}h left` : `${m}m left`; };
+
 /* ---------- curated connections ----------
    Fixed allowlist. Users store a handle only; Orbit builds the URL,
    so nothing outside these domains can ever be linked or rendered. */
@@ -249,6 +288,13 @@ export const THEMES = {
   mono:{ name:'Monochrome', desc:'Quiet greys', sw:['#d4d4d8','#a1a1aa','#f4f4f5'],
     v:{ '--canvas':'#0f0f12','--panel':'#18181c','--panel2':'#1f1f24',
         '--major':'#d4d4d8','--ge':'#a1a1aa','--pe':'#e4e4e7','--nstp':'#fafafa','--now':'#f4f4f5' } },
+  // Orbit+ exclusives — `plus` themes fall back to Nebula when Plus lapses
+  supernova:{ name:'Supernova', desc:'Plus · solar flare', plus:true, sw:['#ffb347','#ff4f81','#8f5bff'],
+    v:{ '--canvas':'#170b14','--panel':'#22111d','--panel2':'#2a1524',
+        '--major':'#ff7a59','--ge':'#ffb347','--pe':'#ffd166','--nstp':'#8f5bff','--now':'#ff4f81' } },
+  eclipse:{ name:'Eclipse', desc:'Plus · corona gold', plus:true, sw:['#f7d774','#7df9ff','#c9a7ff'],
+    v:{ '--canvas':'#07070c','--panel':'#101019','--panel2':'#161622',
+        '--major':'#f7d774','--ge':'#7df9ff','--pe':'#a6f4c5','--nstp':'#c9a7ff','--now':'#ff6b9a' } },
 };
 export const THEME_IDS = Object.keys(THEMES);
 
@@ -384,6 +430,9 @@ export const CHAT_THEMES = {
   aurora:{ name:'Aurora', my:'linear-gradient(135deg,#34d399,#b06bff)', accent:'#34d399' },
   ember:{  name:'Ember',  my:'linear-gradient(135deg,#fb923c,#ff5d8f)', accent:'#fb923c' },
   mono:{   name:'Mono',   my:'linear-gradient(135deg,#8b93a7,#c3c9d6)', accent:'#aab2c5' },
+  holo:{   name:'Holo',   plus:true, my:'linear-gradient(120deg,#7df9ff,#c9a7ff,#ff9ecd,#7df9ff)', accent:'#7df9ff' },
+  galaxy:{ name:'Galaxy', plus:true, my:'linear-gradient(135deg,#3a1c71,#8f5bff 45%,#ff4f81)', accent:'#8f5bff' },
+  gold:{   name:'24K',    plus:true, my:'linear-gradient(135deg,#f7d774,#fff3bf 50%,#d4a017)', accent:'#f7d774' },
 };
 export const CHAT_FONTS = {
   inter:{   name:'Clean', css:"'Inter',system-ui,sans-serif" },
@@ -411,7 +460,7 @@ export const EMOJI_CATS = [
 ];
 export const chatKeyOf = sel => sel ? `${sel.scope}:${sel.ref}` : '';
 export const isMediaUrl = u => /^https:\/\/\S+$/i.test((u||'').trim());
-export const msgPreview = m => m.deleted ? 'unsent a message' : m.kind==='text' ? m.body : m.kind==='gif' ? 'sent a GIF' : 'sent a photo';
+export const msgPreview = m => m.deleted ? 'unsent a message' : m.kind==='text' ? m.body : m.kind==='gif' ? 'sent a GIF' : m.kind==='media' ? 'sent a snap' : 'sent a photo';
 export const clockOf = ts => new Date(ts).toLocaleTimeString(undefined,{ hour:'numeric', minute:'2-digit' });
 export const dayLabel = ts => {
   const d = new Date(ts), t = new Date(), y = new Date(Date.now()-864e5);

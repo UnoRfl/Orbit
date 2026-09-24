@@ -120,6 +120,21 @@ export const GLYPHS = {
   brush:   ['Editing', 205, '<path d="m18.4 3.6-9 9 2 2 9-9a1.4 1.4 0 0 0-2-2z"/><path d="M9.4 12.6c-2.4 0-4 1.6-4 4 0 1.4-.9 2.4-2 3 3 1 7 .5 7.6-3.6z"/>'],
   note:    ['Notes', 220, '<path d="M5.6 3.6h9l4 4v12.8H5.6z"/><path d="M14.6 3.6v4h4M8.6 12h6.8M8.6 16h4.6"/>'],
   dot:     ['Other', 265, '<circle cx="12" cy="12" r="3.6"/>'],
+  // ---- stories, 24h media, Orbit+, mission control ----
+  camera:  ['Camera', 280, '<path d="M4 7.6h3.2L8.9 5h6.2l1.7 2.6H20a1 1 0 0 1 1 1v9.8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.6a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.7"/>'],
+  video:   ['Video', 330, '<rect x="2.8" y="6.2" width="12.8" height="11.6" rx="2.2"/><path d="m15.6 10.4 5.6-3.2v9.6l-5.6-3.2"/>'],
+  clock:   ['Later', 200, '<circle cx="12" cy="12" r="8.8"/><path d="M12 7.2V12l3.2 2"/>'],
+  hourgl:  ['Expiring', 35, '<path d="M6.5 3.5h11M6.5 20.5h11M7.6 3.5c0 4.6 4.4 5.6 4.4 8.5s-4.4 3.9-4.4 8.5M16.4 3.5c0 4.6-4.4 5.6-4.4 8.5s4.4 3.9 4.4 8.5"/>'],
+  plus:    ['Orbit+', 285, '<circle cx="12" cy="12" r="8.8"/><path d="M12 7.8v8.4M7.8 12h8.4"/><circle class="f" cx="19.2" cy="5.6" r="1.5"/>'],
+  megaph:  ['Sponsored', 25, '<path d="M3.6 10v4a1 1 0 0 0 1 1h2.2l7.6 4.4V4.6L6.8 9H4.6a1 1 0 0 0-1 1z"/><path d="M7.2 15l1.4 4.6M18 9.2a4 4 0 0 1 0 5.6M20.4 6.8a7.4 7.4 0 0 1 0 10.4"/>'],
+  chart:   ['Stats', 175, '<path d="M3.6 20.4h16.8"/><path d="M6.4 16.6v-5M11 16.6V7.4M15.6 16.6v-3.4M20 16.6V9.8"/>'],
+  server:  ['Health', 150, '<rect x="3.6" y="3.8" width="16.8" height="6.6" rx="1.6"/><rect x="3.6" y="13.6" width="16.8" height="6.6" rx="1.6"/><path d="M7.2 7.1h.01M7.2 16.9h.01M11 7.1h5.8M11 16.9h5.8"/>'],
+  toggle:  ['Controls', 240, '<rect x="2.8" y="7" width="18.4" height="10" rx="5"/><circle class="f" cx="16.2" cy="12" r="3"/>'],
+  ticket:  ['Code', 320, '<path d="M3.6 7.4a1 1 0 0 1 1-1h14.8a1 1 0 0 1 1 1v2.4a2.2 2.2 0 0 0 0 4.4v2.4a1 1 0 0 1-1 1H4.6a1 1 0 0 1-1-1v-2.4a2.2 2.2 0 0 0 0-4.4z"/><path d="M14.2 6.4v11.2" stroke-dasharray="1.6 2"/>'],
+  close:   ['Close friends', 145, '<path d="M12 20.2s-7.6-4.6-7.6-10a4.3 4.3 0 0 1 7.6-2.8 4.3 4.3 0 0 1 7.6 2.8c0 5.4-7.6 10-7.6 10z"/><path d="m9.4 11.6 1.9 1.9 3.4-3.6"/>'],
+  reply:   ['Reply', 210, '<path d="M9.6 6.4 4 12l5.6 5.6"/><path d="M4.4 12h9.8a5.8 5.8 0 0 1 5.8 5.8v.8"/>'],
+  flip:    ['Flip', 190, '<path d="M4.6 9.4A7.8 7.8 0 0 1 18.8 7M19.4 14.6A7.8 7.8 0 0 1 5.2 17"/><path d="M19 3.4V7h-3.6M5 20.6V17h3.6"/>'],
+  once:    ['View once', 350, '<circle cx="12" cy="12" r="8.8"/><path d="M10.6 9.2 12.6 7.8v8.6"/>'],
 };
 
 /* Emoji already in the database (and in chat-free UI text) → nearest key.

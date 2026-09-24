@@ -1,11 +1,16 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
 import { DISCORD_ID, LiveConnections, discordAvatar, lanyard, lastError } from './connect.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { auraOf, ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
-  const core = html`<div class="avatar" style=${`width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;background:linear-gradient(140deg,${a1},${a2})`}>${initialsOf(shownName(p))}${p?.avatar_url && html`<img class="avimg" src=${p.avatar_url} alt="" loading="lazy" referrerpolicy="no-referrer" draggable=${false} style=${posVars(p.avatar_pos)} onError=${e=>{e.target.style.display='none'}}/>`}</div>`;
+  const face = html`<div class="avatar" style=${`width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;background:linear-gradient(140deg,${a1},${a2})`}>${initialsOf(shownName(p))}${p?.avatar_url && html`<img class="avimg" src=${p.avatar_url} alt="" loading="lazy" referrerpolicy="no-referrer" draggable=${false} style=${posVars(p.avatar_pos)} onError=${e=>{e.target.style.display='none'}}/>`}</div>`;
+  /* Orbit+ aura: drawn only while Plus is live (auraOf checks both), sized off
+     the avatar so it reads the same at 24px in a chat and 68px on a profile.
+     Pure CSS, and stilled at data-perf 2 / reduced motion in styles.css. */
+  const aura = size >= 22 ? auraOf(p) : null;
+  const core = aura ? html`<div class=${'aura aura-'+aura} style=${`--as:${size}px;--aa:${a1};--ab:${a2}`}>${face}<i class="aura-fx" aria-hidden="true"></i></div>` : face;
   if (ring) return html`<div class="avwrap">
     <div class=${'ring'+(ring==='live'?' live':'')} style=${ring==='live' ? `background:conic-gradient(from 0deg, ${a1}, ${a2}, ${a1})` : 'background:rgba(255,255,255,.12)'}><div>${core}</div></div>
     ${badge}</div>`;
@@ -536,6 +541,24 @@ export function sharedToday(myId, otherId, classesByOwner, events, from=null, mi
   const theirs = freeOn(otherId, nd.day, start, END, classesByOwner, events, minLen);
   return intersectGaps(mine, theirs, minLen);
 }
+/* Find a time for a GROUP: every window this week, from now on, when all of
+   `ids` are free for at least `minLen` minutes, between `from` and `to` each
+   day. The pairwise "Free together" card on Home only ever compared two
+   people; this is the Doodle poll nobody has to fill in, because Orbit
+   already knows everyone's classes and plans. */
+export function groupWindows(ids, classesByOwner, events, { minLen=60, from=8*60, to=22*60, days=6, now=nowInfo() } = {}) {
+  const out = [];
+  for (let k = 0; k < days; k++) {
+    const day = (now.day + k) % 7;
+    if (day > 5) continue;                                   // the grid has no Sunday
+    const start = k === 0 ? Math.max(from, Math.ceil(now.min / 15) * 15) : from;
+    if (start >= to) continue;
+    let acc = [[start, to]];
+    for (const id of ids) { acc = intersectGaps(acc, freeOn(id, day, start, to, classesByOwner, events, minLen), minLen); if (!acc.length) break; }
+    for (const w of acc) out.push({ k, day, s:w[0], e:w[1] });
+  }
+  return out;
+}
 export const winLabel = w => `${fmt(w[0])}–${fmt(w[1])}`;
 export const winMins = w => w[1]-w[0];
 // snap a shared window to a sensible plan length (largest preset that fits, ≥30)
@@ -997,7 +1020,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
    moderation view, per-chat looks (theme / font / background).
    ============================================================ */
 
-export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUnsend, onReport, canModRemove, onImg, onImgLoad, onOpenSender }) {
+export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUnsend, onReport, canModRemove, onImg, onImgLoad, onOpenSender, renderMedia }) {
   const cls = 'bub ' + (mine?'me':'them') + (cont?' cont':'');
   return html`<div class=${'msgrow'+(mine?' me':'')+(cont?'':' gap')}>
     ${!mine && group && html`<div class="msgav">${!cont && html`<button style="background:none;border:none;padding:0;cursor:pointer" onClick=${onOpenSender}><${Avatar} p=${p||{}} size=${24}/></button>`}</div>`}
@@ -1007,6 +1030,8 @@ export function Bubble({ m, mine, cont, group, p, bad, onBad, selOn, onSel, onUn
         ? html`<div class=${cls+' gone'}>message unsent</div>`
         : m.kind==='text'
         ? html`<div class=${cls} onClick=${onSel}><${RichText} text=${m.body}/></div>`
+        : m.kind==='media'
+        ? html`<div class=${cls+' pic snapbub'} onClick=${onSel}>${renderMedia ? renderMedia(m) : 'snap'}</div>`
         : html`<div class=${cls+' pic'} onClick=${onSel}>
             ${bad
               ? html`<div class="imgfail"><${Glyph} k="image" size=${15}/> link didn't load</div>`

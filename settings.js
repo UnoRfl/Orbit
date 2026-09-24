@@ -1,11 +1,12 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
-import { Fragment, html, useState } from './lib.js';
-import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui, Glyph, pwnedCount, pwnedMessage } from './core.js';
+import { Fragment, html, useEffect, useState } from './lib.js';
+import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui, Glyph, pwnedCount, pwnedMessage, isPlus } from './core.js';
 import { Avatar, Bubble, NameFx, PwInput, Toggle, You } from './components.js';
 import { Home } from './home.js';
 
 export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setTheme, prefs, setPrefs, pushOn, enablePush, disablePush,
-                    blocks, profiles, friends, unblock, block, onClose, onDeleteAccount, onSignOut }) {
+                    blocks, profiles, friends, unblock, block, onClose, onDeleteAccount, onSignOut, onPlus, closeIds=[], setClose }) {
+  const plus = isPlus(me);
   const [tab, setTab] = useState('look');
   const [name, setName] = useState(me?.display_name||'');
   const [handle, setHandle] = useState(me?.handle||'');
@@ -53,6 +54,13 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
     <div class="sheethead"><div class="sheettitle">Settings</div>
       <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
 
+    <button class=${'plusrow'+(plus?' on':'')} onClick=${onPlus}>
+      <span class="plusmark"><${Glyph} k="plus" size=${17}/></span>
+      <span style="flex:1;min-width:0;text-align:left"><b>${plus ? 'Orbit+ is on' : 'Get Orbit+'}</b>
+        <span class="small" style="display:block">${plus ? `until ${new Date(me.plus_until).toLocaleDateString()} · aura, HD, send later, no ads` : 'Auras, HD stories, send later, exclusive themes, no ads'}</span></span>
+      <span class="pill" style="flex:none">${plus ? 'Manage' : 'See perks'}</span>
+    </button>
+
     <div class="pillrow" style="margin-bottom:4px">
       ${[['look','Appearance',IcPalette],['account','Account',IcUser],['privacy','Privacy',IcShield]].map(([k,l,Ic])=>html`
         <button key=${k} class=${'pill'+(tab===k?' on':'')} style="font-weight:600" onClick=${()=>setTab(k)}>
@@ -63,9 +71,10 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
       <div class="set-section">
         <div class="set-eyebrow">Color theme</div>
         <div class="theme-grid">
-          ${THEME_IDS.map(id=>{ const t=THEMES[id]; return html`<button key=${id} class=${'theme-tile'+(theme===id?' on':'')} onClick=${()=>setTheme(id)}>
+          ${THEME_IDS.map(id=>{ const t=THEMES[id]; const locked = t.plus && !plus; return html`<button key=${id} class=${'theme-tile'+(theme===id?' on':'')+(locked?' plock':'')}
+            onClick=${()=> locked ? onPlus && onPlus() : setTheme(id)} title=${locked ? t.name+' · Orbit+' : t.name}>
             <div class="swatch">${t.sw.map((c,i)=>html`<span key=${i} style=${`background:${c}`}></span>`)}</div>
-            <div class="tname">${t.name}</div><div class="tdesc">${t.desc}</div>
+            <div class="tname">${t.name}${t.plus ? html` <span class="plustag mini"><${Glyph} k="plus" size=${9}/></span>` : ''}</div><div class="tdesc">${t.desc}</div>
           </button>`; })}
           <button class=${'theme-tile auto'+(theme==='auto'?' on':'')} onClick=${()=>setTheme('auto')}>
             <div class="swatch"><span></span><span></span><span></span><span></span><span></span></div>
@@ -188,6 +197,17 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
     <//>`}
 
     ${tab==='privacy' && html`<${Fragment}>
+      <div class="set-section">
+        <div class="set-eyebrow">Close friends</div>
+        <div class="set-card">
+          <div class="set-hint" style="margin-top:0">Stories you share to “Close friends” only reach these people. They aren’t told they’re on the list.</div>
+          <div class="findpick" style="margin-top:10px">
+            ${friends.map(f=>{ const on = closeIds.includes(f.id); return html`<button key=${f.id} class=${'findf'+(on?' on close':'')} onClick=${()=>setClose && setClose(f.id, !on)}>
+              <${Avatar} p=${f} size=${36}/><span>${fname(f)||'—'}</span>${on && html`<i><${Glyph} k="close" size=${10}/></i>`}</button>`; })}
+            ${!friends.length && html`<div class="small">Add friends first.</div>`}
+          </div>
+        </div>
+      </div>
       <div class="set-section">
         <div class="set-eyebrow">Location</div>
         <div class="set-card">

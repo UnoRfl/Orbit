@@ -1,20 +1,21 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useMemo, useRef, useState } from './lib.js';
 import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, Glyph, GlyphTile, Sym, glyphLabel, toGlyph, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
-import { Avatar, You, conflictsFor } from './components.js';
+import { Avatar, You, conflictsFor, groupWindows } from './components.js';
 
 // plan tiles take their colour from the plan type
 const KIND_HUE = { coffee:35, study:175, lunch:150, hangout:285, sleepover:235 };
 const kindHue = k => KIND_HUE[k] ?? 265;
 
-export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen }) {
+export function Plans({ uid, events, myInvites, classesBy, nameOf, profiles, me, onRespond, onNew, onOpen, onFind }) {
   const nd = nowInfo();
   const going = e => e.host===uid || (e.event_invitees||[]).some(i=>i.invitee===uid && i.status==='accepted');
   const confirmed = events.filter(e=>going(e) && evUpcoming(e)).sort(evSort);
   const waiting = events.filter(e=>e.host===uid && evUpcoming(e) && (e.event_invitees||[]).some(i=>i.status==='pending')).sort(evSort);
 
   return html`<div>
-    <div style="display:flex;align-items:center;justify-content:flex-end">
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+      ${onFind && html`<button class="btn" style="border-radius:999px;padding:8px 14px" onClick=${onFind}><${IcClock} size=${15}/> Find a time</button>`}
       <button class="btn btn-grad" style="border-radius:999px;padding:8px 14px" onClick=${onNew}><${IcPlus} size=${15}/> New plan</button>
     </div>
 
@@ -213,7 +214,7 @@ export function Creator({ uid, pre, sys, slot, friends, profiles, nameOf, classe
   const [place, setPlace] = useState(sys ? '' : 'library');
   const [inv, setInv] = useState(()=> sys
     ? (sys.members||[]).filter(m=>m.status==='accepted' && m.user_id!==uid).map(m=>m.user_id)
-    : (pre ? [pre] : []));
+    : (Array.isArray(pre) ? pre : pre ? [pre] : []));
   const [busy, setBusy] = useState(false);
   const span = useMemo(() => { const a = new Date(date); a.setMinutes(start); return { s:a, e:new Date(a.getTime() + dur*6e4) }; }, [date, start, dur]);
   const day = dayIdx(date);
@@ -542,4 +543,44 @@ export function parseScheduleFile(text) {
     if (!Object.keys(profilePatch).length) profilePatch = null;
   }
   return { rows, skipped, profilePatch };
+}
+
+/* ============================================================
+   FIND A TIME — pick friends, get the windows when ALL of you are free
+   this week. Scheduling apps make everyone fill in a poll; Orbit already
+   has the timetables, so the answer is instant. Tap a window to turn it
+   into a plan with everyone invited.
+   ============================================================ */
+export function FindTime({ uid, friends, classesBy, events, onPlan, onClose }) {
+  const [pick, setPick] = useState([]);
+  const [len, setLen] = useState(60);
+  const [q, setQ] = useState('');
+  const ids = [uid, ...pick];
+  const wins = useMemo(() => pick.length ? groupWindows(ids, classesBy, events, { minLen: len }) : [], [pick.join(','), len, classesBy, events]);
+  const noSched = pick.filter(id => !(classesBy[id] || []).length);
+  const pool = friends.filter(f => !q.trim() || ((fname(f) || '') + ' ' + (f.handle || '')).toLowerCase().includes(q.toLowerCase()));
+  const dayName = w => w.k === 0 ? 'Today' : w.k === 1 ? 'Tomorrow' : DAYS7[w.day];
+  const toggle = id => setPick(v => v.includes(id) ? v.filter(x => x !== id) : v.length >= 8 ? v : [...v, id]);
+  return html`<div>
+    <div class="sheethead"><div class="sheettitle">Find a time</div>
+      <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
+    <div class="hint" style="margin-top:-8px">Pick who’s coming — Orbit checks everyone’s classes and plans and shows when you’re all free.</div>
+    <input class="input" style="margin-top:12px" placeholder="Search friends" value=${q} onInput=${e => setQ(e.target.value)}/>
+    <div class="findpick">
+      ${pool.map(f => html`<button key=${f.id} class=${'findf' + (pick.includes(f.id) ? ' on' : '')} onClick=${() => toggle(f.id)}>
+        <${Avatar} p=${f} size=${38}/><span>${fname(f) || '—'}</span>${pick.includes(f.id) && html`<i><${IcCheck} size=${10}/></i>`}</button>`)}
+      ${!friends.length && html`<div class="small">Add friends first — then this finds your group a time.</div>`}
+    </div>
+    <div class="flabel">At least</div>
+    <div class="pillrow">${[30, 60, 90, 120].map(m => html`<button key=${m} class=${'pill' + (len === m ? ' on' : '')} onClick=${() => setLen(m)}>${durLabel(m)}</button>`)}</div>
+    ${noSched.length > 0 && html`<div class="warnbox" style="margin-top:10px">${noSched.map(id => fname(friends.find(f => f.id === id))).join(', ')} ha${noSched.length > 1 ? 've' : 's'} no classes added, so Orbit treats them as free.</div>`}
+    <div class="flabel">${pick.length ? `${wins.length} window${wins.length === 1 ? '' : 's'} this week` : 'Windows'}</div>
+    ${!pick.length && html`<div class="small">Pick at least one friend.</div>`}
+    ${pick.length > 0 && !wins.length && html`<div class="small">No shared gap of ${durLabel(len)} between 8AM and 10PM this week — try a shorter one.</div>`}
+    <div class="stack">${wins.slice(0, 12).map(w => html`<button key=${w.k + ':' + w.s} class="cardrow findwin" onClick=${() => onPlan(pick, { day: w.day, start: w.s, dur: Math.min(w.e - w.s, Math.max(len, 60)) })}>
+      <div class="findday"><b>${dayName(w)}</b><span>${fmt(w.s)}–${fmt(w.e)}</span></div>
+      <div style="flex:1;min-width:0" class="rowsub">${durLabel(w.e - w.s)} free · ${pick.length + 1} people</div>
+      <span class="pill on-teal" style="flex:none">Plan it</span>
+    </button>`)}</div>
+  </div>`;
 }

@@ -23,9 +23,13 @@ Orbit/
 ├── geomap.js · live.js  Real map (MapLibre) · live location
 ├── updates.js        Updates panel (top-bar button)
 ├── plans.js          Plans + schedule import
-├── chat.js           Chat
+├── chat.js           Chat (snaps, streaks, send later)
+├── media.js          24h photos/videos: camera, on-device re-encode, upload, SnapBubble
+├── stories.js        Stories rail rings, full-screen viewer, seen-by
+├── plus.js           Orbit+ page, perks, redeem codes, aura picker
+├── ads.js            Ad slots (home / chats / stories) + the staff Ads manager
 ├── settings.js       Settings
-├── staff.js          Moderation panel
+├── staff.js          Mission Control: dashboard, reports, members, content, Orbit+, ads, controls
 ├── main.js           App root, session boot, background canvas
 ├── manifest.webmanifest · sw.js · icon.png · tos.html
 ├── avatars/          17 premade profile pictures (SVG)
@@ -34,7 +38,7 @@ Orbit/
 ```
 
 Dependencies point downward only (no cycles):
-`lib → glyphs → core → connect → components → (home, map+galaxy+geomap+live, plans, chat, settings, staff, updates) → shell → main`
+`lib → glyphs → core → connect → components → media → (stories, plus, ads) → (home, map+galaxy+geomap+live, plans, chat, settings, staff, updates) → shell → main`
 
 ## Full maintainer's guide
 

@@ -26,7 +26,7 @@
 
    Bump VERSION to evict everything at once.
    ------------------------------------------------------------------ */
-const VERSION = 'orbit-v3';
+const VERSION = 'orbit-v4';
 const SHELL   = './index.html';
 
 self.addEventListener('install', e => {
