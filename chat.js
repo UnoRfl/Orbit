@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { CHAT_BGS, CHAT_FONTS, CHAT_THEMES, EMOJI_CATS, Glyph, Sym, IcBack, IcChat, IcFlag, IcImage, IcMore, IcPlus, IcSend, IcSmile, IcX, TENOR_KEY, ago, chatKeyOf, dayLabel, fname, hueCss, isMediaUrl, pauseBg, posVars, resumeBg, sb, ui } from './core.js';
-import { Avatar, Bubble, ImageAdjust, You, statusOf } from './components.js';
+import { Avatar, Bubble, ImageAdjust, Portal, You, statusOf } from './components.js';
 import { MediaComposer, SnapBubble } from './media.js';
 import { AdCard } from './ads.js';
 import { isPlus, MSG_FX } from './core.js';
@@ -62,7 +62,7 @@ export function ChatsScreen({ kit }) {
             </div>
           </button>`;})}
       </div>
-      <div class="small" style="margin-top:16px;line-height:1.6">Friends-only DMs · photos and videos disappear after 24 hours · chats auto-clear after 3 months. Reported chats can be reviewed by Orbit founders.</div>
+      <div class="small" style="margin-top:16px;line-height:1.6">Friends-only DMs · photos and videos (an Orbit+ perk to send) disappear after 24 hours · chats auto-clear after 3 months. Reported chats can be reviewed by Orbit founders.</div>
     </div>
 
     ${sel ? html`<${ChatView} key=${kSel} kit=${kit} sel=${sel} onClose=${()=>setSel(null)}/>`
@@ -276,12 +276,14 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
     </div></div>`}
     ${pane==='later' && html`<${LaterPane} onClose=${()=>setPane(null)} onPick=${async at=>{ const body=text.trim(); if(!body) return;
       if (await scheduleMsg(sel, body, at)) { setText(''); requestAnimationFrame(grow); setPane(null); } }}/>`}
-    ${pane==='snap' && html`<div class="mcomp-wrap"><${MediaComposer} uid=${uid} me=${me} purpose="chat" allowViewOnce=${isDm}
+    ${pane==='snap' && html`<${Portal}><div class="mcomp-wrap"><${MediaComposer} uid=${uid} me=${me} purpose="chat" allowViewOnce=${isDm}
       onPlus=${onPlus} onClose=${()=>setPane(null)}
-      onPosted=${async (enc, extra)=>{ const ok = await sendSnap(sel, enc, extra, peerId); if (ok) { stick.current = true; setPane(null); } }}/></div>`}
+      onPosted=${async (enc, extra)=>{ const ok = await sendSnap(sel, enc, extra, peerId); if (ok) { stick.current = true; setPane(null); } }}/></div><//>`}
     ${!mod && html`<div class="composer glass">
       <button class="cbtn" aria-label="Emoji" onClick=${()=>setPane(pane==='emoji'?null:'emoji')}><${IcSmile} size=${19}/></button>
-      ${flags.snaps!==false && html`<button class="cbtn" aria-label="Send a photo or video (gone in 24h)" onClick=${()=>setPane('snap')}><${Glyph} k="camera" size=${19}/></button>`}
+      ${flags.snaps!==false && html`<button class=${'cbtn'+(plus?'':' pluslock')} aria-label=${plus ? 'Send a photo or video (gone in 24h)' : 'Send photos and videos · Orbit+'}
+        title=${plus ? 'Photo or video · gone in 24h' : 'Sending photos and videos is an Orbit+ perk'}
+        onClick=${()=> plus ? setPane('snap') : onPlus && onPlus()}><${Glyph} k="camera" size=${19}/></button>`}
       <button class="cbtn" aria-label="GIF or image link" onClick=${()=>setPane(pane==='media'?null:'media')}><${IcImage} size=${19}/></button>
       <div class="cfield">
         ${text.length>1800 && html`<span class="ccount">${2000-text.length}</span>`}
@@ -316,7 +318,7 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
       return m && html`<${ReportMsgPane} m=${m}
         onSend=${async reason=>{ const ok = await reportMsg(m, sel, reason); if (ok) setPane(null); }}
         onClose=${()=>setPane(null)}/>`; })()}
-    ${lightbox && html`<div class="lightbox" onClick=${()=>setLightbox(null)}><img src=${lightbox} referrerpolicy="no-referrer" alt="full size"/></div>`}
+    ${lightbox && html`<${Portal}><div class="lightbox" onClick=${()=>setLightbox(null)}><img src=${lightbox} referrerpolicy="no-referrer" alt="full size"/></div><//>`}
   </div>`;
 }
 

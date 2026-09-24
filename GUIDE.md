@@ -84,7 +84,7 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | Background animation laggy / glitchy | `main.js` (canvas section) | Settings "asteroids" toggle |
 | Push notifications | `shell.js` (`push_subscriptions`) | `core.js` (`PUSH_PUBLIC_KEY`) |
 | Moderation / reports | `staff.js` | `shell.js` (`reports`, `mod_actions`) |
-| Story won't post / snap won't send | `media.js` (`mediaError` says why) | `media_before_insert` trigger; Controls → kill switches |
+| Story won't post / snap won't send | `media.js` (`mediaError` says why); chat photos/videos need Orbit+ to SEND | `media_before_insert` trigger; Controls → kill switches |
 | A story or snap didn't disappear | nothing to fix in the app — RLS hides it at 24h | Mission Control → Background jobs → Media sweep; `ephemeral-sweep` function logs |
 | Story rings / viewer wrong | `stories.js` | `shell.js` (`loadStories`, `orbit-media` channel) |
 | An aura / name / cover effect doesn't show | `core.js` (`auraOf`, `nameFxOf`, `coverFxOf` — all require live Plus) | `styles.css` Orbit+ blocks; `data-perf=2` stills them |

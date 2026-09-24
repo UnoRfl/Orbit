@@ -19,6 +19,7 @@
    what we can do (no download button, no context menu, no drag) we do. */
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Glyph, IcX, MEDIA, isPlus, leftLabel, sb, ui } from './core.js';
+import { Portal } from './components.js';
 
 export const BUCKET = 'ephemeral';
 
@@ -450,28 +451,36 @@ export function MediaFull({ url, kind, onClose, children }) {
     const f = e => { if (e.key === 'Escape') onClose(); };
     addEventListener('keydown', f); return () => removeEventListener('keydown', f);
   }, []);
-  return html`<div class="lightbox mfull" onClick=${onClose}>
+  return html`<${Portal}><div class="lightbox mfull" onClick=${onClose}>
     ${kind === 'video'
       ? html`<video src=${url} autoplay playsinline controls controlsList="nodownload noplaybackrate" disablepictureinpicture
           onClick=${e => e.stopPropagation()} ...${noSave}></video>`
       : html`<img src=${url} alt="" ...${noSave}/>`}
     ${children}
-  </div>`;
+  </div><//>`;
 }
 
 /* A chat message whose body is a media id. The row is fetched through RLS, so
    "expired", "opened (view once)" and "removed" all look the same from here:
    the row simply isn't visible any more. */
+/* A chat message whose body is a media id. The row is fetched through RLS, so
+   "expired", "opened (view once)" and "removed" all look the same from here:
+   the row simply isn't visible any more.
+
+   View once burns for the RECEIVER only. The sender keeps an ordinary
+   thumbnail they can reopen, with a chip saying whether it has been opened;
+   the server agrees (media_open() ignores the owner, and the owner can always
+   read their own row until it expires). */
 export function SnapBubble({ m, mine, row, onLoad, onOpenOnce }) {
-  const [opened, setOpened] = useState(false);
+  const [burnt, setBurnt] = useState(false);          // receiver: viewed it once, it's gone
   const [full, setFull] = useState(null);
   const gone = row === false || (row && Date.parse(row.expires_at) <= Date.now());
   const once = !!row?.view_once && !mine;
   const { url, failed } = useMediaUrl(!gone && row && !once ? row.path : null);
   if (row === undefined) return html`<div class="snap loading"><${Glyph} k="image" size=${16}/> loading…</div>`;
-  if (full) return html`<div class="snap once"><${Glyph} k="once" size=${16}/> Viewing…
-    <${MediaFull} url=${full.url} kind=${full.kind} onClose=${() => { forgetMedia(row.path); setFull(null); setOpened(true); }}/></div>`;
-  if (opened) return html`<div class="snap gone"><${Glyph} k="once" size=${15}/> Opened</div>`;
+  if (once && full) return html`<div class="snap once"><${Glyph} k="once" size=${16}/> Viewing…
+    <${MediaFull} url=${full.url} kind=${full.kind} onClose=${() => { forgetMedia(row.path); setFull(null); setBurnt(true); }}/></div>`;
+  if (burnt) return html`<div class="snap gone"><${Glyph} k="once" size=${15}/> Opened</div>`;
   if (gone || failed) return html`<div class="snap gone"><${Glyph} k="hourgl" size=${15}/>
     ${row ? (row.kind === 'video' ? 'Video' : 'Photo') + ' · expired' : 'Snap · opened or expired'}</div>`;
   if (once) return html`<button class="snap once" onClick=${async e => {
@@ -489,6 +498,7 @@ export function SnapBubble({ m, mine, row, onLoad, onOpenOnce }) {
           : html`<img class="bubimg" src=${url} alt="photo" onLoad=${onLoad}
               onClick=${e => { e.stopPropagation(); setFull({ url, kind: 'image' }); }} ...${noSave}/>`)
       : html`<div class="snap loading" style=${row.width && row.height ? `aspect-ratio:${row.width}/${row.height}` : ''}><${Glyph} k=${row.kind === 'video' ? 'video' : 'image'} size=${18}/></div>`}
-    <span class="snapchip">${row.view_once ? html`<${Glyph} k="once" size=${11}/>` : ''}${row.kind === 'video' ? html`<${Glyph} k="video" size=${11}/>` : ''}${leftLabel(row.expires_at)}</span>
+    <span class="snapchip">${row.view_once ? html`<${Glyph} k="once" size=${11}/>${mine ? (row.opened_at ? ' opened · ' : ' not opened · ') : ''}` : ''}${row.kind === 'video' ? html`<${Glyph} k="video" size=${11}/>` : ''}${leftLabel(row.expires_at)}</span>
+    ${full && html`<${MediaFull} url=${full.url} kind=${full.kind} onClose=${() => setFull(null)}/>`}
   </div>`;
 }

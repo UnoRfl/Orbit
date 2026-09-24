@@ -11,7 +11,8 @@
    entrance and message effect on their own avatar; saving needs Plus. Seeing
    it on yourself sells it better than a list of perks ever could.
 
-   What Plus buys is deliberately cosmetic or convenience, never safety or
+   What Plus buys is cosmetic, convenience, and SENDING photos/videos in chat
+   (everyone can still receive them, and stories stay free) - never safety or
    reach: nobody pays to see more of someone than a free friend can. */
 import { html, useState } from './lib.js';
 import { AURAS, COVER_FX, ENTRANCES, Glyph, IcX, MSG_FX, NAME_PLUS, PLUS_TIERS, THEMES, CHAT_THEMES, fname, flairOf, isPlus, plusTier, sb, shownName } from './core.js';
@@ -19,6 +20,7 @@ import { Avatar, BadgeChips, CoverImg, NameFx } from './components.js';
 import { playFx } from './fx.js';
 
 export const PERKS = [
+  { g: 'camera', t: 'Send photos & videos', d: 'Share pictures and clips in any chat — gone in 24 hours, with optional view once. Everyone can receive them.' },
   { g: 'orbit',  t: 'Auras',            d: 'Nine animated auras — Ringworld, Eclipse, Singularity, Nebula… on your avatar everywhere.' },
   { g: 'image',  t: 'Profile effects',  d: 'Starfield, aurora, meteor showers or nebula moving across your cover.' },
   { g: 'rocket', t: 'Entrances',        d: 'Friends opening your profile get a warp jump, meteor rain or a supernova.' },
@@ -26,7 +28,7 @@ export const PERKS = [
   { g: 'spark',  t: 'Message effects',  d: 'Send with confetti, stardust, hearts or a warp that fills their screen.' },
   { g: 'star',   t: 'Evolving badge',   d: 'Moon → Comet → Planet → Star → Supernova, the longer you stay.' },
   { g: 'clock',  t: 'Send later',       d: 'Write it now, Orbit delivers it at 7:00 tomorrow — even if your phone is off.' },
-  { g: 'camera', t: 'HD stories & snaps', d: '2160px photos and 1080p video instead of 1440px / 720p.' },
+  { g: 'video', t: 'HD stories & snaps', d: '2160px photos and 1080p video instead of 1440px / 720p.' },
   { g: 'palette',t: 'Exclusive themes', d: 'Supernova and Eclipse app themes; Holo, Galaxy and 24K chat bubbles.' },
   { g: 'megaph', t: 'No ads',           d: 'Every sponsored card disappears.' },
 ];

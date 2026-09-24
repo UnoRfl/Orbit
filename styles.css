@@ -1794,3 +1794,17 @@ html[data-perf="2"] .aura *,html[data-perf="2"] .aura *::before,html[data-perf="
 html[data-rm] .aura *,html[data-rm] .aura *::before,html[data-rm] .aura *::after,
 html[data-perf="2"] .coverfx i,html[data-rm] .coverfx i,
 html[data-rm] .nfx,html[data-rm] .nfx::before,html[data-rm] .nfx::after,html[data-rm] .plustier{animation:none !important}
+
+/* Popovers over the composer: `.glass{position:relative}` (declared later in
+   this file) was beating `.chatpop{position:absolute}`, so the emoji / image /
+   effect popover dropped INTO the composer's flex row — squashing the text box
+   to nothing and stretching the bar. Also keep the composer (and its popover)
+   above the 3D-tilted bubbles, and keep that 3D inside the chat body. */
+.chatpop.glass{position:absolute}
+.composer{z-index:6}
+.chatbody{isolation:isolate}
+.snap.once{text-align:left}
+.chatpop.glass{background-color:var(--panel2);background-color:color-mix(in srgb,var(--panel2) 97%,transparent)}
+/* a composer button that's an Orbit+ perk for this person: tapping opens Orbit+ */
+.cbtn.pluslock{position:relative}
+.cbtn.pluslock::after{content:"+";position:absolute;right:-4px;top:-4px;width:14px;height:14px;border-radius:50%;font-size:10px;font-weight:800;line-height:14px;text-align:center;color:#0f0a16;background:linear-gradient(90deg,#c9a7ff,#7df9ff)}

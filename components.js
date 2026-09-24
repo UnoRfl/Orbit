@@ -212,6 +212,20 @@ export function SetStatusSheet({ current, onSet, onClose }) {
   </div>`;
 }
 
+/* Full-screen overlays (lightbox, snap viewer, composer) must escape their
+   parents: position:fixed is measured against the nearest ancestor with a
+   transform / filter / backdrop-filter, and chat bubbles are 3D-tilted and the
+   chat pane animates in with a transform — so an overlay rendered inside them
+   was clipped to the bubble or the pane. This renders its children into a node
+   on <body> instead (preact/compat's createPortal isn't vendored). */
+export function Portal({ children }) {
+  const host = useRef(null);
+  if (!host.current) { host.current = document.createElement('div'); host.current.className = 'portal'; }
+  useEffect(() => { document.body.appendChild(host.current); return () => { render(null, host.current); host.current.remove(); }; }, []);
+  useEffect(() => { render(children, host.current); });
+  return null;
+}
+
 export const StatusDot = ({color}) => html`<span class="statusdot" style=${`background:${color};--pc:${color}`}></span>`;
 export const PinBadge = () => html`<span class="pinbadge"><${IcPin} size=${8}/></span>`;
 export const Eyebrow = ({color='var(--major)', children}) => html`<div class="eyebrow" style=${`color:${color}`}>${children}</div>`;
