@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -74,6 +74,69 @@ export function HobbyChip({ raw, bare=false }) {
   const { text, g } = hobbyOf(raw);
   const inner = html`${g && html`<${Glyph} k=${g} size=${13}/>`}${text}`;
   return bare ? html`<span class="gi">${inner}</span>` : html`<span class="idchip gi">${inner}</span>`;
+}
+
+/* ============================================================
+   AVATAR PICKER — premade pictures, a link, or a linked account's photo.
+   Every option ends as an https URL in avatar_url, which is all the rest of
+   the app (and the DB's CHECK) knows about.
+   ============================================================ */
+export function AvatarPicker({ p, me, setP, onFrame }) {
+  const url = p.avatarUrl.trim();
+  const [tab, setTab] = useState(() => presetOf(url) || !url ? 'preset' : 'link');
+  const [state, setState] = useState('idle');           // idle | loading | ok | fail
+  const [gh, setGh] = useState(() => (p.links || []).find(l => l.k === 'github')?.u || '');
+  // thumbnails resolve against this module, so they load from wherever Orbit is served
+  const thumb = n => new URL('./avatars/' + n + '.svg', import.meta.url).href;
+  useEffect(() => {
+    if (!url) { setState('idle'); return; }
+    if (presetOf(url)) { setState('ok'); return; }                 // our own file — nothing to probe
+    if (!/^https:\/\/.+/i.test(url)) { setState('bad'); return; }
+    setState('loading');
+    let dead = false; const img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.onload = () => { if (!dead) setState('ok'); };
+    img.onerror = () => { if (!dead) setState('fail'); };
+    const t = setTimeout(() => { img.src = url; }, 250);            // don't probe every keystroke
+    return () => { dead = true; clearTimeout(t); };
+  }, [url]);
+  const set = u => setP(v => ({ ...v, avatarUrl: u, avatarPos: { x:0, y:0, z:1 } }));
+  const paste = async () => { try { const t = (await navigator.clipboard.readText() || '').trim(); if (t) { set(t); setTab('link'); } } catch { ui.toast('Clipboard is blocked — long-press the box and paste instead'); } };
+  const cur = presetOf(url);
+  const say = { idle:'No photo — your initials show instead', loading:'Checking the link…', ok:'Looks good', fail:"That link didn't load — the site may block embedding",
+                bad:'Links must start with https://' }[state];
+  return html`<div class="avpick">
+    <div class="avpick-top">
+      <${Avatar} p=${{ ...me, avatar_url: cur ? thumb(cur) : state==='ok' ? url : null, avatar_pos:p.avatarPos, accent1:p.acc[0], accent2:p.acc[1] }} size=${64}/>
+      <div style="min-width:0;flex:1">
+        <div class=${'avpick-st '+state}>${say}</div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn" style="padding:7px 11px" disabled=${state!=='ok'} onClick=${onFrame}>Frame</button>
+          <button class="btn" style="padding:7px 11px" disabled=${!url} onClick=${()=>set('')}>Remove</button>
+        </div>
+      </div>
+    </div>
+    <div class="pillrow" style="margin-top:12px">
+      ${[['preset','spark','Orbit avatars'],['link','image','Link'],['acct','users','From an account']].map(([k,g,l])=>html`
+        <button key=${k} type="button" class=${'pill'+(tab===k?' on':'')} onClick=${()=>setTab(k)}><${Glyph} k=${g} size=${13}/> ${l}</button>`)}
+    </div>
+    ${tab==='preset' && html`<div class="avgrid">
+      ${PRESET_AVATARS.map(n=>html`<button key=${n} type="button" class=${'avopt'+(cur===n?' on':'')} aria-label=${n} onClick=${()=>set(presetUrl(n))}>
+        <img src=${thumb(n)} alt="" loading="lazy" draggable=${false}/></button>`)}
+    </div>`}
+    ${tab==='link' && html`<div style="display:flex;gap:8px;margin-top:10px">
+      <input class="input" value=${p.avatarUrl} onInput=${e=>set(e.target.value)} placeholder="https://… (Imgur, GIPHY, Tenor…)" autocapitalize="none" inputmode="url"/>
+      <button class="btn" style="flex:none;padding:11px 12px" type="button" onClick=${paste}>Paste</button>
+    </div>`}
+    ${tab==='acct' && html`<div class="stack" style="margin-top:10px">
+      <div style="display:flex;gap:8px">
+        <input class="input" value=${gh} onInput=${e=>setGh(cleanSocial(e.target.value))} placeholder="GitHub username" autocapitalize="none"/>
+        <button class="btn" style="flex:none;padding:11px 12px" type="button" disabled=${!gh}
+          onClick=${()=>set(`https://github.com/${encodeURIComponent(gh)}.png?size=256`)}>Use GitHub photo</button>
+      </div>
+      <div class="small">Discord and Roblox photos appear here once you link those accounts below.</div>
+    </div>`}
+  </div>`;
 }
 
 /* connection chips — URL is always built from the allowlist template */
@@ -741,11 +804,8 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
 
     ${editing && html`<div class="card" style="margin-top:16px">
       <div class="set-eyebrow" style="margin-bottom:2px">Photos</div>
-      <div class="flabel">Profile photo · paste a link</div>
-      <div style="display:flex;gap:8px">
-        <input class="input" value=${p.avatarUrl} onInput=${e=>setP(v=>({...v,avatarUrl:e.target.value}))} placeholder="https://…" autocapitalize="none"/>
-        <button class="btn" style="flex:none;padding:11px 13px" disabled=${!p.avatarUrl.trim()} onClick=${()=>setAdjust('avatar')}>Frame</button>
-      </div>
+      <div class="flabel">Profile photo</div>
+      <${AvatarPicker} p=${p} me=${me} setP=${setP} onFrame=${()=>setAdjust('avatar')}/>
       <div class="flabel">Cover · link (GIFs work)</div>
       <div style="display:flex;gap:8px">
         <input class="input" value=${p.coverUrl} onInput=${e=>setP(v=>({...v,coverUrl:e.target.value}))} placeholder="https://… still image or GIF" autocapitalize="none"/>

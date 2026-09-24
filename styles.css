@@ -1248,3 +1248,15 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
   background:linear-gradient(155deg,hsl(var(--th,265) 70% 52%),hsl(calc(var(--th,265) + 25) 65% 30%));box-shadow:0 4px 14px -6px hsl(var(--th,265) 80% 45% / .8)}
 .symtxt{line-height:1}
 .geopin-i .glyph{color:#fff}
+
+/* avatar picker (components.js AvatarPicker) */
+.avpick{border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)}
+.avpick-top{display:flex;align-items:center;gap:12px}
+.avpick-st{font-size:12.5px;font-weight:600;color:var(--muted)}
+.avpick-st.ok{color:var(--pe)}
+.avpick-st.fail,.avpick-st.bad{color:var(--now)}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin-top:10px}
+.avopt{aspect-ratio:1;border-radius:50%;border:2px solid transparent;padding:2px;background:none;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+.avopt img{width:100%;height:100%;border-radius:50%;display:block}
+.avopt:hover{transform:translateY(-1px)}
+.avopt.on{border-color:var(--major);box-shadow:0 0 14px -2px var(--major)}
