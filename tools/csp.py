@@ -53,7 +53,8 @@ STATIC = [
                     # live connections (connect.js): Discord presence via Lanyard, GitHub profile
                     "https://api.lanyard.rest "
                     "https://api.github.com "
-                    "https://esm.sh "
+                    # leaked-password check (k-anonymous: only a 5-char hash prefix is sent)
+                    "https://api.pwnedpasswords.com "
                     "https://cdnjs.cloudflare.com"),
     # MapLibre GL runs its tile parser in a worker built from a blob: URL.
     ("worker-src", "'self' blob:"),
@@ -73,7 +74,9 @@ STATIC = [
 # therefore has to be handled another way — see the frame-buster note in
 # index.html.
 
-SCRIPT_HOSTS = "'self' https://esm.sh https://cdnjs.cloudflare.com"
+# esm.sh is gone: preact, htm and supabase-js are vendored in /vendor. cdnjs
+# stays for MapLibre only, and that file is pinned with SRI in geomap.js.
+SCRIPT_HOSTS = "'self' https://cdnjs.cloudflare.com"
 
 
 def inline_scripts(html):

@@ -542,6 +542,23 @@ export const toMin = s => { const [h,m]=s.split(':').map(Number); return h*60+m;
 export const pxFor = m => (Math.max(START, Math.min(END, m)) - START) * (HOUR/60);
 export const fmt = min => { let h=Math.floor(min/60), m=min%60, ap=h>=12?'PM':'AM', hh=h%12||12; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; };
 export const nowInfo = () => { const d=new Date(); return { day:(d.getDay()+6)%7, min:d.getHours()*60+d.getMinutes() }; };
+/* Leaked-password check — the free stand-in for Supabase's paid "leaked
+   password protection". Have I Been Pwned's range API is k-anonymous: only the
+   first 5 hex chars of the password's SHA-1 leave the device, the service
+   answers with every breached suffix under that prefix, and the match happens
+   here. Fails open (returns 0) if the service is unreachable, so an outage
+   never blocks a sign-up. Runs on new passwords only — never on sign-in. */
+export async function pwnedCount(pw) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pw));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const r = await fetch('https://api.pwnedpasswords.com/range/' + hex.slice(0, 5), { headers: { 'Add-Padding': 'true' } });
+    if (!r.ok) return 0;
+    const line = (await r.text()).split(/\r?\n/).find(l => l.startsWith(hex.slice(5)));
+    return line ? parseInt(line.split(':')[1], 10) || 0 : 0;
+  } catch { return 0; }
+}
+export const pwnedMessage = n => `That password has shown up in ${n.toLocaleString()} data breaches — attackers try those first. Pick a different one.`;
 export const zoneName = id => ZONES.find(z=>z.id===id)?.name || null;
 
 /* ---------- plan time ----------

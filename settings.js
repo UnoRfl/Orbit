@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, html, useState } from './lib.js';
-import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui, Glyph } from './core.js';
+import { ACCENTS, B, BG_IDS, BG_STYLES, IcBan, IcLock, IcMail, IcOut, IcPalette, IcShield, IcSpark, IcUser, IcX, NAME_FX, THEMES, THEME_IDS, bgAllowed, cleanHandle, decodePlace, flairOf, fname, perfTier, pingChime, sb, shownName, ui, Glyph, pwnedCount, pwnedMessage } from './core.js';
 import { Avatar, Bubble, NameFx, PwInput, Toggle, You } from './components.js';
 import { Home } from './home.js';
 
@@ -36,9 +36,11 @@ export function Settings({ me, uid, saveProfile, myPres, setPres, theme, setThem
     if (error) ui.toast(error.message); else { setEmail(''); ui.toast('Check both inboxes for a link to finish the change.'); }
   }
   async function changePw(){
-    if (pw1.length<6){ ui.toast('Password needs at least 6 characters.'); return; }
+    if (pw1.length<8){ ui.toast('Password needs at least 8 characters.'); return; }
     if (pw1!==pw2){ ui.toast("Passwords don't match."); return; }
     setBusy('pw');
+    const leaked = await pwnedCount(pw1);
+    if (leaked) { setBusy(''); ui.toast(pwnedMessage(leaked)); return; }
     const { error } = await sb.auth.updateUser({ password:pw1 });
     setBusy('');
     if (error) ui.toast(error.message); else { setPw1(''); setPw2(''); ui.toast('Password updated ✓'); }

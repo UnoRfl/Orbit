@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
 import { DISCORD_ID, LiveConnections, discordAvatar, lanyard, lastError } from './connect.js';
-import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -624,7 +624,9 @@ export function AuthScreen() {
       if (mode==='up') {
         if (!f.name.trim()) throw new Error('Add your name.');
         if (f.handle.length<3) throw new Error('Handle needs 3–20 letters/numbers/underscores.');
-        if (f.password.length<6) throw new Error('Password needs at least 6 characters.');
+        if (f.password.length<8) throw new Error('Password needs at least 8 characters.');
+        const leaked = await pwnedCount(f.password);
+        if (leaked) throw new Error(pwnedMessage(leaked));
         const { data, error } = await sb.auth.signUp({
           email:f.email.trim(), password:f.password,
           options:{ data:{ display_name:f.name.trim(), handle:f.handle, course:f.course.trim(), school:f.school.trim() } }

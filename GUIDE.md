@@ -58,6 +58,7 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | A user reports… | Start in | Also check |
 |-----------------|----------|-----------|
 | Can't sign up / log in / Google login | `components.js` (`AuthScreen`) | Supabase → Auth settings; `main.js` (session) |
+| "That password has shown up in … breaches" | `core.js` (`pwnedCount`) — intended; pick another password | api.pwnedpasswords.com reachable? (fails open) |
 | Gets logged out randomly | `main.js` (session handling) | `shell.js` |
 | Friend's status wrong / not updating live | `shell.js` (`orbit-live`, `presence`) | `home.js` (how it's shown) |
 | Adding / accepting friends broken | `shell.js` (`friendships`) | `home.js` (`FriendsSheet`) |
@@ -113,9 +114,8 @@ The loop for **every** change, one feature at a time:
 4. **Pull request → merge** into `main`. GitHub Pages redeploys automatically (~1 min).
 5. If it breaks, the PR's **Revert** button puts you back instantly.
 
-**Don't edit:** `styles.css` for logic, `lib.js` unless bumping a library (also update the
-import map in `index.html` if you do), or vendored library code (it's loaded from a CDN, not
-in the repo).
+**Don't edit:** `styles.css` for logic, `lib.js` unless bumping a library, or anything in
+`vendor/` except to upgrade it (the steps are in `vendor/README.md`, then `python tools/csp.py --write`).
 
 ---
 

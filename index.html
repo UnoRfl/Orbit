@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="script-src 'self' https://esm.sh https://cdnjs.cloudflare.com 'sha256-4NDqLgRTUuA3GLialMT405nIXdXZxt4U2XFrOhcK1BQ=' 'sha256-Y82SqKtqBWofWvwOUKZVe9R3JvCFNJttdTb8Rh0RYD4='; default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://zdlevrezefagfqhflusj.supabase.co wss://zdlevrezefagfqhflusj.supabase.co https://tiles.openfreemap.org https://tenor.googleapis.com https://api.lanyard.rest https://api.github.com https://esm.sh https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' https://cdnjs.cloudflare.com 'sha256-4NDqLgRTUuA3GLialMT405nIXdXZxt4U2XFrOhcK1BQ=' 'sha256-CK3kC9TNp9t5lrTZKfI+TuwLVR/l9iwPaqI8Rv4HYUQ='; default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://zdlevrezefagfqhflusj.supabase.co wss://zdlevrezefagfqhflusj.supabase.co https://tiles.openfreemap.org https://tenor.googleapis.com https://api.lanyard.rest https://api.github.com https://api.pwnedpasswords.com https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#17121f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -81,10 +81,10 @@
 <script type="importmap">
 {
   "imports": {
-    "preact": "https://esm.sh/preact@10.23.2",
-    "preact/hooks": "https://esm.sh/preact@10.23.2/hooks",
-    "htm": "https://esm.sh/htm@3.1.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+    "preact": "./vendor/preact.mjs",
+    "preact/hooks": "./vendor/hooks.mjs",
+    "htm": "./vendor/htm.mjs",
+    "@supabase/supabase-js": "./vendor/supabase.mjs"
   }
 }
 </script>
