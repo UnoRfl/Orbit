@@ -138,7 +138,9 @@ export const AVATAR_BASE = 'https://unorfl.github.io/Orbit/avatars/';
 export const PRESET_AVATARS = ['saturn','neptune','orchid','moon','sun','comet','astro','alien','robot','cat',
   'blackhole','nebula','ufo','rocket','earth','ghost','starface'];
 export const presetUrl = n => AVATAR_BASE + n + '.svg';
-export const presetOf = url => { const m = /\/avatars\/([a-z]+)\.svg$/.exec(url || ''); return m && PRESET_AVATARS.includes(m[1]) ? m[1] : null; };
+// only OUR files count as presets — a lookalike path on another host is just a link
+export const presetOf = url => { const u = String(url || ''); if (!u.startsWith(AVATAR_BASE)) return null;
+  const n = u.slice(AVATAR_BASE.length).replace(/\.svg$/, ''); return PRESET_AVATARS.includes(n) ? n : null; };
 export const SOCIALS = {
   discord:   { name:'Discord',   c:['#5865f2','#3b46c4'], url:null,   // no profile URLs by handle — copy instead
     Ic:B('<path d="M19.6 5.6A16 16 0 0 0 15.9 4l-.4.8a13 13 0 0 0-7 0L8 4a16 16 0 0 0-3.7 1.6C2 9.4 1.4 13 1.7 16.6A16 16 0 0 0 6.6 19l1-1.5a10 10 0 0 1-1.6-.8l.4-.3a11.4 11.4 0 0 0 11.2 0l.4.3c-.5.3-1 .6-1.6.8l1 1.5a16 16 0 0 0 4.9-2.4c.4-4.1-.6-7.6-2.7-11zM9 14.5c-.9 0-1.6-.8-1.6-1.8S8.1 11 9 11s1.6.8 1.6 1.8-.7 1.7-1.6 1.7zm6 0c-.9 0-1.6-.8-1.6-1.8s.7-1.7 1.6-1.7 1.6.8 1.6 1.8-.7 1.7-1.6 1.7z" fill="currentColor"/>') },

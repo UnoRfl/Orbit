@@ -36,6 +36,11 @@ import { COARSE_M, LIVE_DURATIONS, acquireFix, ageLabel, fixError, snapToPlace, 
 
 const MAPLIBRE_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js';
 const MAPLIBRE_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css';
+/* Subresource Integrity: the browser refuses either file if one byte differs.
+   These are cdnjs's own published hashes (api.cdnjs.com/libraries/maplibre-gl/4.7.1?fields=sri),
+   checked against the files on 2026-09-24. Bumping the version means bumping these. */
+const MAPLIBRE_JS_SRI  = 'sha512-dXgoFR02YHJ9Fa29P3D/1umNaZ0EXS2N0w29Lm3b/1BK8UDLMdLWDFwuujIyJJdU27/PLuk3dmS1V9NO8ABX1A==';
+const MAPLIBRE_CSS_SRI = 'sha512-qN/uDg9bS3IAldWq4lswyC+9ZSoShtfyNDp+FaJhdtXJqdgubHA+s4nB8BajW0m90Y0+RBGbqu2anzbxiQYdHA==';
 const STYLE_URL    = 'https://tiles.openfreemap.org/styles/dark';
 
 /* Manila, so a brand-new system opens somewhere sane instead of null island. */
@@ -63,11 +68,11 @@ function loadMapLibre(){
   _libPromise = new Promise((resolve, reject) => {
     if (!document.querySelector(`link[href="${MAPLIBRE_CSS}"]`)) {
       const l = document.createElement('link');
-      l.rel = 'stylesheet'; l.href = MAPLIBRE_CSS;
+      l.rel = 'stylesheet'; l.href = MAPLIBRE_CSS; l.integrity = MAPLIBRE_CSS_SRI; l.crossOrigin = 'anonymous';
       document.head.appendChild(l);
     }
     const s = document.createElement('script');
-    s.src = MAPLIBRE_JS; s.async = true;
+    s.src = MAPLIBRE_JS; s.async = true; s.integrity = MAPLIBRE_JS_SRI; s.crossOrigin = 'anonymous';
     s.onload  = () => window.maplibregl ? resolve(window.maplibregl) : reject(new Error('maplibre missing'));
     s.onerror = () => { _libPromise = null; reject(new Error('maplibre failed to load')); };
     document.head.appendChild(s);
