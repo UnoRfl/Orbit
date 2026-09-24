@@ -1260,3 +1260,32 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
 .avopt img{width:100%;height:100%;border-radius:50%;display:block}
 .avopt:hover{transform:translateY(-1px)}
 .avopt.on{border-color:var(--major);box-shadow:0 0 14px -2px var(--major)}
+
+/* ============================================================
+   LIVE CONNECTIONS (connect.js) — Discord presence, Spotify, GitHub
+   ============================================================ */
+.lvwrap{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.lvhead{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);font-weight:600}
+.lvstatus{width:9px;height:9px;border-radius:50%;background:#747f8d;flex:none}
+.lvstatus.online{background:#23a55a;box-shadow:0 0 8px #23a55a}
+.lvstatus.idle{background:#f0b232}
+.lvstatus.dnd{background:#f23f43}
+.lvcustom{color:var(--ink);font-weight:500;font-style:italic;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lvcard{display:flex;gap:12px;align-items:center;padding:11px 12px;border-radius:14px;border:1px solid var(--line);
+  background:linear-gradient(140deg,rgba(255,255,255,.045),rgba(255,255,255,.015));color:var(--ink);text-decoration:none;min-width:0}
+a.lvcard:hover{border-color:var(--line-strong)}
+.lvart{width:58px;height:58px;border-radius:11px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(150deg,var(--lc),color-mix(in srgb,var(--lc) 40%,#000))}
+.lvart img{width:100%;height:100%;object-fit:cover;display:block}
+.lvbody{min-width:0;flex:1}
+.lveb{display:flex;align-items:center;gap:6px;font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.14em}
+.lvdot{width:6px;height:6px;border-radius:50%;flex:none;animation:pulse 1.8s ease-in-out infinite}
+.lvtitle{font-weight:700;font-size:13.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvsub{font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvfor{display:flex;align-items:center;gap:4px;color:var(--ink);opacity:.8}
+.lvbar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:7px;overflow:hidden}
+.lvbar i{display:block;height:100%;border-radius:99px}
+.lvtime{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+.lvhint{padding:9px 11px;border-radius:12px;border:1px dashed var(--line-strong)}
+.lvline{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#1db954;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcbox{margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in srgb,#5865f2 45%,var(--line));background:rgba(88,101,242,.07)}

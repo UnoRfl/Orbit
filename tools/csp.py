@@ -50,6 +50,9 @@ STATIC = [
                     "wss://zdlevrezefagfqhflusj.supabase.co "
                     "https://tiles.openfreemap.org "
                     "https://tenor.googleapis.com "
+                    # live connections (connect.js): Discord presence via Lanyard, GitHub profile
+                    "https://api.lanyard.rest "
+                    "https://api.github.com "
                     "https://esm.sh "
                     "https://cdnjs.cloudflare.com"),
     # MapLibre GL runs its tile parser in a worker built from a blob: URL.

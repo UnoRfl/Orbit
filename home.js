@@ -1,6 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { html, useState } from './lib.js';
 import { actOf, ago, DAYS, Glyph, GlyphTile, Sym, decodePlace, fmt, fname, IcBack, IcChat, IcCheck, IcFlag, IcPin, IcPlus, IcSearch, IcTrash, IcX, KINDS, evSort, evUpcoming, nowInfo, whenLabel, presencePlace, PROFILE_VIEW, safeColor, sb, shownName, systemPhrase, ui, zoneName } from './core.js';
+import { LiveConnections, LiveLine } from './connect.js';
 import { ActivityCard, Avatar, BadgeChips, Bubble, CoverImg, Eyebrow, Grid, HobbyChip, LinkChips, NameFx, PinBadge, StatusDot, You, durLabel, fitDur, freeNow, sharedToday, statusOf, winLabel, winMins } from './components.js';
 
 export function Home({ uid, me, friends, classesBy, events, presence, myPres, myInvites=[], onRespond, sysInvites=[], onSysInvite, nameOf, systems=[], onOpenFriend, onYou, onAdd, onMessage, onStudy }) {
@@ -132,6 +133,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
               <div style="min-width:0;flex:1">
                 <div class="rowname"><${NameFx} p=${f} text=${fname(f)}/></div>
                 <div class="rowsub" style=${`color:${st.color}`}>${st.text}</div>
+                ${Array.isArray(f.links) && f.links.some(l=>l?.k==='discord' && l.id) && html`<${LiveLine} links=${f.links}/>`}
               </div>
               ${(()=>{ const d=presencePlace(presence[f.id]); return d && html`<div class="small" style="display:flex;align-items:center;gap:4px;color:var(--faint)">
                 <span style="color:var(--ge);display:flex"><${IcPin} size=${11}/></span>${d.place}</div>`; })()}
@@ -190,6 +192,7 @@ export function FriendDash({ f, uid, classesBy, events, presence, onBack, onPoke
     </div>
     ${(actOf(presence[f.id]) || (Array.isArray(f.links) && f.links.length>0)) && html`<div style="margin:-4px 0 16px;display:flex;flex-direction:column;gap:10px">
       ${(()=>{ const a = actOf(presence[f.id]); return a && html`<${ActivityCard} act=${a}/>`; })()}
+      ${Array.isArray(f.links) && f.links.length>0 && html`<${LiveConnections} links=${f.links}/>`}
       ${Array.isArray(f.links) && f.links.length>0 && html`<${LinkChips} links=${f.links}/>`}
     </div>`}
     <div style="display:flex;gap:8px;margin-bottom:16px">

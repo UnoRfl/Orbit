@@ -1,5 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
+import { DISCORD_ID, LiveConnections, discordAvatar, lanyard, lastError } from './connect.js';
 import { ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
@@ -86,6 +87,13 @@ export function AvatarPicker({ p, me, setP, onFrame }) {
   const [tab, setTab] = useState(() => presetOf(url) || !url ? 'preset' : 'link');
   const [state, setState] = useState('idle');           // idle | loading | ok | fail
   const [gh, setGh] = useState(() => (p.links || []).find(l => l.k === 'github')?.u || '');
+  const dcId = (p.links || []).find(l => l.k === 'discord' && DISCORD_ID.test(String(l.id || '')))?.id || null;
+  const [dcBusy, setDcBusy] = useState(false);
+  const useDiscord = async () => {
+    setDcBusy(true); const d = await lanyard(dcId, 0); setDcBusy(false);
+    const u = discordAvatar(d);
+    if (u) set(u); else ui.toast(lastError('ly:' + dcId) === 'not_monitored' ? 'Join discord.gg/lanyard first so Orbit can see your Discord' : "Couldn't get your Discord photo");
+  };
   // thumbnails resolve against this module, so they load from wherever Orbit is served
   const thumb = n => new URL('./avatars/' + n + '.svg', import.meta.url).href;
   useEffect(() => {
@@ -134,7 +142,8 @@ export function AvatarPicker({ p, me, setP, onFrame }) {
         <button class="btn" style="flex:none;padding:11px 12px" type="button" disabled=${!gh}
           onClick=${()=>set(`https://github.com/${encodeURIComponent(gh)}.png?size=256`)}>Use GitHub photo</button>
       </div>
-      <div class="small">Discord and Roblox photos appear here once you link those accounts below.</div>
+      ${dcId ? html`<button class="btn" type="button" disabled=${dcBusy} onClick=${useDiscord}>${dcBusy ? 'Fetching…' : 'Use my Discord photo'}</button>`
+        : html`<div class="small">Add your Discord user ID under Connections to use your Discord photo too.</div>`}
     </div>`}
   </div>`;
 }
@@ -732,11 +741,23 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
     if(!has && v.hobbies.length>=10) return v;
     return { ...v, hobbies: has ? v.hobbies.filter(x=>x!==h) : [...v.hobbies, h] }; });
   const addHobby = () => { const t=hobbyIn.trim().slice(0,24); if(t) togHobby(t); setHobbyIn(''); };
+  const [dcId, setDcId] = useState('');
+  const [dcCheck, setDcCheck] = useState(null);          // null | 'busy' | 'ok:<name>' | 'not_monitored' | 'unavailable'
   const addLink = () => { const u = cleanSocial(linkIn); if (!linkPick || !u) return;
+    const id = linkPick==='discord' && DISCORD_ID.test(dcId.trim()) ? dcId.trim() : undefined;
     setP(v=>{ const rest = v.links.filter(x=>x.k!==linkPick);
       if (rest.length>=5) return v;
-      return { ...v, links:[...rest, { k:linkPick, u }] }; });
-    setLinkIn(''); setLinkPick(null); };
+      return { ...v, links:[...rest, id ? { k:linkPick, u, id } : { k:linkPick, u }] }; });
+    setLinkIn(''); setLinkPick(null); setDcId(''); setDcCheck(null); };
+  // Lanyard answers for any Discord ID that has joined its server — use that to
+  // confirm the ID and fill in the username, so a typo can't link a stranger
+  const checkDiscord = async () => {
+    const id = dcId.trim(); if (!DISCORD_ID.test(id)) return;
+    setDcCheck('busy');
+    const d = await lanyard(id, 0);
+    if (d?.discord_user) { setDcCheck('ok:' + (d.discord_user.username || '')); if (!linkIn) setLinkIn(d.discord_user.username || ''); }
+    else setDcCheck(lastError('ly:' + id) || 'unavailable');
+  };
   const badUrl = u => u && !/^https:\/\/.+/i.test(u);
 
   async function submitClass() {
@@ -790,6 +811,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
       ${(()=>{ const a = actOf(myPres); return a
         ? html`<${ActivityCard} act=${a} mine onClear=${()=>setPres({ activity:null })} onEdit=${()=>setStatusOpen(true)}/>`
         : html`<button class="setactbtn" onClick=${()=>setStatusOpen(true)}><${Glyph} k="spark" size=${15}/> Set a status — what are you on right now?</button>`; })()}
+      ${Array.isArray(pv?.links) && pv.links.length>0 && html`<${LiveConnections} links=${pv.links} own=${true}/>`}
       ${Array.isArray(pv?.links) && pv.links.length>0 && html`<${LinkChips} links=${pv.links}/>`}
     </div>
 
@@ -864,6 +886,17 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
         <input class="input" maxlength="30" value=${linkIn} onInput=${e=>setLinkIn(e.target.value)} autocapitalize="none"
           placeholder=${'your '+(SOCIALS[linkPick]?.name||'')+' handle'} onKeyDown=${e=>{ if(e.key==='Enter') addLink(); }}/>
         <button class="btn" style="flex:none;padding:11px 13px" disabled=${!cleanSocial(linkIn)} onClick=${addLink}><${IcPlus} size=${14}/></button>
+      </div>`}
+      ${linkPick==='discord' && html`<div class="dcbox">
+        <div class="flabel" style="margin-top:4px">Discord user ID · for your live status</div>
+        <div style="display:flex;gap:8px">
+          <input class="input" inputmode="numeric" maxlength="20" value=${dcId} onInput=${e=>{ setDcId(e.target.value.replace(/\D/g,'')); setDcCheck(null); }} placeholder="e.g. 312345678901234567"/>
+          <button class="btn" style="flex:none;padding:11px 12px" disabled=${!DISCORD_ID.test(dcId) || dcCheck==='busy'} onClick=${checkDiscord}>${dcCheck==='busy'?'Checking…':'Check'}</button>
+        </div>
+        ${dcCheck?.startsWith('ok:') && html`<div class="okbox" style="margin-top:8px">Found @${dcCheck.slice(3)} — Orbit can show what you're playing and listening to.</div>`}
+        ${dcCheck==='not_monitored' && html`<div class="errbox" style="margin-top:8px">That ID works, but Lanyard can't see it yet. Join <b>discord.gg/lanyard</b> once (it's how the live status is shared), then check again.</div>`}
+        ${dcCheck==='unavailable' && html`<div class="errbox" style="margin-top:8px">Couldn't reach Lanyard right now — you can still add the ID and it'll start working when it can.</div>`}
+        <div class="small" style="margin-top:8px">Discord → Settings → Advanced → turn on Developer Mode, then right-click your name → Copy User ID. Your status is only shown if you add this.</div>
       </div>`}
 
       <div class="flabel">Bubble colors</div>
