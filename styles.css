@@ -20,6 +20,14 @@ button{font-family:inherit;color:inherit}
 input,select,textarea{font-family:inherit}
 ::-webkit-scrollbar{width:0;height:0}
 *{scrollbar-width:none}
+@media (hover:hover) and (pointer:fine){
+  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px;
+    border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26);background-clip:content-box}
+}
 
 #waves{position:fixed;inset:0;z-index:0;pointer-events:none}
 #glow{position:fixed;left:0;top:0;width:560px;height:560px;z-index:0;pointer-events:none;opacity:0;
@@ -146,30 +154,35 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .hr{position:absolute;right:6px;transform:translateY(-6px);font-size:9.5px;color:var(--faint);font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
 .track{position:relative;border-left:1px solid var(--line);
   background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hour) - 1px),var(--line) calc(var(--hour) - 1px),var(--line) var(--hour))}
+/* Traffic: how many people are booked in this hour, across every schedule
+   Orbit has loaded. Sits behind the blocks, never in front of them — and
+   because it steps opacity at every hour mark, the blocks above it are
+   opaque (mixed over --panel, not over transparent). A translucent block
+   let the step through and sliced a 7:00–8:30 class in two at 8:00. */
+.heat{position:absolute;left:0;right:0;background:var(--ge);pointer-events:auto;z-index:0}
+.cls,.evt{z-index:1}
+/* Midnight, 06:00, 12:00, 18:00 read brighter, so a 24-hour column is still
+   scannable at a glance instead of 25 identical grey numbers. */
+.hr.major{color:var(--ink);opacity:.62;font-weight:600}
 .track.wknd{background-color:rgba(255,255,255,.015)}
 .track.today{background-color:rgba(255,93,143,.028)}
 .cls{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
+  background:color-mix(in srgb,var(--c) 13%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 34%,transparent)}
 .cls::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);border-radius:8px 0 0 8px}
 .cname{font-weight:600;font-size:10.5px;line-height:1.15;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .cmeta{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ctime{font-size:9px;color:var(--c);font-weight:600;margin-top:auto;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .evt{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 6px 5px 8px;overflow:hidden;display:flex;flex-direction:column;gap:1px;cursor:pointer;
-  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14));border:1px dashed rgba(255,255,255,.4)}
+  background:linear-gradient(135deg,rgba(176,107,255,.18),rgba(45,212,191,.14)),var(--panel);border:1px dashed rgba(255,255,255,.4)}
 .evt .ctime{color:#e7d9f5}
 .nowline{position:absolute;left:0;right:0;height:2px;z-index:7;pointer-events:none;background:var(--now);box-shadow:0 0 8px rgba(255,93,143,.8)}
 .nowline::before{content:"";position:absolute;left:-2px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--now);box-shadow:0 0 10px rgba(255,93,143,.9)}
-
-/* map */
-.maparea{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;overflow:hidden;isolation:isolate;
-  background:radial-gradient(700px 400px at 30% -10%, rgba(176,107,255,.10), transparent 60%), var(--panel)}
 .mapgrid{position:absolute;inset:0;opacity:.6;
   background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px}
 .zone{position:absolute;transform:translate(-50%,-50%);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;
   padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:76px;transition:border-color .15s ease,background .15s ease}
 .zone.on{background:rgba(45,212,191,.14);border-color:var(--ge)}
 .zname{font-size:10px;color:var(--ink);font-weight:600;font-family:'Space Grotesk',sans-serif;white-space:nowrap}
-.zav{display:flex;margin-top:2px;min-height:22px;align-items:center}
 .zav .avatar{border:1.5px solid var(--panel)}
 .quiet{font-size:9.5px;color:var(--faint)}
 
@@ -282,18 +295,13 @@ a{color:var(--ge)}
 @keyframes twinkle{to{opacity:.32}}
 
 .map-orbit{position:absolute;border-radius:50%;border:1px dashed rgba(255,255,255,.045);pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%)}
-.map-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:7px;z-index:2}
 .map-center-star{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 40% 40%, #fff8d6, #f5b544 45%, #b45309 100%);
   box-shadow:0 0 22px rgba(245,181,68,.55), 0 0 44px rgba(245,181,68,.25);position:relative}
 .map-center-star::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(245,181,68,.25);animation:sun-pulse 3.6s ease-in-out infinite}
 @keyframes sun-pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.4);opacity:0}}
 .map-center-label{font-family:'Space Grotesk',sans-serif;font-size:8px;letter-spacing:.34em;color:rgba(255,255,255,.45);font-weight:600}
-
-.planet-zone{position:absolute;transform:translate(-50%,-50%);background:none;border:none;cursor:pointer;padding:0;line-height:0;transition:transform .18s ease}
-.planet-zone:hover{transform:translate(-50%,-50%) scale(1.08)}
 .planet-zone.on{transform:translate(-50%,-50%) scale(1.1)}
 .planet-body{width:50px;height:50px;border-radius:50%;position:relative;transition:box-shadow .2s ease}
-.planet-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .planet-zone.on .planet-body{box-shadow:0 0 0 2px rgba(255,255,255,.4), 0 0 32px currentColor}
 
 .planet-body.p-purple{background:radial-gradient(circle at 32% 28%, #e6c5ff, #b06bff 45%, #4b1976 100%);color:#b06bff;box-shadow:0 0 22px rgba(176,107,255,.35)}
@@ -306,12 +314,7 @@ a{color:var(--ge)}
 .planet-body.ring::after{content:'';position:absolute;left:-14px;right:-14px;top:50%;height:65%;
   transform:translateY(-50%) rotate(-22deg);border-radius:50%;
   border:2px solid rgba(255,255,255,.35);border-left-color:transparent;border-right-color:transparent;pointer-events:none}
-.planet-zone .zav{position:absolute;top:-6px;right:-8px;display:flex}
 .planet-zone .zav .avatar{border:2px solid #0b0714}
-.map-svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
-.planet-label{position:absolute;transform:translate(-50%,-50%);z-index:6000;pointer-events:none;
-  font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;color:#fff;letter-spacing:.03em;white-space:nowrap;
-  text-shadow:0 1px 3px rgba(0,0,0,.95), 0 0 7px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.9)}
 .planet-label .cnt{color:var(--ge);font-weight:700}
 .planet-label.on{text-shadow:0 0 10px var(--major), 0 1px 3px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.9)}
 .planet-zone .zname{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;color:#fff;letter-spacing:.06em;
@@ -370,34 +373,6 @@ a{color:var(--ge)}
 .storybubble .bdot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:5px;vertical-align:middle;box-shadow:0 0 6px currentColor}
 @keyframes bubblein{from{opacity:0;transform:translateX(-50%) translateY(5px)}to{opacity:1;transform:translateX(-50%)}}
 
-/* ============ systems grid (map landing) ============ */
-.sysinvite{border-color:rgba(176,107,255,.45);background:rgba(176,107,255,.07);margin:12px 0 2px}
-.sysgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
-.systile{position:relative;border:1px solid var(--line);border-radius:16px;padding:14px;cursor:pointer;text-align:left;overflow:hidden;
-  background:radial-gradient(130% 120% at 50% -10%, color-mix(in srgb, var(--sh) 20%, transparent), transparent 62%), var(--panel);
-  transition:border-color .15s ease, transform .12s ease}
-.systile:hover{border-color:var(--line-strong)}
-.systile:active{transform:scale(.985)}
-.sysmini{position:relative;width:100%;height:80px;margin-bottom:11px;pointer-events:none}
-.sysmini .sun{position:absolute;left:50%;top:50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);
-  background:radial-gradient(circle at 38% 34%, #fff, color-mix(in srgb, var(--sh) 65%, #fff) 45%, color-mix(in srgb, var(--sh) 82%, #000));
-  box-shadow:0 0 18px color-mix(in srgb, var(--sh) 70%, transparent)}
-.sysmini .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed color-mix(in srgb, var(--sh) 42%, transparent)}
-.sysmini .orbiter{position:absolute;left:50%;top:50%;width:0;height:0;transform-origin:0 0;animation:sys-spin var(--d,20s) linear infinite}
-.sysmini .pdot{position:absolute;font-size:12px;line-height:1;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
-@keyframes sys-spin{to{transform:rotate(360deg)}}
-.systile .sname{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#fff;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.systile .smeta{font-size:10.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.systile .slive{display:inline-flex;align-items:center;gap:4px;color:var(--pe);font-weight:600}
-.systile .sfaces{position:absolute;top:13px;right:13px;display:flex}
-.systile .sfaces .avatar{border:2px solid var(--panel)}
-.systile.addsys{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-style:dashed;
-  background:rgba(255,255,255,.02);min-height:158px;color:var(--muted);gap:8px}
-.systile.addsys .plusdisc{width:44px;height:44px;border-radius:50%;border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center}
-.systile.addsys:hover{color:var(--major)}
-.systile.addsys:hover .plusdisc{border-color:var(--major)}
-.systile .del{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:9px;background:rgba(255,93,143,.16);border:1px solid rgba(255,93,143,.42);
-  color:#ffb1c8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4}
 
 /* ============ system detail (orrery header) ============ */
 .syshead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -412,8 +387,6 @@ a{color:var(--ge)}
 /* dashed "add a place" planet inside a system */
 .planet-zone.add .planet-body{background:rgba(255,255,255,.03);border:1.5px dashed var(--line-strong);box-shadow:none;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .planet-zone.add:hover .planet-body{border-color:var(--major);color:var(--major)}
-.planet-zone .pdel{position:absolute;top:-7px;left:-9px;width:20px;height:20px;border-radius:50%;background:#2a1620;border:1px solid rgba(255,93,143,.55);
-  color:#ffb1c8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:7}
 
 /* emoji picker */
 .emojigrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:8px}
@@ -467,7 +440,7 @@ button.actcard:hover{border-color:color-mix(in srgb, var(--ac,#b06bff) 62%, tran
 .actopt.on .nm{color:var(--ink)}
 
 /* ============ boot checklist ============ */
-@keyframes spin{to{transform:rotate(360deg)}}
+
 .bootsteps{display:flex;flex-direction:column;gap:7px;align-items:flex-start;margin-top:16px;min-width:200px}
 .bootstep{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;
   letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.38)}
@@ -523,12 +496,6 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .adjmask.round::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:100%;aspect-ratio:1;border-radius:50%;box-shadow:0 0 0 400px rgba(8,5,14,.6);border:1.5px dashed rgba(255,255,255,.45)}
 
-/* mission log (Map landing) */
-.logframe{margin-top:24px;border:1px solid var(--line);border-radius:18px;padding:14px;position:relative;overflow:hidden;
-  background:linear-gradient(155deg, color-mix(in srgb, var(--major) 8%, transparent), transparent 46%), var(--panel)}
-.logrow{display:flex;gap:10px;align-items:flex-start;padding:11px 2px;border-top:1px solid var(--line)}
-button.logrow{background:none;border:none;border-top:1px solid var(--line);width:100%;text-align:left;cursor:pointer;font-size:inherit}
-button.logrow:hover .rowname{color:#fff}
 .logtag{flex:none;font-size:8.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:.12em;text-transform:uppercase;
   padding:2.5px 7px;border-radius:6px;border:1px solid}
 
@@ -717,3 +684,1127 @@ button.logrow:hover .rowname{color:#fff}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ================================================================
+   LIQUID GLASS · SMOOTH MORPH · CHAT DEPTH
+   ----------------------------------------------------------------
+   One place for the material and the motion. Everything here keys
+   off <html data-perf> (0 full · 1 phones/mid · 2 low-end), which
+   index.html stamps before first paint and main.js can step down at
+   runtime, so a weak device never renders the expensive version for
+   even one frame.
+
+   The rule that keeps this fast: backdrop-filter is charged by AREA.
+   Small chrome (nav, chat header, composer, menus, toasts) really
+   blurs. Big surfaces and anything that repeats down a list — cards,
+   rows, bubbles — get the *look* of glass from a gradient tint and a
+   specular rim only, which costs nothing at all.
+   ================================================================ */
+:root{
+  /* material */
+  --glass-blur:20px;
+  --glass-sat:155%;
+  --glass-base:rgba(24,18,32,.58);          /* what sits under the blur   */
+  --glass-tint:rgba(255,255,255,.055);      /* top-down sheen             */
+  --glass-line:rgba(255,255,255,.11);       /* body edge                  */
+  --glass-rim:rgba(255,255,255,.32);        /* lit corner of the rim      */
+  --glass-rim-dim:rgba(255,255,255,.05);
+  --glass-hi:rgba(255,255,255,.14);         /* inner top highlight        */
+  --glass-lo:rgba(0,0,0,.26);               /* inner bottom shade         */
+  --glass-cast:0 14px 40px -18px rgba(0,0,0,.75);
+
+  /* motion */
+  --ease-morph:cubic-bezier(.22,1,.36,1);   /* settles, never overshoots  */
+  --ease-snap:cubic-bezier(.34,1.32,.52,1); /* a little bounce on entry   */
+  --t-fast:.15s; --t-mid:.28s; --t-slow:.44s;
+  --morph-blur:7px;                         /* focus-pull on screen entry */
+  --press:.975;                             /* tap-down scale             */
+}
+/* Phones blur less and skip the focus-pull; the entry still reads as a morph
+   because the scale + travel curve is what carries it, not the blur. */
+html[data-perf="1"]{ --glass-blur:13px; --glass-sat:132%; --morph-blur:0px; --t-slow:.38s }
+html[data-perf="2"]{ --glass-blur:8px;  --glass-sat:115%; --morph-blur:0px; --t-slow:.3s;
+                     --glass-cast:0 8px 22px -14px rgba(0,0,0,.7) }
+
+/* No backdrop-filter support, or the OS asked for less transparency:
+   fall back to the solid panel. Same shape, same rim, no sampling. */
+html[data-noglass] .glass,
+html[data-noglass] .glass-lg{ background-color:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none }
+@media (prefers-reduced-transparency: reduce){
+  .glass,.glass-lg{ background-color:var(--panel)!important;
+    backdrop-filter:none!important;-webkit-backdrop-filter:none!important }
+}
+
+/* ---------- the material ---------- */
+.glass,.glass-lg,.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  position:relative;
+  background-color:var(--glass-base);
+  background-image:linear-gradient(180deg,var(--glass-tint),rgba(255,255,255,.014) 44%,rgba(255,255,255,0) 76%);
+  border:1px solid var(--glass-line);
+  box-shadow:inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--glass-cast);
+}
+.glass{ backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+        -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+/* Large surfaces only sample the backdrop where the GPU can afford the area. */
+html[data-perf="0"] .glass-lg{
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)) }
+html:not([data-perf="0"]) .glass-lg{ background-color:var(--panel2);
+  background-color:color-mix(in srgb, var(--panel2) 92%, transparent) }
+/* .glass-lite never blurs — for anything that repeats down a list. */
+.glass-lite,.card,.cardrow,.convrow,.authcard,.set-card{
+  background-color:var(--panel);
+  background-color:color-mix(in srgb, var(--panel) 90%, transparent);
+  box-shadow:inset 0 1px 0 var(--glass-hi) }
+.convrow.on{ background-color:rgba(176,107,255,.14);
+  background-color:color-mix(in srgb, var(--major) 15%, transparent);border-color:var(--major) }
+
+/* A rim is absolutely positioned, so inside a SCROLLING box it scrolls away
+   with the content. Those surfaces keep the inset highlight (which is painted
+   against the border box and stays put) and skip the rim. */
+.sheet::before,.chatovercard::before{ display:none }
+
+/* The refracted rim: a 1px gradient border, bright where the light would
+   catch a bevel and fading away around the curve. Masked so it paints the
+   edge only. This is what actually sells "glass" — not the blur. */
+.glass::before,.glass-lg::before,.glass-lite::before,
+.card::before,.cardrow::before,.convrow::before,.authcard::before,.set-card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:0;
+  background:linear-gradient(146deg,var(--glass-rim),var(--glass-rim-dim) 30%,
+             rgba(255,255,255,0) 58%,var(--glass-rim-dim) 76%,rgba(255,255,255,.18));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+
+/* ---------- smooth morph: one motion language on everything touchable ---------- */
+.btn,.pill,.iconbtn,.xbtn,.cbtn,.csend,.cardrow,.convrow,.theme-tile,.authtab,.navbtn,.lookswatch,.ghosticon{
+  transition:transform var(--t-fast) var(--ease-morph),
+             background-color var(--t-mid) var(--ease-morph),
+             border-color var(--t-mid) var(--ease-morph),
+             box-shadow var(--t-mid) var(--ease-morph),
+             color var(--t-mid) var(--ease-morph);
+}
+.btn:active,.pill:active,.iconbtn:active,.xbtn:active,.cbtn:active,.csend:not(:disabled):active,
+.cardrow:active,.convrow:active,.theme-tile:active,.authtab:active,.lookswatch:active{ transform:scale(var(--press)) }
+.navbtn:active{ transform:scale(.94) }
+/* lift on hover, but only where there is a real cursor */
+@media (hover:hover) and (pointer:fine){
+  .cardrow:hover,.convrow:hover{ transform:translateY(-1px) }
+}
+
+@keyframes morphIn{
+  from{ opacity:0;transform:translate3d(0,16px,0) scale(.968);filter:blur(var(--morph-blur)) }
+  to  { opacity:1;transform:none;filter:blur(0) }
+}
+@keyframes morphSheet{
+  from{ opacity:0;transform:translate3d(0,26px,0) scale(.975) }
+  to  { opacity:1;transform:none }
+}
+@keyframes morphPop{
+  from{ opacity:0;transform:scale(.94) translate3d(0,6px,0) }
+  to  { opacity:1;transform:none }
+}
+
+/* screens change by morphing instead of cutting */
+.content{ animation:morphIn var(--t-slow) var(--ease-morph) }
+.sheet{ animation:morphSheet var(--t-slow) var(--ease-morph) }
+.chatmenu,.chatpop,.toast{ animation:morphPop var(--t-mid) var(--ease-snap) }
+.chatpane{ animation:morphIn var(--t-mid) var(--ease-morph) }
+
+/* ---------- where the material goes ---------- */
+.navin{ background:var(--glass-base);border-top:1px solid var(--glass-line) }
+.sheet{ background-color:var(--glass-base) }
+.toast{ background-color:rgba(36,29,46,.72) }
+.chathead,.composer{ background-color:rgba(24,18,32,.62) }
+.chatmenu,.chatpop{ background-color:rgba(31,23,40,.74) }
+
+/* The nav's morphing selection — one pill that travels between tabs instead
+   of five that blink on and off. --navn = tab count, --navi = active index,
+   both set by shell.js, so the travel is a single transform transition. */
+.navin{ position:relative }
+.navink{
+  position:absolute;left:8px;top:8px;z-index:0;pointer-events:none;
+  width:calc((100% - 16px) / var(--navn,5));
+  height:calc(100% - 16px - env(safe-area-inset-bottom));
+  border-radius:13px;
+  background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.028));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17), 0 4px 14px -8px var(--major);
+  transform:translate3d(calc(var(--navi,0) * 100%),0,0);
+  transition:transform var(--t-slow) var(--ease-morph);
+}
+.navbtn{ z-index:1 }
+
+/* ================================================================
+   CHAT — the shallow-screen illusion
+   ----------------------------------------------------------------
+   Flat elements, but the two bubble columns are hinged on their
+   anchored edge and turned a few degrees toward the middle under a
+   long perspective. Because the perspective origin belongs to the
+   pane and not to the scroller, the angle a bubble presents changes
+   as it travels past the centre line — which is what reads as a
+   screen bending away at its edges rather than a static skew. A
+   faint edge shade does the rest: a curved surface catches less
+   light where it turns away from you.
+
+   Deliberately small (~3°). Chat only — nothing else in Orbit tilts.
+   ================================================================ */
+.chat3d .msgs{
+  perspective:var(--ch-persp,820px);
+  perspective-origin:50% 44%;
+  transform-style:preserve-3d;
+}
+.chat3d .bubcol{
+  transform-origin:left center;
+  transform:rotateY(var(--ch-tilt,3.6deg)) translateZ(var(--ch-depth,-6px));
+  transition:transform var(--t-mid) var(--ease-morph);
+}
+.chat3d .msgrow.me .bubcol{
+  transform-origin:right center;
+  transform:rotateY(calc(var(--ch-tilt,3.6deg) * -1)) translateZ(var(--ch-depth,-6px));
+}
+/* the surface turning away from the light at the left and right edges */
+.chat3d .chatbody::after{
+  content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    linear-gradient(90deg, rgba(3,1,7,.30), rgba(3,1,7,0) 15%, rgba(3,1,7,0) 85%, rgba(3,1,7,.30)),
+    radial-gradient(125% 96% at 50% 46%, rgba(3,1,7,0) 56%, rgba(3,1,7,.20));
+}
+/* Phones tilt less and sit closer, so the foreshortening stays gentle on a
+   narrow column; the weakest tier drops the 3D entirely rather than paying
+   for a composited layer per bubble while the list scrolls. */
+html[data-perf="1"] .chat3d .msgs{ --ch-persp:900px }
+html[data-perf="1"] .chat3d .bubcol{ --ch-tilt:3deg;--ch-depth:-4px }
+html[data-perf="2"] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-perf="2"] .chat3d .bubcol,
+html[data-perf="2"] .chat3d .msgrow.me .bubcol{ transform:none }
+html[data-perf="2"] .chat3d .chatbody::after{ display:none }
+html[data-rm] .chat3d .msgs{ perspective:none;transform-style:flat }
+html[data-rm] .chat3d .bubcol,
+html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
+
+/* glass bubbles — tint + rim only, never a blur: this repeats per message */
+.bub.them{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 70%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 6px 16px -12px rgba(0,0,0,.9);
+}
+.bub.me{ box-shadow:inset 0 1px 0 rgba(255,255,255,.24), 0 6px 18px -12px rgba(0,0,0,.85) }
+.cfield{ background-color:var(--panel2);
+         background-color:color-mix(in srgb, var(--panel2) 82%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+         transition:border-color var(--t-mid) var(--ease-morph),box-shadow var(--t-mid) var(--ease-morph) }
+.cfield:focus-within{ border-color:color-mix(in srgb, var(--chacc) 55%, transparent);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 0 0 3px color-mix(in srgb, var(--chacc) 13%, transparent) }
+
+/* ---------- desktop: the nav is a column, so the ink slides down ---------- */
+@media (min-width:900px){
+  .navin{ background:var(--glass-base) }
+  /* the side rail stacks with a 2px gap, so the ink's height and its travel
+     both have to allow for the gutters or it drifts off the last tab */
+  .navink{
+    width:calc(100% - 16px);
+    height:calc((100% - 16px - (var(--navn,5) - 1) * 2px) / var(--navn,5));
+    transform:translate3d(0,calc(var(--navi,0) * (100% + 2px)),0);
+    border-radius:11px;
+  }
+  .navbtn.on{ background:none }          /* the travelling ink is the highlight now */
+  .chatpane{ background-color:var(--panel);
+             background-color:color-mix(in srgb, var(--panel) 88%, transparent) }
+}
+.theme-tile.locked{opacity:.42;cursor:not-allowed;filter:grayscale(.7)}
+.theme-tile.locked:active{transform:none}
+
+/* ============ real map (geomap.js) ============ */
+.geowrap{position:relative;width:100%;aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:18px;
+  overflow:hidden;isolation:isolate;background:var(--canvas)}
+/* MapLibre stamps .maplibregl-map on this element and its own stylesheet —
+   injected into <head> AFTER this file — sets `.maplibregl-map{position:relative}`.
+   At equal specificity the later rule won, `inset:0` stopped applying and the
+   container collapsed to 0 height, so the map rendered into MapLibre's fallback
+   300px canvas and nothing was visible. Two classes deep so we win regardless
+   of load order, plus explicit size so it cannot collapse again. */
+.geowrap .geomap{position:absolute;inset:0;width:100%;height:100%}
+.geoload{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2;background:var(--canvas)}
+.geofail{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  width:100%;aspect-ratio:1/1.05;border:1px dashed var(--line-strong);border-radius:18px;padding:20px;color:var(--muted)}
+/* MapLibre ships a light chrome; bring it into the theme */
+.geowrap .maplibregl-ctrl-attrib{background:rgba(15,10,22,.72)!important;color:var(--faint)!important;font-size:9px}
+.geowrap .maplibregl-ctrl-attrib a{color:var(--muted)!important}
+.geowrap .maplibregl-ctrl-group{background:var(--panel);border:1px solid var(--line);box-shadow:none}
+.geowrap .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+.geowrap .maplibregl-ctrl-group button span{filter:invert(1) opacity(.7)}
+
+/* MapLibre positions a marker by writing `transform` onto the element you hand
+   it, and it rewrites that on every frame of a pan or zoom. This element had a
+   transform AND a transition on the same property, so each of those rewrites
+   got animated instead of applied — the pins slid along behind the map and
+   ended up wherever the animation had got to. Never transform or transition a
+   marker root; do it on something inside. */
+.geopin{cursor:pointer}
+.geopin-in{display:flex;flex-direction:column;align-items:center;position:relative;
+  transform:translateY(-7px);transition:transform var(--t-fast) var(--ease-morph)}
+/* The marker is anchored 'bottom', so its layout box must end exactly at the
+   pin's tip. The head is a 34px square turned 45deg, whose point hangs ~7px
+   below the square's own box — hence the -7px — and the label is taken out of
+   flow, or the anchor lands on the label and the tip points ~16px north of
+   the real spot. */
+.geopin:hover .geopin-in{transform:translateY(-10px)}
+/* Belt and braces: whatever anyone adds later, the map owns this transform. */
+.maplibregl-marker{transition:none!important}
+/* Backstop for MapLibre's own stylesheet. If that file ever fails to load
+   (it was blocked by the CSP for a week), markers fall back to normal flow and
+   the per-frame translate is applied on top of their flow offset — pins drift
+   off their spot on every zoom. Two classes deep so load order can't undo it,
+   and nothing here may set `position` on a marker root. */
+.geowrap .maplibregl-marker{position:absolute;top:0;left:0;will-change:transform}
+.geowrap .maplibregl-canvas{position:absolute;left:0;top:0}
+.geowrap .maplibregl-canvas-container{position:absolute;inset:0}
+.geopin-i{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50% 50% 50% 4px;
+  transform:rotate(-45deg);font-size:15px;
+  background:radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--ph,var(--major)) 62%, transparent), rgba(18,12,26,.96));
+  border:1.5px solid color-mix(in srgb, var(--ph,var(--major)) 78%, transparent);
+  box-shadow:0 0 16px -3px color-mix(in srgb, var(--ph,var(--major)) 85%, transparent), 0 4px 10px -4px rgba(0,0,0,.9)}
+.geopin-i>*{transform:rotate(45deg)}
+.geopin.me .geopin-i{border-color:var(--ge);box-shadow:0 0 18px -2px var(--ge)}
+.geopin-n{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:var(--now);
+  color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;
+  border:1.5px solid var(--canvas)}
+.geopin-l{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+  background:rgba(12,8,18,.78);border-radius:999px;padding:2px 7px;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+
+.geoctl{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;gap:7px}
+.geobtn{width:38px;height:38px;border-radius:11px;background:var(--panel);border:1px solid var(--line-strong);
+  color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px -8px rgba(0,0,0,.9)}
+/* Locate me samples for a few seconds instead of answering instantly with a
+   stale guess, so the button has to say it is working. */
+.geobtn.busy{color:var(--ge);border-color:var(--ge);animation:geoseek 1.1s ease-in-out infinite}
+@keyframes geoseek{0%,100%{opacity:1}50%{opacity:.45}}
+:root[data-rm="1"] .geobtn.busy{animation:none;opacity:.7}
+.geohint{position:absolute;left:10px;right:10px;top:10px;z-index:3;background:rgba(20,14,28,.88);
+  border:1px solid var(--line-strong);border-radius:11px;padding:8px 11px;font-size:12px;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;text-align:center}
+.geotray{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(12,8,18,.92) 34%)}
+.mapmode button.on{background:rgba(176,107,255,.16);color:var(--ink)}
+
+/* ============ live location (live.js · geomap.js) ============ */
+.livebox{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.liverow{display:flex;align-items:center;gap:10px}
+.livepulse{width:11px;height:11px;border-radius:50%;background:var(--ge);flex:none;
+  box-shadow:0 0 0 0 color-mix(in srgb, var(--ge) 60%, transparent);animation:livepulse 2s ease-out infinite}
+@keyframes livepulse{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ge) 55%, transparent)}
+  70%{box-shadow:0 0 0 9px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+
+/* a friend broadcasting live, drawn on the map */
+.livedot{display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.livedot-ring{position:absolute;top:-5px;left:50%;width:44px;height:44px;margin-left:-22px;border-radius:50%;
+  border:2px solid var(--ge);opacity:.55;animation:livering 2.4s ease-out infinite;pointer-events:none}
+@keyframes livering{0%{transform:scale(.62);opacity:.7}70%{transform:scale(1.12);opacity:0}100%{opacity:0}}
+.livedot-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:#0f0a16;object-fit:cover;
+  background:linear-gradient(135deg,var(--pa,#b06bff),var(--pb,#2dd4bf));
+  border:2px solid var(--canvas);box-shadow:0 0 14px -2px color-mix(in srgb, var(--ge) 70%, transparent)}
+/* Out of flow on purpose. This marker is anchored 'center', which centres the
+   element's whole box on the coordinate — and with the name label in the box,
+   that box was avatar + label, so the avatar floated a good 9px ABOVE where the
+   person actually was. Absolute means the box is just the avatar, and the
+   avatar lands on the fix. */
+.livedot-l{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
+  background:rgba(12,8,18,.82);border-radius:999px;padding:2px 7px;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+/* a last-known position, not a live one — stop the pulse and say so */
+.livedot.stale{opacity:.62}
+.livedot.stale .livedot-ring{display:none}
+.livedot.stale .livedot-av{box-shadow:none;filter:grayscale(.45)}
+
+/* live-share control, sitting on the map beside "locate me" */
+.geoctl{flex-wrap:wrap;max-width:calc(100% - 20px)}
+.geobtn.live{width:auto;padding:0 13px;gap:7px;font-size:12px;font-weight:600;font-family:'Space Grotesk',sans-serif;
+  letter-spacing:.02em;white-space:nowrap}
+.geobtn.live.on{border-color:var(--ge);color:var(--ge);
+  background:linear-gradient(180deg,color-mix(in srgb, var(--ge) 18%, transparent),var(--panel))}
+.geodot{width:8px;height:8px;border-radius:50%;background:var(--ge);flex:none;
+  animation:livepulse 2s ease-out infinite}
+.geolive{position:absolute;left:10px;right:10px;bottom:58px;z-index:4;
+  background:rgba(20,14,28,.94);border:1px solid var(--line-strong);border-radius:14px;padding:12px 13px;
+  box-shadow:0 18px 46px -18px rgba(0,0,0,.9);animation:morphPop var(--t-mid) var(--ease-snap)}
+
+/* your own live dot — distinct from a friend's so you can find yourself */
+.livedot.me .livedot-av{border-color:var(--ge);
+  box-shadow:0 0 0 2px var(--canvas), 0 0 18px -1px var(--ge)}
+.livedot.me .livedot-ring{border-color:var(--ge);opacity:.75}
+.livedot.me .livedot-l{background:var(--ge);color:#0f0a16;font-weight:700}
+
+/* a fix too coarse to be a "spot" — softened so it reads as an area, not a pin */
+.livedot.coarse .livedot-av{border-style:dashed;box-shadow:none}
+.livedot.coarse .livedot-ring{display:none}
+.livedot.coarse .livedot-l{background:rgba(12,8,18,.72);font-weight:600}
+
+/* a handle someone already has — flagged while it can still be changed */
+.input.bad{border-color:var(--now)}
+
+/* A dot matched to a known place is being drawn ON that place, so it gets a
+   solid edge instead of the fuzzy one that means "somewhere around here". */
+.livedot.snapped .livedot-ring{opacity:1;border-style:solid}
+.livedot.snapped .livedot-l{font-weight:600}
+
+/* ============================================================
+   GALAXY — the Map tab's overview (galaxy.js)
+   Nodes' transform/opacity/z-index are written every frame by JS:
+   never give .gnode a transition on those, or the orbit lags.
+   ============================================================ */
+.galaxy-wrap{margin-top:12px}
+.galaxy{position:relative;height:380px;border-radius:22px;overflow:hidden;border:1px solid var(--line);
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 47%, color-mix(in srgb, var(--gfocus) 18%, transparent), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 115%, rgba(255,255,255,.05), transparent 70%),
+    color-mix(in srgb, var(--canvas) 72%, #000);
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;isolation:isolate}
+.galaxy:active{cursor:grabbing}
+@media (min-width:768px){ .galaxy{height:440px} }
+
+.gstars{position:absolute;inset:-260px;pointer-events:none;will-change:transform}
+.gstars i{position:absolute;inset:0;background-size:240px 240px;animation:gtwinkle 5s ease-in-out infinite alternate}
+.gstars i:nth-child(1){background-image:
+  radial-gradient(1px 1px at 12px 40px,#fff,transparent),radial-gradient(1px 1px at 90px 130px,#fff,transparent),
+  radial-gradient(1px 1px at 170px 60px,#fff,transparent),radial-gradient(1px 1px at 210px 200px,#fff,transparent),
+  radial-gradient(1px 1px at 60px 210px,#fff,transparent);opacity:.55}
+.gstars i:nth-child(2){background-image:
+  radial-gradient(1.5px 1.5px at 40px 90px,#fff,transparent),radial-gradient(1.5px 1.5px at 140px 20px,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 200px 150px,#fff,transparent);opacity:.4;animation-delay:-2.5s}
+.gstars i:nth-child(3){background-image:
+  radial-gradient(2px 2px at 110px 180px,color-mix(in srgb,var(--ge) 70%,#fff),transparent),
+  radial-gradient(2px 2px at 20px 150px,color-mix(in srgb,var(--major) 70%,#fff),transparent);opacity:.5;animation-delay:-1s}
+@keyframes gtwinkle{from{opacity:.25}to{opacity:.7}}
+
+.gnebula{position:absolute;inset:0;pointer-events:none}
+.gnebula span{position:absolute;width:62%;height:70%;border-radius:50%;background:var(--nh);opacity:.11;filter:blur(48px);
+  left:calc(-12% + var(--ni) * 24%);top:calc(8% + (var(--ni) - 1) * 9%);animation:gdrift 26s ease-in-out infinite alternate;
+  animation-delay:calc(var(--ni) * -6s)}
+@keyframes gdrift{to{translate:8% -6%}}
+[data-perf="2"] .gnebula{display:none}
+
+.gsvg{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.gring{stroke:rgba(255,255,255,.2);stroke-width:1;stroke-dasharray:1 5;stroke-linecap:round}
+.gring.r1{stroke:rgba(255,255,255,.13)}
+.gring.r2{stroke:rgba(255,255,255,.07);stroke-dasharray:1 9}
+.gsignal{stroke-width:1.5;stroke-dasharray:3 7;stroke-linecap:round;animation:gsig 1.1s linear infinite}
+.gsignal.mine{stroke-dasharray:1 6;stroke-width:1.1}
+@keyframes gsig{to{stroke-dashoffset:-20}}
+
+.gcore{position:absolute;left:50%;top:47%;transform:translate(-50%,-26px);display:flex;flex-direction:column;align-items:center;pointer-events:none}
+.gcore .avatar{box-shadow:0 0 0 3px color-mix(in srgb,var(--canvas) 70%,#000),0 0 28px color-mix(in srgb,var(--major) 55%,transparent)}
+.gcore-halo{position:absolute;left:50%;top:26px;width:130px;height:130px;border-radius:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle, color-mix(in srgb,var(--major) 30%,transparent), transparent 62%);animation:ghalo 3.4s ease-in-out infinite}
+@keyframes ghalo{50%{transform:translate(-50%,-50%) scale(1.14);opacity:.7}}
+.gcore-l{margin-top:7px;font-size:10.5px;color:var(--ink);background:rgba(0,0,0,.4);padding:3px 9px;border-radius:99px;white-space:nowrap;
+  border:1px solid var(--line)}
+
+.gnode{position:absolute;left:0;top:0;border:none;background:none;padding:0;margin:0;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:7px;color:var(--ink);will-change:transform,opacity;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+.gstar{position:relative;width:var(--gs);height:var(--gs);border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;
+  background:radial-gradient(circle at 33% 28%, #fff 0 3%, color-mix(in srgb,var(--gh) 70%,#fff) 13%, var(--gh) 44%, color-mix(in srgb,var(--gh) 38%,#000) 100%);
+  box-shadow:0 0 24px color-mix(in srgb,var(--gh) 55%,transparent),0 0 64px color-mix(in srgb,var(--gh) 22%,transparent),
+    inset -7px -9px 18px rgba(0,0,0,.38)}
+.gglyph{display:flex;color:#fff;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.gnode.busy .gstar::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--gh) 75%,transparent);
+  animation:gbeat 2.6s ease-out infinite;pointer-events:none}
+@keyframes gbeat{from{transform:scale(.92);opacity:.9}to{transform:scale(1.55);opacity:0}}
+.gnode:focus-visible{outline:none}
+.gnode:focus-visible .gstar{outline:2px solid var(--ink);outline-offset:5px}
+
+.gmoon,.gsat{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.gmoon{transform:rotate(var(--ma,0deg));animation:gorbit var(--md) linear infinite;animation-delay:var(--mo)}
+.gmoon i{position:absolute;left:var(--mr);top:-2.5px;width:5px;height:5px;border-radius:50%;
+  background:color-mix(in srgb,var(--gh) 45%,#fff);box-shadow:0 0 7px var(--gh)}
+.gsat{transform:rotate(var(--sa,0deg));animation:gorbit var(--sd) linear infinite;animation-delay:var(--so)}
+.gsat-in{position:absolute;left:var(--sr);top:0;transform:translate(-50%,-50%);animation:gcounter var(--sd) linear infinite;animation-delay:var(--so)}
+.gsat .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--canvas) 70%,#000),0 0 12px var(--gh)}
+@keyframes gorbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes gcounter{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(-360deg)}}
+.gcount{position:absolute;top:-3px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--pe);color:#04210f;
+  font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px var(--pe),0 0 0 2px rgba(0,0,0,.35)}
+.gname{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;white-space:nowrap;padding:3px 9px;border-radius:99px;
+  background:rgba(8,6,12,.5);border:1px solid var(--line);text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.gnode.mine .gname{border-color:color-mix(in srgb,var(--ge) 70%,transparent)}
+
+.gnode.invite .gstar{background:radial-gradient(circle at 40% 36%, #fff 0 8%, var(--gh) 38%, transparent 72%);
+  box-shadow:0 0 20px var(--gh);animation:gflick 1.7s ease-in-out infinite}
+.gnode.invite .gname{border-style:dashed;border-color:color-mix(in srgb,var(--gh) 70%,transparent)}
+.gtail{position:absolute;left:50%;top:17px;width:78px;height:7px;margin-top:-3.5px;transform-origin:0 50%;transform:rotate(var(--tail,180deg));
+  border-radius:99px;background:linear-gradient(90deg, color-mix(in srgb,var(--gh) 75%,transparent), transparent);filter:blur(1.5px);pointer-events:none}
+@keyframes gflick{50%{box-shadow:0 0 34px var(--gh);filter:brightness(1.25)}}
+
+.gnew{position:absolute;right:12px;top:12px;z-index:400;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:99px;
+  border:1px solid var(--line-strong);background:rgba(8,6,12,.55);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.gnew:hover{border-color:var(--major)}
+.ghint{position:absolute;left:50%;bottom:11px;transform:translateX(-50%);z-index:400;font-size:10.5px;color:var(--faint);letter-spacing:.05em;
+  pointer-events:none;white-space:nowrap}
+.galaxy.focused .gring{stroke:rgba(255,255,255,.05)}
+
+/* still: perf tier 2 / reduced motion — same layout, nothing drifting */
+.galaxy.still .gstars i,.galaxy.still .gnebula span,.galaxy.still .gmoon,.galaxy.still .gsat,.galaxy.still .gsat-in,
+.galaxy.still .gsignal,.galaxy.still .gcore-halo,.galaxy.still .gnode.busy .gstar::after,.galaxy.still .gnode.invite .gstar{animation:none}
+
+.gcard{--gh:var(--major);margin-top:10px;border:1px solid color-mix(in srgb,var(--gh) 38%,var(--line));border-radius:16px;padding:14px;
+  background:linear-gradient(160deg, color-mix(in srgb,var(--gh) 13%,var(--panel)), var(--panel) 70%);animation:gcardin .3s ease-out}
+@keyframes gcardin{from{transform:translateY(6px)}}
+.gcard.idle{display:flex;flex-direction:column;gap:3px}
+.gcard-h{display:flex;align-items:center;gap:11px}
+.gcard-g{font-size:23px;width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--gh) 22%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gh) 40%,transparent)}
+.gcard-t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;letter-spacing:-.01em}
+.gcard-who{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.gwho{display:inline-flex;align-items:center;gap:7px;padding:4px 11px 4px 4px;border-radius:99px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer}
+.gwho:hover{border-color:var(--line-strong)}
+.gwho.me{border-color:color-mix(in srgb,var(--ge) 60%,transparent);cursor:default}
+.gwho-at{color:var(--muted);font-weight:500;font-size:11px}
+.gcard-ev{margin-top:10px;width:100%;display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);color:var(--ink);font-size:12px;text-align:left;cursor:pointer}
+.gcard-ev:hover{border-color:var(--line-strong)}
+
+/* ============================================================
+   UPDATES PANEL (updates.js) — the mission log as a timeline
+   ============================================================ */
+.utimeline{position:relative;padding-left:4px}
+.ugroup+.ugroup{margin-top:14px}
+.ugroup-h{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 8px 44px}
+.uitem{position:relative;display:flex;gap:12px;padding:0 0 14px}
+.uitem::before{content:"";position:absolute;left:17px;top:38px;bottom:0;width:1px;
+  background:linear-gradient(var(--line-strong),transparent)}
+.ugroup .uitem:last-child::before{display:none}
+.uitem-dot{flex:none;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;
+  background:color-mix(in srgb,var(--ut) 16%,var(--panel2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ut) 40%,transparent)}
+.uitem.fresh .uitem-dot{box-shadow:inset 0 0 0 1px var(--ut),0 0 18px color-mix(in srgb,var(--ut) 45%,transparent)}
+.uitem-b{min-width:0;flex:1;padding:9px 12px 10px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.uitem.fresh .uitem-b{border-color:color-mix(in srgb,var(--ut) 45%,var(--line));
+  background:linear-gradient(150deg,color-mix(in srgb,var(--ut) 9%,transparent),rgba(255,255,255,.02))}
+.uitem-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.uitem-t{font-weight:700;font-size:13.5px}
+.uitem-body{font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:4px;white-space:pre-line}
+.unew{width:7px;height:7px;border-radius:50%;background:var(--nstp);box-shadow:0 0 9px var(--nstp);margin-left:auto}
+
+/* ============================================================
+   WHEN PICKER (plans.js) — date chips, scroll wheels, 48h strip
+   ============================================================ */
+.when-days{margin-bottom:10px}
+.when-day{flex-direction:column;align-items:flex-start;gap:0;padding:6px 11px;min-width:64px;line-height:1.25}
+.when-day b{font-size:12px;font-weight:700;color:var(--ink)}
+.when-day span{font-size:10.5px;color:var(--muted)}
+.when-day.on span{color:var(--ink);opacity:.8}
+.when-wheels{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.when-col{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);padding:9px 8px 10px}
+.when-cap{font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0 0 4px 4px}
+.twheel{position:relative;display:flex;align-items:stretch;justify-content:center;gap:2px;height:170px;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.twheel-hl{position:absolute;left:2px;right:2px;top:68px;height:34px;border-radius:10px;pointer-events:none;
+  background:color-mix(in srgb,var(--major) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--major) 45%,transparent)}
+.twheel-c{align-self:center;font-weight:700;color:var(--muted);position:relative}
+.wheel{position:relative;height:170px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;min-width:34px;flex:1}
+.wheel::-webkit-scrollbar{display:none}
+.wheel-pad{height:68px}
+.wheel-i{display:block;width:100%;height:34px;scroll-snap-align:center;border:none;background:none;color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums;padding:0}
+.wheel-i.on{color:var(--ink);font-weight:700}
+.when-endday{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.when-endday .pill{padding:4px 9px;font-size:11px}
+.when-endday .pill:disabled{opacity:.35;cursor:not-allowed}
+.when-strip{position:relative;height:30px;margin-top:14px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--line);cursor:pointer;overflow:hidden}
+.when-band{position:absolute;top:3px;bottom:3px;border-radius:6px;min-width:4px;
+  background:linear-gradient(90deg,var(--major),var(--ge));box-shadow:0 0 14px color-mix(in srgb,var(--major) 45%,transparent)}
+.when-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-strong)}
+.when-tick{position:absolute;bottom:2px;transform:translateX(3px);font-size:8.5px;color:var(--faint);pointer-events:none;letter-spacing:.02em}
+.when-sum{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12.5px}
+.when-sum span{color:var(--muted);font-size:11.5px}
+
+/* ============================================================
+   GLYPHS (glyphs.js) — Orbit's own symbol set
+   ============================================================ */
+.glyph{display:inline-block;flex:none;vertical-align:-.18em}
+.glyph .f{fill:currentColor;stroke:none}
+.gtile{display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff;
+  background:
+    radial-gradient(120% 90% at 30% 18%, hsl(var(--th) 85% 72% / .55), transparent 60%),
+    linear-gradient(155deg, hsl(var(--th) 70% 52%), hsl(calc(var(--th) + 25) 65% 30%));
+  box-shadow:inset 0 0 0 1px hsl(var(--th) 90% 80% / .28), inset 0 -6px 12px rgba(0,0,0,.22), 0 4px 14px -6px hsl(var(--th) 80% 45% / .7)}
+.gtile .glyph{filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
+/* inline glyph beside text (buttons, labels) — optically matched to 13px text */
+.gi{display:inline-flex;align-items:center;gap:6px}
+
+/* glyph pickers (system icon, place icon, plan icon, update icon) */
+.glyphgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:7px}
+.glyphbtn{height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.035);color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:border-color .15s ease,background .15s ease,color .15s ease}
+.glyphbtn:hover{border-color:var(--line-strong);color:var(--ink)}
+.glyphbtn.on{color:#fff;border-color:hsl(var(--th,265) 80% 70% / .7);
+  background:linear-gradient(155deg,hsl(var(--th,265) 70% 52%),hsl(calc(var(--th,265) + 25) 65% 30%));box-shadow:0 4px 14px -6px hsl(var(--th,265) 80% 45% / .8)}
+.symtxt{line-height:1}
+.geopin-i .glyph{color:#fff}
+
+/* avatar picker (components.js AvatarPicker) */
+.avpick{border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(255,255,255,.02)}
+.avpick-top{display:flex;align-items:center;gap:12px}
+.avpick-st{font-size:12.5px;font-weight:600;color:var(--muted)}
+.avpick-st.ok{color:var(--pe)}
+.avpick-st.fail,.avpick-st.bad{color:var(--now)}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin-top:10px}
+.avopt{aspect-ratio:1;border-radius:50%;border:2px solid transparent;padding:2px;background:none;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+.avopt img{width:100%;height:100%;border-radius:50%;display:block}
+.avopt:hover{transform:translateY(-1px)}
+.avopt.on{border-color:var(--major);box-shadow:0 0 14px -2px var(--major)}
+
+/* ============================================================
+   LIVE CONNECTIONS (connect.js) — Discord presence, Spotify, GitHub
+   ============================================================ */
+.lvwrap{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.lvhead{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);font-weight:600}
+.lvstatus{width:9px;height:9px;border-radius:50%;background:#747f8d;flex:none}
+.lvstatus.online{background:#23a55a;box-shadow:0 0 8px #23a55a}
+.lvstatus.idle{background:#f0b232}
+.lvstatus.dnd{background:#f23f43}
+.lvcustom{color:var(--ink);font-weight:500;font-style:italic;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lvcard{display:flex;gap:12px;align-items:center;padding:11px 12px;border-radius:14px;border:1px solid var(--line);
+  background:linear-gradient(140deg,rgba(255,255,255,.045),rgba(255,255,255,.015));color:var(--ink);text-decoration:none;min-width:0}
+a.lvcard:hover{border-color:var(--line-strong)}
+.lvart{width:58px;height:58px;border-radius:11px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(150deg,var(--lc),color-mix(in srgb,var(--lc) 40%,#000))}
+.lvart img{width:100%;height:100%;object-fit:cover;display:block}
+.lvbody{min-width:0;flex:1}
+.lveb{display:flex;align-items:center;gap:6px;font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.14em}
+.lvdot{width:6px;height:6px;border-radius:50%;flex:none;animation:pulse 1.8s ease-in-out infinite}
+.lvtitle{font-weight:700;font-size:13.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvsub{font-size:11.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvfor{display:flex;align-items:center;gap:4px;color:var(--ink);opacity:.8}
+.lvbar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:7px;overflow:hidden}
+.lvbar i{display:block;height:100%;border-radius:99px}
+.lvtime{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
+.lvhint{padding:9px 11px;border-radius:12px;border:1px dashed var(--line-strong)}
+.lvline{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#1db954;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcbox{margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in srgb,#5865f2 45%,var(--line));background:rgba(88,101,242,.07)}
+.geospin{width:12px;height:12px;border-radius:50%;flex:none;border:2px solid color-mix(in srgb,var(--ge) 30%,transparent);border-top-color:var(--ge);animation:spin .8s linear infinite;display:inline-block}
+.geobtn.live.busy{gap:7px}
+
+/* ============================================================
+   2026-09-24 — stories, 24h media, Orbit+, ads, Mission Control
+   Everything animated here stills itself at data-perf 2 and for
+   reduced motion (block at the end of this section).
+   ============================================================ */
+.linkbtn{background:none;border:none;padding:0;color:var(--major);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.spin{width:26px;height:26px;border-radius:50%;border:2.5px solid rgba(255,255,255,.18);border-top-color:#fff;animation:spin .8s linear infinite}
+
+/* ---- Orbit+ auras ----
+   Three layers per avatar (components.js Avatar): .aura-g a flat glow behind,
+   .aura-b a back layer that may be tilted in 3D, and .aura-f a front layer
+   drawn OVER the face — that split is how a ring passes behind the avatar and
+   then in front of it. Everything is sized off --as (the avatar size), so an
+   aura reads the same at 24px in chat and 96px in the studio. */
+.aura{position:relative;flex:none;width:var(--as);height:var(--as);border-radius:50%;isolation:isolate}
+.aura>.avatar{position:relative;z-index:1}
+.aura-g,.aura-b,.aura-f{position:absolute;pointer-events:none;display:none;border-radius:50%}
+.aura-g{inset:calc(var(--as) * -.2);z-index:0}
+.aura-b{z-index:0}
+.aura-f{z-index:2}
+.aura-g::before,.aura-g::after,.aura-b::before,.aura-b::after,.aura-f::before,.aura-f::after{content:"";position:absolute;border-radius:50%}
+@keyframes aurabreath{50%{transform:scale(1.07);opacity:.72}}
+@keyframes twinkle2{to{opacity:.45}}
+
+/* Nebula — two gas clouds swirling in opposite directions */
+.aura-nebula .aura-g{display:block;inset:calc(var(--as) * -.3)}
+.aura-nebula .aura-g::before{inset:0;background:conic-gradient(from 0deg,var(--aa),transparent 26%,var(--ab) 50%,transparent 74%,var(--aa));
+  filter:blur(calc(var(--as) * .09));animation:spin 7s linear infinite}
+.aura-nebula .aura-g::after{inset:12%;background:conic-gradient(from 180deg,transparent,color-mix(in srgb,var(--ab) 70%,#fff) 18%,transparent 38%,color-mix(in srgb,var(--aa) 70%,#fff) 64%,transparent 84%);
+  filter:blur(calc(var(--as) * .045));mix-blend-mode:screen;animation:spin 11s linear infinite reverse}
+.aura-nebula .aura-b{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--ab) 75%,transparent),0 0 calc(var(--as) * .28) color-mix(in srgb,var(--aa) 55%,transparent)}
+
+/* Ringworld — a banded planetary ring, tilted, passing behind and in front */
+.aura-orbit .aura-g{display:block;inset:calc(var(--as) * -.1);background:radial-gradient(closest-side,color-mix(in srgb,var(--ab) 50%,transparent),transparent 80%);animation:aurabreath 4.5s ease-in-out infinite}
+.aura-orbit .aura-b,.aura-orbit .aura-f{display:block;left:50%;top:50%;width:calc(var(--as) * 1.95);height:calc(var(--as) * 1.95);
+  margin:calc(var(--as) * -.975) 0 0 calc(var(--as) * -.975);transform:rotate(-20deg) rotateX(74deg);
+  background:radial-gradient(closest-side,transparent 59%,color-mix(in srgb,var(--aa) 55%,transparent) 61%,transparent 65%,
+    color-mix(in srgb,var(--ab) 85%,transparent) 69%,rgba(255,255,255,.9) 73%,color-mix(in srgb,var(--ab) 75%,transparent) 77%,
+    transparent 80%,color-mix(in srgb,var(--aa) 50%,transparent) 86%,transparent 91%)}
+.aura-orbit .aura-f{clip-path:inset(50% 0 0 0)}
+.aura-orbit .aura-b::after,.aura-orbit .aura-f::after{inset:0;background:conic-gradient(from 0deg,transparent 0 68%,color-mix(in srgb,var(--ab) 55%,transparent) 88%,#fff 97.5%,transparent 100%);
+  -webkit-mask:radial-gradient(closest-side,transparent 62%,#000 67%,#000 83%,transparent 88%);mask:radial-gradient(closest-side,transparent 62%,#000 67%,#000 83%,transparent 88%);
+  animation:spin 3.4s linear infinite}
+
+/* Eclipse — you are the moon; a corona of rays burns around your edge */
+.aura-corona .aura-g{display:block;inset:calc(var(--as) * -.36)}
+.aura-corona .aura-g::before{inset:0;background:repeating-conic-gradient(from 0deg,rgba(255,246,220,.95) 0 1.3deg,transparent 1.3deg 6.5deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 50%,#000 55%,rgba(0,0,0,.35) 74%,transparent 100%);mask:radial-gradient(closest-side,transparent 50%,#000 55%,rgba(0,0,0,.35) 74%,transparent 100%);
+  animation:spin 70s linear infinite}
+.aura-corona .aura-g::after{inset:9%;background:repeating-conic-gradient(from 3deg,color-mix(in srgb,var(--aa) 65%,#fff) 0 2deg,transparent 2deg 10deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 58%,#000 63%,transparent 97%);mask:radial-gradient(closest-side,transparent 58%,#000 63%,transparent 97%);
+  opacity:.8;animation:spin 100s linear infinite reverse}
+.aura-corona .aura-b{display:block;inset:calc(var(--as) * -.06);
+  box-shadow:0 0 0 2px #fff8e1,0 0 calc(var(--as) * .12) 2px #ffe7a0,0 0 calc(var(--as) * .38) color-mix(in srgb,var(--aa) 60%,#ffb347);
+  animation:flare 3.4s ease-in-out infinite}
+@keyframes flare{50%{box-shadow:0 0 0 2.5px #fff,0 0 calc(var(--as) * .2) 3px #ffe7a0,0 0 calc(var(--as) * .55) color-mix(in srgb,var(--aa) 75%,#ffb347)}}
+.aura-corona .aura-f{display:block;inset:calc(var(--as) * -.08)}
+.aura-corona .aura-f::after{top:4%;right:10%;width:calc(var(--as) * .18);height:calc(var(--as) * .18);
+  background:radial-gradient(circle,#fff 0 18%,rgba(255,236,170,.8) 32%,transparent 70%);animation:twinkle2 1.8s ease-in-out infinite alternate}
+
+/* Aurora — curtains of light rippling round in a ring */
+.aura-aurora .aura-g{display:block;inset:calc(var(--as) * -.3)}
+.aura-aurora .aura-g::before,.aura-aurora .aura-g::after{inset:0;
+  background:conic-gradient(from 0deg,#34d399,#22d3ee,#a78bfa,#f472b6,#a3e635,#34d399);
+  -webkit-mask:radial-gradient(closest-side,transparent 48%,#000 60%,transparent 94%),repeating-conic-gradient(#000 0 5deg,rgba(0,0,0,.22) 5deg 13deg);
+  -webkit-mask-composite:source-in;
+  mask:radial-gradient(closest-side,transparent 48%,#000 60%,transparent 94%),repeating-conic-gradient(#000 0 5deg,rgba(0,0,0,.22) 5deg 13deg);
+  mask-composite:intersect;filter:blur(calc(var(--as) * .03));animation:spin 10s linear infinite,aurorahue 6s ease-in-out infinite alternate}
+.aura-aurora .aura-g::after{inset:11%;opacity:.7;animation:spin 14s linear infinite reverse,aurorahue 5s ease-in-out infinite alternate-reverse}
+@keyframes aurorahue{to{filter:blur(calc(var(--as) * .03)) hue-rotate(80deg)}}
+.aura-aurora .aura-b{display:block;inset:calc(var(--as) * -.04);box-shadow:0 0 calc(var(--as) * .2) rgba(52,211,153,.45)}
+
+/* Singularity — a black hole's accretion disk, with the photon ring glowing */
+.aura-singularity .aura-g{display:block;inset:calc(var(--as) * -.12);
+  box-shadow:0 0 0 2px rgba(255,214,160,.95),0 0 calc(var(--as) * .16) rgba(255,150,60,.85),inset 0 0 calc(var(--as) * .08) rgba(255,180,90,.7);
+  animation:aurabreath 3s ease-in-out infinite}
+.aura-singularity .aura-b,.aura-singularity .aura-f{display:block;left:50%;top:50%;width:calc(var(--as) * 2.2);height:calc(var(--as) * 2.2);
+  margin:calc(var(--as) * -1.1) 0 0 calc(var(--as) * -1.1);transform:rotate(14deg) rotateX(78deg);
+  background:radial-gradient(closest-side,transparent 47%,rgba(255,140,60,.9) 53%,#fff4da 59%,rgba(255,176,90,.95) 65%,rgba(220,70,40,.6) 78%,rgba(120,20,60,.25) 88%,transparent 96%)}
+.aura-singularity .aura-f{clip-path:inset(50% 0 0 0)}
+.aura-singularity .aura-b::after,.aura-singularity .aura-f::after{inset:0;background:repeating-conic-gradient(rgba(255,255,255,.55) 0 2.5deg,transparent 2.5deg 17deg);
+  -webkit-mask:radial-gradient(closest-side,transparent 50%,#000 56%,#000 76%,transparent 90%);mask:radial-gradient(closest-side,transparent 50%,#000 56%,#000 76%,transparent 90%);
+  animation:spin 2.2s linear infinite}
+
+/* Stardust — sparks in orbit at two speeds, twinkling */
+.aura-stardust .aura-g{display:block;inset:calc(var(--as) * -.32)}
+.aura-stardust .aura-g::before,.aura-stardust .aura-g::after{inset:0;filter:drop-shadow(0 0 2px #fff)}
+.aura-stardust .aura-g::before{background:radial-gradient(circle at 50% 4%,#fff 0 2%,transparent 3.4%),radial-gradient(circle at 93% 40%,var(--ab) 0 1.8%,transparent 3.2%),
+  radial-gradient(circle at 74% 90%,#fff 0 1.5%,transparent 2.9%),radial-gradient(circle at 17% 84%,var(--aa) 0 2%,transparent 3.4%),
+  radial-gradient(circle at 5% 42%,#fff 0 1.3%,transparent 2.6%),radial-gradient(circle at 30% 9%,var(--ab) 0 1.2%,transparent 2.5%);
+  animation:spin 9s linear infinite,twinkle2 1.7s ease-in-out infinite alternate}
+.aura-stardust .aura-g::after{inset:13%;background:radial-gradient(circle at 80% 12%,#fff 0 2.2%,transparent 3.6%),radial-gradient(circle at 12% 30%,var(--aa) 0 2%,transparent 3.4%),
+  radial-gradient(circle at 60% 96%,var(--ab) 0 2%,transparent 3.4%),radial-gradient(circle at 96% 70%,#fff 0 1.6%,transparent 3%);
+  animation:spin 5.5s linear infinite reverse,twinkle2 1.2s ease-in-out infinite alternate-reverse}
+.aura-stardust .aura-b{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 calc(var(--as) * .22) color-mix(in srgb,var(--ab) 45%,transparent)}
+
+/* Supernova — shockwaves rolling outward from a blazing rim */
+.aura-supernova .aura-g{display:block;inset:0}
+.aura-supernova .aura-g::before,.aura-supernova .aura-g::after{inset:0;border:2px solid var(--ab);
+  box-shadow:0 0 10px var(--aa),inset 0 0 8px var(--aa);animation:shock 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+.aura-supernova .aura-g::after{border-color:var(--aa);box-shadow:0 0 10px var(--ab),inset 0 0 8px var(--ab);animation-delay:1.2s}
+@keyframes shock{0%{transform:scale(.96);opacity:1}100%{transform:scale(1.8);opacity:0}}
+.aura-supernova .aura-b{display:block;inset:calc(var(--as) * -.09);
+  background:radial-gradient(closest-side,transparent 72%,rgba(255,255,255,.95) 78%,color-mix(in srgb,var(--ab) 80%,transparent) 86%,transparent 100%);
+  animation:aurabreath 1.3s ease-in-out infinite}
+
+/* Halo + Comet (the originals) */
+.aura-halo .aura-b{display:block;inset:calc(var(--as) * -.12);background:conic-gradient(from 0deg,var(--aa),transparent 30%,var(--ab) 55%,transparent 80%,var(--aa));
+  -webkit-mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 92%,transparent 100%);mask:radial-gradient(closest-side,transparent 78%,#000 80%,#000 92%,transparent 100%);
+  animation:spin 6s linear infinite;filter:saturate(1.4)}
+.aura-comet .aura-b{display:block;inset:calc(var(--as) * -.12);background:conic-gradient(from 0deg,transparent 0 60%,color-mix(in srgb,var(--ab) 40%,transparent) 80%,#fff 99%,transparent 100%);
+  -webkit-mask:radial-gradient(closest-side,transparent 78%,#000 82%,#000 96%,transparent 100%);mask:radial-gradient(closest-side,transparent 78%,#000 82%,#000 96%,transparent 100%);animation:spin 2.4s linear infinite}
+.aura-comet .aura-g{display:block;inset:calc(var(--as) * -.05);box-shadow:0 0 calc(var(--as) * .2) color-mix(in srgb,var(--ab) 40%,transparent)}
+
+/* small avatars (chat bubbles, lists) keep the look but drop the costly layers */
+.aura-sm .aura-g::after,.aura-sm .aura-b::after,.aura-sm .aura-f::after{display:none}
+.aura-sm .aura-g::before{filter:none}
+.aura-sm.aura-nebula .aura-g::before{filter:blur(2px)}
+
+/* ---- story rail ---- */
+.story-hit{background:none;border:none;padding:0;cursor:pointer;display:block}
+.story-add{position:absolute;top:38px;left:40px;z-index:3;width:21px;height:21px;border-radius:50%;border:2.5px solid var(--canvas);
+  background:linear-gradient(135deg,var(--major),var(--ge));color:#0f0a16;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.sring{position:relative;border-radius:50%;padding:2.5px;width:calc(var(--ss) + 9px);height:calc(var(--ss) + 9px);background:rgba(255,255,255,.16)}
+.sring.new{background:conic-gradient(from 210deg,var(--sa),var(--sb),#ff5d8f,var(--sa))}
+.sring.close.new{background:conic-gradient(from 210deg,#34d399,#a3e635,#34d399)}
+.sring.close:not(.new){background:rgba(52,211,153,.45)}
+.sring.mine{background:linear-gradient(140deg,var(--sa),var(--sb))}
+.sring-in{border-radius:50%;padding:2px;background:var(--canvas);width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.sring-moon{position:absolute;inset:-3px;border-radius:50%;animation:spin 4.5s linear infinite;pointer-events:none}
+.sring-moon::after{content:"";position:absolute;top:-1px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#fff;box-shadow:0 0 8px var(--sb),0 0 2px #fff}
+
+/* ---- story viewer ---- */
+.sv{position:fixed;inset:0;z-index:140;background:#05030a;display:flex;flex-direction:column;animation:cffade .18s ease;touch-action:none}
+.sv-stage{position:relative;flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;overflow:hidden}
+@media (min-width:700px){ .sv-stage{max-width:min(460px,56vh);margin:12px auto 0;border-radius:18px} }
+.sv-media{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;-webkit-touch-callout:none}
+.sv-load{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.sv-top{position:absolute;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 10px 26px;background:linear-gradient(180deg,rgba(0,0,0,.55),transparent);z-index:2}
+.sv-bars{display:flex;gap:3px}
+.sv-bars span{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.3);overflow:hidden}
+.sv-bars i{display:block;height:100%;background:#fff;transform-origin:left;will-change:transform}
+.sv-head{display:flex;align-items:center;gap:9px;margin-top:10px}
+.sv-who{min-width:0;flex:1}
+.sv-name{font-weight:700;font-size:13.5px;color:#fff;display:flex;align-items:center;gap:7px;min-width:0}
+.sv-ago{font-weight:500;font-size:11.5px;color:rgba(255,255,255,.6)}
+.sv-sub{font-size:11.5px;color:rgba(255,255,255,.72);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sv-close{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#04210f;background:#34d399;border-radius:99px;padding:1px 7px}
+.sv-adico{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff}
+.sv-paused{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.7);background:rgba(0,0,0,.4);padding:5px 12px;border-radius:99px;z-index:2}
+.sv-cap{position:absolute;left:0;right:0;bottom:18px;z-index:2}
+.story-cap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 18px;text-align:center}
+.story-cap>span:not(.story-place){background:rgba(0,0,0,.55);color:#fff;font-weight:600;font-size:15px;padding:6px 12px;border-radius:10px;max-width:100%;overflow-wrap:anywhere}
+.story-place{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#04121a;background:var(--ge);padding:3px 10px;border-radius:99px}
+.medit .story-cap{position:absolute;left:0;right:0;bottom:16px;z-index:2}
+.sv-foot{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom));width:100%;max-width:520px;margin:0 auto}
+.sv-react{display:flex;justify-content:space-between;gap:4px}
+.sv-react button{flex:1;font-size:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:6px 0;cursor:pointer;transition:transform .12s ease}
+.sv-react button:active{transform:scale(1.25)}
+.sv-reply{display:flex;gap:8px;align-items:center}
+.sv-reply input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:99px;color:#fff;padding:11px 16px;font-size:14px;outline:none}
+.sv-reply input:focus{border-color:rgba(255,255,255,.5)}
+.sv-seen{align-self:center;display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:99px;padding:9px 16px;font-weight:600;font-size:13px;cursor:pointer}
+.sv-menu{position:absolute;right:12px;top:calc(76px + env(safe-area-inset-top));z-index:5;border-radius:13px;overflow:hidden;min-width:190px;border:1px solid var(--line-strong);background:var(--panel2)}
+.sv-menu button{display:flex;align-items:center;gap:9px;width:100%;background:none;border:none;padding:12px 14px;text-align:left;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
+.sv-menu button+button{border-top:1px solid var(--line)}
+.sv-views{position:absolute;left:0;right:0;bottom:0;z-index:6;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:var(--panel2);border:1px solid var(--line-strong);animation:rise .2s ease}
+.sv-ad{position:relative;width:100%;height:100%;display:flex;align-items:flex-end;background:radial-gradient(120% 80% at 20% 0%,rgba(176,107,255,.35),transparent 60%),radial-gradient(100% 70% at 90% 100%,rgba(45,212,191,.25),transparent 60%),#0b0714}
+.sv-ad img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
+.sv-adbody{position:relative;z-index:1;width:100%;padding:24px 20px 34px;background:linear-gradient(0deg,rgba(0,0,0,.8),transparent);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.sv-adtitle{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#fff;line-height:1.15}
+.sv-adtext{font-size:14px;color:rgba(255,255,255,.85)}
+.sv-adbody .btn{text-decoration:none;margin-top:6px}
+.camico{width:38px;height:38px;flex:none;border-radius:50%;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.camico:disabled{opacity:.4}
+
+/* ---- composer + camera ---- */
+.mcomp{position:fixed;inset:0;z-index:150;background:#07040c;display:flex;flex-direction:column;animation:cffade .18s ease}
+.mpick{width:100%;max-width:520px;margin:auto;padding:22px 18px calc(22px + env(safe-area-inset-bottom))}
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mtitle{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:#fff;margin-top:4px;letter-spacing:-.01em}
+.mtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.mtile{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:18px 16px;border-radius:18px;border:1px solid var(--line-strong);cursor:pointer;text-align:left;color:var(--ink);
+  background:radial-gradient(120% 90% at 0% 0%,rgba(176,107,255,.16),transparent 60%),var(--panel)}
+.mtile b{font-size:15px;font-family:'Space Grotesk',sans-serif}
+.mtile span:last-child{font-size:11.5px;color:var(--muted);line-height:1.4}
+.mtico{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#0f0a16;background:linear-gradient(135deg,var(--major),var(--ge));margin-bottom:6px}
+.mtico.alt{background:linear-gradient(135deg,var(--now),var(--nstp))}
+.mfine{display:flex;gap:7px;align-items:flex-start;margin-top:18px;font-size:11.5px;color:var(--muted);line-height:1.5}
+.medit{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:520px;margin:0 auto}
+.mstage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden}
+@media (min-width:700px){ .mstage{border-radius:18px;margin-top:12px} }
+.mstage img,.mstage video{width:100%;height:100%;object-fit:contain;display:block}
+.mclose{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;z-index:3}
+.mbusy{position:absolute;left:0;right:0;bottom:0;z-index:4;padding:16px;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);display:flex;flex-direction:column;gap:7px;font-size:12px;color:#fff;font-weight:600}
+.mbar{height:4px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden}
+.mbar i{display:block;height:100%;background:linear-gradient(90deg,var(--major),var(--ge));transition:width .25s ease}
+.mopts{flex:none;padding:12px 14px calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px}
+.mtrim input{width:100%;accent-color:var(--ge)}
+.cam{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;z-index:5}
+.camfeed{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.camfeed.mirror{transform:scaleX(-1)}
+.camerr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#fff;text-align:center;padding:30px;font-weight:600}
+.camtop{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(12px + env(safe-area-inset-top)) 12px 0}
+.campill{font-size:11.5px;color:#fff;background:rgba(0,0,0,.4);padding:6px 12px;border-radius:99px;display:inline-flex;align-items:center;gap:6px}
+.recdot{width:8px;height:8px;border-radius:50%;background:#ff4d6d;animation:geoseek 1s ease-in-out infinite}
+.cambot{position:relative;z-index:2;margin-top:auto;display:flex;justify-content:center;padding:0 0 calc(28px + env(safe-area-inset-bottom))}
+.shutter{position:relative;width:80px;height:80px;border-radius:50%;background:none;border:none;padding:0;cursor:pointer;touch-action:none;-webkit-touch-callout:none;user-select:none}
+.shutter svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.shr-bg{fill:none;stroke:rgba(255,255,255,.85);stroke-width:5}
+.shr-fg{fill:none;stroke:#ff4d6d;stroke-width:5;stroke-dasharray:226.2;stroke-dashoffset:226.2;stroke-linecap:round}
+.shutter.rec .shr-fg{animation:shring var(--rs) linear forwards}
+@keyframes shring{to{stroke-dashoffset:0}}
+.shcore{position:absolute;inset:12px;border-radius:50%;background:#fff;transition:transform .2s ease,background .2s ease,border-radius .2s ease}
+.shutter.rec .shcore{transform:scale(.62);background:#ff4d6d;border-radius:30%}
+
+/* ---- snaps in chat ---- */
+.bub.snapbub{padding:3px;background:transparent !important;border:none !important}
+.snapwrap{position:relative}
+.snapwrap video.bubimg{background:#000}
+.snapchip{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);padding:2px 7px;border-radius:99px}
+.snap{display:inline-flex;align-items:center;gap:7px;padding:11px 14px;border-radius:15px;font-size:12.5px;font-weight:600;border:1px solid var(--line-strong);background:var(--panel2);color:var(--ink)}
+.snap.loading{min-width:140px;min-height:96px;justify-content:center;color:var(--muted);max-width:260px}
+.snap.gone{color:var(--muted);border-style:dashed;background:transparent;font-weight:500}
+.snap.once{cursor:pointer;color:#fff;border-color:transparent;background:linear-gradient(135deg,color-mix(in srgb,var(--now) 70%,transparent),color-mix(in srgb,var(--major) 70%,transparent))}
+.snapleft{font-size:10.5px;font-weight:600;opacity:.8;margin-left:4px}
+.mfull img,.mfull video{max-width:94vw;max-height:88vh;border-radius:12px;-webkit-touch-callout:none}
+.streak{display:inline-flex;align-items:center;gap:2px;margin-left:6px;font-size:11px;font-weight:700;color:#ffb347;vertical-align:1px}
+.streak.risk{color:var(--muted)}
+.streak.risk .glyph{animation:geoseek 1.4s ease-in-out infinite}
+.queuechip{align-self:center;display:inline-flex;align-items:center;gap:6px;margin:0 auto 6px;font-size:11.5px;font-weight:600;color:var(--ge);background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.35);border-radius:99px;padding:5px 12px;cursor:pointer}
+.lookswatch.plusw{position:relative}
+.lookswatch.plusw::after{content:"+";position:absolute;right:-3px;top:-3px;width:14px;height:14px;border-radius:50%;background:#0f0a16;color:#fff;font-size:10px;font-weight:800;line-height:14px;text-align:center;border:1px solid var(--line-strong)}
+.lookswatch.plock{opacity:.55}
+
+/* ---- ads ---- */
+.adslot:empty{display:none}
+.adslot{margin-top:20px}
+.adcard{margin-top:12px;border-radius:14px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(245,181,68,.06),transparent 55%),var(--panel);padding:10px 12px 11px}
+.adslot .adcard{margin-top:0}
+.adcard-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.adtag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--nstp)}
+.adx{background:none;border:none;color:var(--faint);cursor:pointer;padding:2px;display:flex}
+.adcard-body{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit}
+.adimg{width:52px;height:52px;border-radius:11px;object-fit:cover;flex:none;background:var(--panel2)}
+.adtitle{font-weight:700;font-size:13.5px;color:var(--ink)}
+.adtext{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}
+.adcta{flex:none;font-size:12px;font-weight:700;color:#0f0a16;background:var(--nstp);border-radius:99px;padding:7px 12px}
+.adplus{display:block;margin:8px 0 0;font-size:11px;color:var(--faint)}
+
+/* ---- broadcast banner ---- */
+.obanner{position:relative;z-index:4;display:flex;align-items:center;gap:9px;margin:4px 0 12px;padding:10px 12px;border-radius:12px;font-size:12.5px;font-weight:600;line-height:1.4;
+  border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.1);color:var(--ink);animation:rise .25s ease}
+.obanner.warn{border-color:rgba(255,93,143,.45);background:rgba(255,93,143,.12)}
+.obanner.party{border-color:rgba(176,107,255,.45);background:linear-gradient(90deg,rgba(176,107,255,.16),rgba(45,212,191,.12))}
+.obanner span{flex:1;min-width:0}
+.obanner button{flex:none;background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:3px}
+
+/* ---- Orbit+ ---- */
+.plusbtn{color:var(--major)}
+.plusbtn.on{background:linear-gradient(135deg,color-mix(in srgb,var(--major) 30%,var(--panel)),color-mix(in srgb,var(--ge) 22%,var(--panel)));border-color:color-mix(in srgb,var(--major) 60%,transparent);color:#fff}
+.plustag{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;letter-spacing:.02em;padding:2px 7px;border-radius:99px;color:#0f0a16;
+  background:linear-gradient(90deg,#c9a7ff,#7df9ff);vertical-align:1px;white-space:nowrap}
+.plustag.mini{padding:1px 4px}
+.plusmark{width:34px;height:34px;flex:none;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:#0f0a16;background:linear-gradient(135deg,#c9a7ff,#7df9ff)}
+.plushero-t{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;color:#fff}
+.plushero-t b{background:linear-gradient(90deg,#c9a7ff,#7df9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.plushero{display:flex;gap:16px;align-items:center;padding:16px;border-radius:16px;margin-bottom:14px;border:1px solid color-mix(in srgb,var(--major) 40%,transparent);
+  background:radial-gradient(120% 120% at 0% 0%,rgba(176,107,255,.22),transparent 60%),radial-gradient(90% 90% at 100% 100%,rgba(45,212,191,.16),transparent 60%),var(--panel)}
+.plushero-av{padding:10px;flex:none}
+.plushero-h{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;color:#fff}
+.plushero-s{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.perkgrid{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:520px){ .perkgrid{grid-template-columns:1fr 1fr} }
+.perk{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+.perkico{width:32px;height:32px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--major);background:color-mix(in srgb,var(--major) 14%,transparent)}
+.perk-t{font-weight:700;font-size:13px;color:var(--ink)}
+.perk-d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+.aurapick{display:flex;gap:10px;overflow-x:auto;padding:12px 4px 6px}
+.aurabtn{flex:none;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 12px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);cursor:pointer;font-size:11.5px;font-weight:600;color:var(--muted);min-width:78px}
+.aurabtn.on{border-color:var(--major);background:color-mix(in srgb,var(--major) 12%,transparent);color:var(--ink)}
+.plusrow{width:100%;display:flex;align-items:center;gap:11px;padding:11px 12px;margin:-4px 0 14px;border-radius:14px;cursor:pointer;color:var(--ink);text-align:left;
+  border:1px solid color-mix(in srgb,var(--major) 35%,transparent);background:linear-gradient(90deg,rgba(176,107,255,.12),rgba(45,212,191,.06))}
+.plusrow b{font-size:13.5px}
+.theme-tile.plock{position:relative;opacity:.8}
+.theme-tile.plock::after{content:"Orbit+";position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;color:#0f0a16;background:linear-gradient(90deg,#c9a7ff,#7df9ff);padding:1px 6px;border-radius:99px}
+
+/* ---- find a time + close friends picker ---- */
+.findpick{display:flex;gap:10px;overflow-x:auto;padding:12px 2px 4px}
+.findf{position:relative;flex:none;width:62px;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0}
+.findf span{max-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.findf.on{color:var(--ink);font-weight:600}
+.findf.on .avatar{box-shadow:0 0 0 2.5px var(--canvas),0 0 0 4.5px var(--ge)}
+.findf.on.close .avatar{box-shadow:0 0 0 2.5px var(--canvas),0 0 0 4.5px #34d399}
+.findf i{position:absolute;top:24px;left:38px;width:17px;height:17px;border-radius:50%;background:var(--ge);color:#04121a;display:flex;align-items:center;justify-content:center;border:2px solid var(--canvas)}
+.findf.close i{background:#34d399}
+.findwin{cursor:pointer}
+.findday{display:flex;flex-direction:column;min-width:96px}
+.findday b{font-size:13px;color:var(--ink)}
+.findday span{font-size:12px;color:var(--ge);font-weight:600}
+
+/* ---- Mission Control ---- */
+.mc{--mc-ok:#34d399;--mc-warn:#f5b544;--mc-crit:#ff5d8f}
+.mc-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:16px;border-radius:18px;border:1px solid var(--line);
+  background:radial-gradient(120% 140% at 0% 0%,color-mix(in srgb,var(--major) 18%,transparent),transparent 60%),radial-gradient(80% 120% at 100% 100%,color-mix(in srgb,var(--ge) 12%,transparent),transparent 60%),var(--panel)}
+.mc-hero-t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:#fff;margin-top:4px;letter-spacing:-.01em}
+.mc-live{display:inline-flex;align-items:center;gap:6px}
+.mc-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;background:var(--faint)}
+.mc-dot.ok{background:var(--mc-ok,#34d399)}.mc-dot.warn{background:var(--mc-warn,#f5b544)}.mc-dot.crit{background:var(--mc-crit,#ff5d8f)}.mc-dot.off{background:var(--faint)}
+.mc-dot.pulse{--pc:rgba(52,211,153,.5);animation:pulse 2s ease-in-out infinite}
+.mc-tabs{display:flex;gap:6px;overflow-x:auto;margin:14px -18px 0;padding:2px 18px 6px;scroll-snap-type:x proximity}
+@media (min-width:900px){ .mc-tabs{margin:14px 0 0;padding:2px 0 6px;flex-wrap:wrap} }
+.mc-tab{flex:none;scroll-snap-align:start;display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer}
+.mc-tab.on{color:var(--ink);border-color:var(--major);background:color-mix(in srgb,var(--major) 14%,transparent)}
+.mc-tab em{font-style:normal;font-size:10.5px;font-weight:800;color:#fff;background:var(--now);border-radius:99px;padding:0 6px;min-width:17px;text-align:center}
+.mc-alerts{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.mc-alert{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:13px;cursor:pointer;text-align:left;color:var(--ink);font-size:12.5px;
+  border:1px solid rgba(255,93,143,.4);background:rgba(255,93,143,.08)}
+.mc-alert.warn{border-color:rgba(245,181,68,.45);background:rgba(245,181,68,.08)}
+.mc-alert span{color:var(--muted);margin-left:auto;font-size:11.5px;text-align:right}
+.mc-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+@media (min-width:700px){ .mc-tiles{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.mc-tile{text-align:left;display:flex;flex-direction:column;gap:4px;padding:13px 13px 12px;border-radius:15px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:default;min-height:104px;transition:border-color .15s ease,transform .15s ease;font:inherit}
+.mc-tile.click{cursor:pointer}.mc-tile.click:hover{border-color:var(--line-strong);transform:translateY(-1px)}
+.mc-tile:disabled{opacity:1}
+.mc-tile.hot{border-color:rgba(255,93,143,.45)}
+.mc-tile.skel{background:linear-gradient(90deg,var(--panel),var(--panel2),var(--panel));background-size:200% 100%;animation:ngslide 1.4s linear infinite}
+.mc-tile-h{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);font-weight:600}
+.mc-tile-ico{width:26px;height:26px;border-radius:8px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--major);background:color-mix(in srgb,var(--major) 13%,transparent)}
+.mc-tile-v{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;color:#fff;letter-spacing:-.02em;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.mc-tile-s{font-size:11px;color:var(--faint);line-height:1.35;display:flex;gap:5px;align-items:baseline;flex-wrap:wrap}
+.mc-delta{font-weight:700;color:var(--muted)}
+.mc-delta.up{color:var(--mc-ok)}.mc-delta.down{color:var(--mc-crit)}
+.mc-2col{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px}
+@media (min-width:700px){ .mc-2col{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.mc-card{border-radius:15px;border:1px solid var(--line);background:var(--panel);padding:14px}
+.mc-cardh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font-size:13px;color:var(--ink)}
+.mc-chart svg{width:100%;height:auto;display:block;overflow:visible}
+.mc-bar{fill:var(--major);opacity:.75;transition:opacity .12s ease}
+.mc-bar.on{opacity:1}
+.mc-axis{stroke:var(--line-strong);stroke-width:1}
+.mc-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
+.mc-ax{fill:var(--faint);font-size:8.5px;font-family:Inter,system-ui,sans-serif}
+.mc-table{margin-top:8px;font-size:11px;color:var(--muted)}
+.mc-table summary{cursor:pointer;color:var(--faint)}
+.mc-table table{width:100%;border-collapse:collapse;margin-top:6px}
+.mc-table td{padding:3px 0;border-top:1px solid var(--line)}
+.mc-table td+td{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+.mc-meter{margin-bottom:12px}
+.mc-meter-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.mc-meter-h>span:first-child{display:inline-flex;align-items:center;gap:6px}
+.mc-meter-bar{height:7px;border-radius:7px;background:rgba(255,255,255,.07);overflow:hidden;margin-bottom:5px}
+.mc-meter-bar i{display:block;height:100%;border-radius:7px;background:var(--ge)}
+.mc-meter-bar i.warn{background:var(--mc-warn)}.mc-meter-bar i.crit{background:var(--mc-crit)}
+.mc-state{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--muted)}
+.mc-job{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.mc-cardh+.mc-job,.mc-cardh+.small+.mc-job{border-top:none}
+.mc-report{border-radius:14px;border:1px solid var(--line);background:var(--panel);padding:12px 13px}
+.mc-report.done{opacity:.6}
+.mc-report-h{display:flex;align-items:center;gap:8px}
+.mc-kind{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;color:var(--ink);background:rgba(255,255,255,.07)}
+.mc-kind.k-story{color:#0f0a16;background:var(--ge)}
+.mc-kind.k-message{color:#0f0a16;background:var(--major)}
+.mc-evidence{margin-top:9px;display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.mc-evidence img,.mc-evidence video{max-width:220px;max-height:280px;border-radius:12px;background:#000}
+.mc-empty{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:30px 16px;color:var(--muted);font-size:13px}
+.mc-empty .glyph{color:var(--faint)}
+.mc-row{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+.mc-row>.mc-dot{margin-top:6px}
+.mc-acts{display:flex;gap:6px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+.mc-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+@media (min-width:520px){ .mc-kpis{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.mc-kpi{border-radius:12px;border:1px solid var(--line);background:var(--panel);padding:10px}
+.mc-kpi span{display:block;font-size:10.5px;color:var(--faint);font-weight:600}
+.mc-kpi b{font-family:'Space Grotesk',sans-serif;font-size:20px;color:#fff}
+.mc-form{display:flex;flex-direction:column;gap:9px}
+.mc-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:600;color:var(--faint);letter-spacing:.02em}
+.mc-form label .input{margin:0}
+.mc-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mc-steps{margin:0 0 10px 18px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.mc-steps code{font-size:11.5px;color:var(--ge)}
+.mc-codes{display:flex;flex-wrap:wrap;gap:6px}
+.mc-codes .mc-cardh{flex-basis:100%}
+.mc-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;letter-spacing:.06em;padding:8px 11px;border-radius:9px;border:1px dashed color-mix(in srgb,var(--major) 50%,transparent);background:color-mix(in srgb,var(--major) 8%,transparent);color:var(--ink);cursor:pointer}
+.mc-switch{position:relative;flex:none;width:44px;height:26px;border-radius:99px;border:1px solid var(--line-strong);background:rgba(255,255,255,.08);cursor:pointer;padding:0;transition:background .2s ease}
+.mc-switch i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s var(--ease-morph,ease)}
+.mc-switch.on{background:var(--mc-ok);border-color:transparent}
+.mc-switch.on i{transform:translateX(18px)}
+.mc-switch:disabled{opacity:.5;cursor:not-allowed}
+
+/* (aura quiet rules moved to the Orbit+ v2 block below) */
+html[data-perf="2"] .sring-moon,html[data-rm] .sring-moon,html[data-rm] .mc-dot.pulse,html[data-rm] .streak.risk .glyph,html[data-rm] .mc-tile.skel{animation:none}
+
+@media (max-width:420px){ .topbar .iconbtn{width:38px;height:38px} .topbar>div:last-child{gap:6px !important} .brand-eyebrow{letter-spacing:.14em;font-size:10px;white-space:nowrap} }
+
+/* ---- Orbit+ name effects ---- */
+.nfx{position:relative;display:inline-block;max-width:100%}
+.nfx-neon{color:#fff;text-shadow:0 0 3px var(--na),0 0 9px var(--na),0 0 20px var(--nb);animation:neonflick 5s infinite}
+@keyframes neonflick{0%,17%,21%,61%,64%,100%{opacity:1}19%,62.5%{opacity:.5}}
+.nfx-holo,.nfx-rainbow{-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:ngslide 3.4s linear infinite}
+.nfx-holo{background-image:linear-gradient(110deg,#fff 0%,#c9a7ff 16%,#7df9ff 30%,#fff 44%,#ffd6f5 58%,#a6f4c5 72%,#fff 86%);background-size:250% 100%;
+  filter:drop-shadow(0 0 6px rgba(201,167,255,.35))}
+.nfx-rainbow{background-image:linear-gradient(90deg,#ff5d8f,#f5b544,#a3e635,#2dd4bf,#4dabf7,#b06bff,#ff5d8f);background-size:200% 100%}
+.nfx-glitch{color:#fff}
+.nfx-glitch::before,.nfx-glitch::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;overflow:hidden;white-space:nowrap;pointer-events:none;mix-blend-mode:screen}
+.nfx-glitch::before{color:#ff2bd6;clip-path:inset(0 0 55% 0);animation:glitchA 2.6s steps(1) infinite}
+.nfx-glitch::after{color:#22e5ff;clip-path:inset(50% 0 0 0);animation:glitchB 2.2s steps(1) infinite}
+@keyframes glitchA{0%,88%{transform:translate(-1px,0)}90%{transform:translate(-4px,-1px);clip-path:inset(10% 0 60% 0)}94%{transform:translate(3px,1px);clip-path:inset(40% 0 20% 0)}}
+@keyframes glitchB{0%,84%{transform:translate(1px,0)}87%{transform:translate(4px,1px);clip-path:inset(60% 0 5% 0)}93%{transform:translate(-3px,0);clip-path:inset(20% 0 50% 0)}}
+
+/* ---- Orbit+ profile (cover) effects ---- */
+.coverfx{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.coverfx i{position:absolute;display:block}
+.cfx-stars i{inset:-20% -40%;background:
+  radial-gradient(1.4px 1.4px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1.8px 1.8px at 55% 35%,#fff,transparent),
+  radial-gradient(1px 1px at 70% 80%,#fff,transparent),radial-gradient(1.2px 1.2px at 85% 25%,#fff,transparent),radial-gradient(1px 1px at 45% 90%,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 20% 55%,#fff,transparent),radial-gradient(1px 1px at 95% 60%,#fff,transparent);
+  background-size:180px 120px;animation:stardrift 40s linear infinite,twinkle2 2.4s ease-in-out infinite alternate}
+.cfx-stars i:nth-child(2){background-size:260px 170px;opacity:.6;animation-duration:70s,3.1s}
+.cfx-stars i:nth-child(3){background-size:120px 90px;opacity:.35;animation-duration:26s,1.8s}
+@keyframes stardrift{to{transform:translateX(-180px)}}
+.cfx-aurora i{left:-30%;right:-30%;height:70%;top:-10%;filter:blur(18px);opacity:.55;border-radius:50%;
+  background:linear-gradient(90deg,transparent,#34d399 25%,#22d3ee 45%,#a78bfa 65%,transparent);animation:auroraband 9s ease-in-out infinite alternate}
+.cfx-aurora i:nth-child(2){top:20%;opacity:.4;animation-duration:12s;animation-direction:alternate-reverse;background:linear-gradient(90deg,transparent,#a3e635 30%,#34d399 50%,#f472b6 75%,transparent)}
+.cfx-aurora i:nth-child(3){display:none}
+@keyframes auroraband{0%{transform:translateX(-12%) skewX(-18deg) scaleY(.8)}100%{transform:translateX(12%) skewX(14deg) scaleY(1.15)}}
+.cfx-meteors i{top:-30%;width:2px;height:90px;border-radius:2px;background:linear-gradient(0deg,#fff,rgba(255,255,255,0));
+  transform:rotate(-35deg);opacity:0;animation:meteorfall 3.6s linear infinite;filter:drop-shadow(0 0 4px var(--pb))}
+.cfx-meteors i:nth-child(1){left:30%}
+.cfx-meteors i:nth-child(2){left:65%;animation-delay:1.2s;height:60px}
+.cfx-meteors i:nth-child(3){left:90%;animation-delay:2.4s;height:110px}
+@keyframes meteorfall{0%{opacity:0;translate:0 0}8%{opacity:1}40%{opacity:1}55%,100%{opacity:0;translate:-220px 320px}}
+.cfx-nebula i{width:70%;aspect-ratio:1;border-radius:50%;filter:blur(30px);opacity:.55;mix-blend-mode:screen}
+.cfx-nebula i:nth-child(1){left:-10%;top:-40%;background:var(--pa);animation:neb1 14s ease-in-out infinite alternate}
+.cfx-nebula i:nth-child(2){right:-15%;bottom:-50%;background:var(--pb);animation:neb2 17s ease-in-out infinite alternate}
+.cfx-nebula i:nth-child(3){left:35%;top:10%;width:40%;background:#ff5d8f;opacity:.3;animation:neb1 11s ease-in-out infinite alternate-reverse}
+@keyframes neb1{to{transform:translate(30%,20%) scale(1.2)}}
+@keyframes neb2{to{transform:translate(-25%,-15%) scale(.9)}}
+
+/* ---- evolving Orbit+ badge ---- */
+.plustier{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap;color:#0f0a16;vertical-align:1px}
+.plustier.t-moon{background:linear-gradient(90deg,#e5e7eb,#9ca3af)}
+.plustier.t-comet{background:linear-gradient(90deg,#7df9ff,#2dd4bf)}
+.plustier.t-planet{background:linear-gradient(90deg,#c9a7ff,#8f5bff);color:#fff}
+.plustier.t-star{background:linear-gradient(90deg,#ffe28a,#f5b544)}
+.plustier.t-nova{background:linear-gradient(90deg,#ff4f81,#ffb347,#ff4f81);background-size:200% 100%;color:#fff;animation:ngslide 3s linear infinite;box-shadow:0 0 10px rgba(255,79,129,.45)}
+
+/* ---- Orbit+ studio ---- */
+.studio{border-radius:18px;border:1px solid color-mix(in srgb,var(--major) 35%,transparent);background:var(--panel);overflow:hidden;margin-bottom:14px}
+.studio-stage{position:relative;min-height:236px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:18px 16px 14px;gap:6px;overflow:hidden}
+.studio-stage>.profcover{position:absolute;inset:0;aspect-ratio:auto;height:100%;border:none;border-radius:0}
+.studio-nebula{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(10,6,18,.05),rgba(10,6,18,.2) 45%,var(--panel) 96%)}
+.studio-av,.studio-name,.studio-chips,.studio-note{position:relative;z-index:2}
+.studio-av{margin-bottom:12px}
+.studio-name{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;color:#fff;letter-spacing:-.01em;text-align:center;max-width:100%}
+.studio-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:18px}
+.studio-note{font-size:11px;color:var(--muted)}
+.studio-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 12px 0}
+.studio-tab{flex:none;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+.studio-tab.on{color:#fff;border-color:transparent;background:linear-gradient(90deg,color-mix(in srgb,#c9a7ff 40%,transparent),color-mix(in srgb,#7df9ff 30%,transparent))}
+.studio>.btn{width:calc(100% - 24px);margin:12px 12px 0}
+.studio>.small{padding:0 12px}
+.stiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;padding:12px 12px 0}
+.stiles.wide{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+.stile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted);cursor:pointer;min-width:0}
+.stile b{font-size:11.5px;font-weight:700}
+.stile.on{border-color:var(--major);background:color-mix(in srgb,var(--major) 13%,transparent);color:#fff}
+.stile-art{min-height:70px;width:100%;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:#fff;overflow:visible}
+.stile-cover{width:100%}
+.stile-cover .profcover{aspect-ratio:auto;height:64px;border-radius:10px}
+.stile-fx{width:54px;height:54px;border-radius:17px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--major),var(--ge))}
+.fxi-meteor,.fxm-hearts{background:linear-gradient(135deg,#ff5d8f,#f5b544)}
+.fxi-bloom,.fxm-confetti{background:linear-gradient(135deg,#f5b544,#b06bff)}
+.fxm-stars{background:linear-gradient(135deg,#7df9ff,#b06bff)}
+.fxi-warp,.fxm-warp{background:linear-gradient(135deg,#1f1b3a,#4dabf7);box-shadow:0 0 16px rgba(77,171,247,.4)}
+.tierbox{border-radius:16px;border:1px solid var(--line);background:var(--panel);padding:14px;margin-bottom:14px}
+.tierline{display:flex;justify-content:space-between;gap:4px;position:relative}
+.tierline::before{content:"";position:absolute;left:8%;right:8%;top:11px;height:2px;background:var(--line-strong)}
+.tierstep{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:0;opacity:.45}
+.tierstep .plustier{width:24px;height:24px;padding:0;justify-content:center}
+.tierstep b{font-size:10.5px;color:var(--ink)}
+.tierstep em{font-style:normal;font-size:9.5px;color:var(--faint)}
+.tierstep.got{opacity:1}
+.tierstep.cur .plustier{box-shadow:0 0 0 2px var(--canvas),0 0 0 3.5px #fff}
+
+/* ---- message effects ---- */
+.fxlayer{position:fixed;inset:0;width:100vw;height:100vh;z-index:260;pointer-events:none}
+.fxgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 10px 10px}
+.fxbtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);font-size:11px;font-weight:600;cursor:pointer}
+.fxbtn span{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--major),var(--ge))}
+.fxbtn.fx-confetti span{background:linear-gradient(135deg,#f5b544,#b06bff)}
+.fxbtn.fx-hearts span{background:linear-gradient(135deg,#ff5d8f,#f5b544)}
+.fxbtn.fx-stars span{background:linear-gradient(135deg,#7df9ff,#b06bff)}
+.fxbtn.fx-warp span{background:linear-gradient(135deg,#1f1b3a,#4dabf7)}
+.bub.hasfx{position:relative;padding-right:26px}
+.fxtag{position:absolute;right:6px;bottom:6px;background:none;border:none;padding:0;cursor:pointer;color:inherit;opacity:.75;display:flex}
+
+/* ---- the quiet versions (auras, name + cover effects) ---- */
+html[data-perf="2"] .aura *,html[data-perf="2"] .aura *::before,html[data-perf="2"] .aura *::after,
+html[data-rm] .aura *,html[data-rm] .aura *::before,html[data-rm] .aura *::after,
+html[data-perf="2"] .coverfx i,html[data-rm] .coverfx i,
+html[data-rm] .nfx,html[data-rm] .nfx::before,html[data-rm] .nfx::after,html[data-rm] .plustier{animation:none !important}
+
+/* Popovers over the composer: `.glass{position:relative}` (declared later in
+   this file) was beating `.chatpop{position:absolute}`, so the emoji / image /
+   effect popover dropped INTO the composer's flex row — squashing the text box
+   to nothing and stretching the bar. Also keep the composer (and its popover)
+   above the 3D-tilted bubbles, and keep that 3D inside the chat body. */
+.chatpop.glass{position:absolute}
+.composer{z-index:6}
+.chatbody{isolation:isolate}
+.snap.once{text-align:left}
+.chatpop.glass{background-color:var(--panel2);background-color:color-mix(in srgb,var(--panel2) 97%,transparent)}
+/* a composer button that's an Orbit+ perk for this person: tapping opens Orbit+ */
+.cbtn.pluslock{position:relative}
+.cbtn.pluslock::after{content:"+";position:absolute;right:-4px;top:-4px;width:14px;height:14px;border-radius:50%;font-size:10px;font-weight:800;line-height:14px;text-align:center;color:#0f0a16;background:linear-gradient(90deg,#c9a7ff,#7df9ff)}

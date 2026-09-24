@@ -1,6 +1,8 @@
 /* Orbit — auto-split module. Part of the Orbit single-page app.
    See ARCHITECTURE.md for how the pieces fit together. */
 import { createClient, h, html, render } from './lib.js';
+import { EVENT_SET, PLACE_SET, SYSTEM_SET } from './glyphs.js';
+export { Glyph, GlyphTile, GLYPHS, glyphKey, glyphLabel, glyphSVG, Sym, toGlyph, EVENT_SET, PLACE_SET, SYSTEM_SET, UPDATE_SET } from './glyphs.js';
 
 
 /* ============================================================
@@ -12,18 +14,22 @@ export const SUPABASE_KEY = 'sb_publishable_OB4qTnJFKnjO59R5BvkFTQ_AtKbtx2N';
 
 /* EDIT ME — campus zones for the map. id stays short, name is shown. */
 export const ZONES = [
-  { id:'main',      name:'Main Building', x:.24, y:.28, icon:'🏛️' },
-  { id:'ccs',       name:'Academic Hall', x:.72, y:.24, icon:'🏫' },
-  { id:'library',   name:'Library',       x:.50, y:.50, icon:'📚' },
-  { id:'cafeteria', name:'Cafeteria',     x:.22, y:.70, icon:'🍜' },
-  { id:'gym',       name:'Gymnasium',     x:.76, y:.66, icon:'🏀' },
-  { id:'quad',      name:'The Quad',      x:.50, y:.84, icon:'🌳' },
+  { id:'main',      name:'Main Building', x:.24, y:.28, icon:'hall' },
+  { id:'ccs',       name:'Academic Hall', x:.72, y:.24, icon:'school' },
+  { id:'library',   name:'Library',       x:.50, y:.50, icon:'book' },
+  { id:'cafeteria', name:'Cafeteria',     x:.22, y:.70, icon:'food' },
+  { id:'gym',       name:'Gymnasium',     x:.76, y:.66, icon:'ball' },
+  { id:'quad',      name:'The Quad',      x:.50, y:.84, icon:'tree' },
 ];
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // wake the free-tier database the moment the script runs — its cold start
 // then overlaps the boot screen instead of stacking after it
-try{ sb.from('profiles').select('id', { head:true, count:'exact' }).limit(1).then(()=>{}, ()=>{}); }catch{}
+/* Reads go through this view, never the table: it redacts display_name for
+   anyone who hid it, and ban_reason / suspended_until for everyone but you and
+   staff. `authenticated` has no SELECT on public.profiles at all. */
+export const PROFILE_VIEW = 'profiles_view';
+try{ sb.from(PROFILE_VIEW).select('id', { head:true, count:'exact' }).limit(1).then(()=>{}, ()=>{}); }catch{}
 
 /* imperative UI bridge — any component can fire a branded confirm or a
    toast without prop-drilling. Shell wires the real handlers on mount;
@@ -35,19 +41,28 @@ export const ui = {
 
 /* ---------- constants ---------- */
 export const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
-export const HOUR = 52, START = 7*60, END = 19*60;
+/* The grid used to run 07:00-19:00, which quietly decided that nothing worth
+   scheduling happens at night. Night classes, shifts, and anyone revising at
+   1am simply had nowhere to be drawn — a block outside the window was clamped
+   by pxFor() onto the edge and looked like it started at 7am. The day is now
+   the whole day. HOUR comes down so 24 rows stay scrollable rather than
+   becoming a 1250px column. */
+/* HOUR went back to 52 after 40 read as squished — the grid scrolls, so height
+   costs nothing, and the day wraps around now rather than dead-ending. */
+export const HOUR = 52, START = 0, END = 24*60;
 export const CAT = { major:'var(--major)', ge:'var(--ge)', pe:'var(--pe)', nstp:'var(--nstp)' };
 export const CATHEX = { major:'#b06bff', ge:'#2dd4bf', pe:'#34d399', nstp:'#f5b544' };
 export const CATNAME = { major:'Major', ge:'Gen Ed', pe:'PE', nstp:'NSTP' };
 export const KINDS = {
-  coffee:{ label:'Coffee', emoji:'☕', accent:'#f5b544' },
-  study:{ label:'Study group', emoji:'📚', accent:'#2dd4bf' },
-  lunch:{ label:'Lunch', emoji:'🍜', accent:'#34d399' },
-  hangout:{ label:'Hangout', emoji:'✨', accent:'#b06bff' },
+  coffee:{ label:'Coffee', emoji:'coffee', accent:'#f5b544' },
+  study:{ label:'Study group', emoji:'book', accent:'#2dd4bf' },
+  lunch:{ label:'Lunch', emoji:'food', accent:'#34d399' },
+  hangout:{ label:'Hangout', emoji:'spark', accent:'#b06bff' },
+  sleepover:{ label:'Sleepover', emoji:'moon', accent:'#7c8cff' },
 };
 export const PING_PRESETS = [
-  { t:'Study?', e:'📖' }, { t:'Coffee?', e:'☕' }, { t:'Lunch?', e:'🍜' },
-  { t:'Where u at?', e:'📍' }, { t:'Free rn?', e:'👋' }, { t:'Walk to class?', e:'🚶' },
+  { t:'Study?', e:'book' }, { t:'Coffee?', e:'coffee' }, { t:'Lunch?', e:'food' },
+  { t:'Where u at?', e:'pin' }, { t:'Free rn?', e:'wave' }, { t:'Walk to class?', e:'walk' },
 ];
 export const ACCENTS = [
   ['#b06bff','#2dd4bf'], ['#f5b544','#ff5d8f'], ['#2dd4bf','#34d399'],
@@ -65,31 +80,155 @@ export const NAME_FX = [
   { id:'gold',   name:'24K',    c:['#ffd43b','#fff3bf'] },
   { id:'chrome', name:'Chrome', c:['#f4f4f5','#8f8f98'] },
 ];
+/* Anything another user controls that ends up inside a style STRING must go
+   through one of these. Preact applies a string style as cssText, so a ';'
+   smuggled into an accent colour or a position adds declarations of its own —
+   a full-screen overlay on every avatar of that user, for everyone who sees it. */
+export const safeColor = (c, d) => /^#[0-9a-f]{3,8}$/i.test(String(c ?? '')) ? c : d;
+export const safeNum = (n, d = 0, lo = -400, hi = 400) => {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+};
+// `--cx:…%;--cy:…%;--cz:…` for the pan/zoom framing of an image
+export const posVars = pos => {
+  const q = (pos && typeof pos === 'object') ? pos : {};
+  return `--cx:${safeNum(q.x)}%;--cy:${safeNum(q.y)}%;--cz:${safeNum(q.z, 1, 0.2, 6)}`;
+};
 export const flairOf = p => (p && p.flair && typeof p.flair === 'object' && !Array.isArray(p.flair)) ? p.flair : {};
 
 /* profile identity — pronouns, hobbies, developer badges + event emojis */
 export const PRONOUN_PRESETS = ['he/him','she/her','they/them','he/they','she/they','it/its','any pronouns','ask me'];
-export const HOBBY_PRESETS = ['🎮 Gaming','📚 Reading','🎨 Art','🎵 Music','💻 Coding','📷 Photos','🍳 Cooking','☕ Coffee','🧋 Milk tea','⚽ Football','🏀 Basketball','🏐 Volleyball','🏋️ Gym','🚴 Biking','✈️ Travel','🎬 Movies','📺 Anime','✍️ Writing','🎤 Singing','💃 Dance','🌱 Plants','🐾 Animals','🛹 Skating','♟️ Chess','🎧 Podcasts','🧵 Crafts'];
-export const EVENT_EMOJIS = ['🎮','🎬','🎂','🎉','🛍️','🧋','🍕','🎳','🏖️','🏀','🏐','💻','🎤','📖','⛪','🚶'];
+export const HOBBY_PRESETS = ['Gaming','Reading','Art','Music','Coding','Photos','Cooking','Coffee','Milk tea','Football','Basketball','Volleyball','Gym','Biking','Travel','Movies','Anime','Writing','Singing','Dance','Plants','Animals','Skating','Chess','Podcasts','Crafts'];
+const HOBBY_GLYPH = { gaming:'game', reading:'book', art:'palette', music:'music', coding:'code', photos:'image', cooking:'food', coffee:'coffee',
+  'milk tea':'boba', football:'ball', basketball:'ball', volleyball:'volley', gym:'gym', biking:'walk', travel:'plane', movies:'film',
+  anime:'film', writing:'note', singing:'mic', dance:'music', plants:'leaf', animals:'heart', skating:'bolt', chess:'pawn', podcasts:'headph', crafts:'palette' };
+/* Hobbies used to be stored as "🎮 Gaming". Split any leading emoji off, keep
+   the words, and pick the glyph from the words — so old and new rows look alike. */
+export function hobbyOf(raw) {
+  const str = String(raw || '').trim();
+  const m = str.match(/^([^\p{L}\p{N}]+)\s*(.*)$/u);
+  const text = (m ? m[2] : str) || str;
+  return { text, g: HOBBY_GLYPH[text.toLowerCase()] || null };
+}
+export const EVENT_EMOJIS = EVENT_SET;
 export const LOG_TAGS = { new:{ l:'New', c:'#b06bff' }, improved:{ l:'Improved', c:'#2dd4bf' }, fixed:{ l:'Fixed', c:'#34d399' }, news:{ l:'News', c:'#f5b544' } };
 /* badge catalog — the three power roles are built in as a fallback; the full
    catalog (incl. recognition badges) streams in from the badge_defs table, so
    badges created in mission control need zero code changes to render. */
 export const BADGE_DEFS = {
-  founder:{ label:'Orbit Founder', icon:'✦', color:'#f5b544', tier:'power', sort:0 },
-  staff:{ label:'Orbit Staff', icon:'🛡️', color:'#b06bff', tier:'power', sort:1 },
-  support:{ label:'Orbit Support', icon:'🎧', color:'#2dd4bf', tier:'power', sort:2 },
+  founder:{ label:'Orbit Founder', icon:'star4', color:'#f5b544', tier:'power', sort:0 },
+  staff:{ label:'Orbit Staff', icon:'shield', color:'#b06bff', tier:'power', sort:1 },
+  support:{ label:'Orbit Support', icon:'headset', color:'#2dd4bf', tier:'power', sort:2 },
 };
 export const badgesOf = p => Array.isArray(p?.badges) ? p.badges : [];
 export const roleOf = p => badgesOf(p).includes('founder') ? 'founder'
                   : badgesOf(p).includes('staff') ? 'staff'
                   : badgesOf(p).includes('support') ? 'support' : null;
 
+/* ---------- Orbit+ ----------
+   plus_until arrives on every profile through profiles_view, already null
+   once it has lapsed — so "is this person Plus" is one field, read the same
+   way for yourself, a friend's avatar or a chat bubble. The database is what
+   actually grants anything that matters (scheduled messages check it in RLS);
+   everything gated here is cosmetic. */
+export const isPlus = p => !!p?.plus_until && Date.parse(p.plus_until) > Date.now();
+// Everything below is picked in Orbit+, stored in `flair`, and only DRAWN
+// while Plus is live — a lapsed member keeps their choices for when they return.
+export const AURAS = {
+  nebula:     { name:'Nebula',      blurb:'two gas clouds swirling around you' },
+  orbit:      { name:'Ringworld',   blurb:'a tilted planetary ring that passes behind and in front of you' },
+  corona:     { name:'Eclipse',     blurb:'you are the moon; a solar corona burns around your edge' },
+  aurora:     { name:'Aurora',      blurb:'northern-light curtains rippling in a ring' },
+  singularity:{ name:'Singularity', blurb:'a black hole’s glowing accretion disk' },
+  stardust:   { name:'Stardust',    blurb:'sparks drifting in orbit at different speeds' },
+  supernova:  { name:'Supernova',   blurb:'shockwaves rolling out from you' },
+  halo:       { name:'Halo',        blurb:'a slow rotating light ring' },
+  comet:      { name:'Comet',       blurb:'a comet chasing its tail around you' },
+};
+export const auraOf = p => { const a = flairOf(p).aura; return isPlus(p) && Object.hasOwn(AURAS, a) ? a : null; };
+export const NAME_PLUS = {
+  neon:    { name:'Neon',    blurb:'a buzzing tube-light glow' },
+  holo:    { name:'Holo',    blurb:'a holographic foil sheen' },
+  glitch:  { name:'Glitch',  blurb:'RGB split that twitches' },
+  rainbow: { name:'Prism',   blurb:'the full spectrum, flowing' },
+};
+export const COVER_FX = {
+  stars:   { name:'Starfield',     blurb:'twinkling stars drift across your cover' },
+  aurora:  { name:'Aurora',        blurb:'light curtains over your cover' },
+  meteors: { name:'Meteor shower', blurb:'meteors streak across it' },
+  nebula:  { name:'Nebula',        blurb:'slow clouds of your colours' },
+};
+export const ENTRANCES = {
+  warp:   { name:'Warp in',     blurb:'hyperspace streaks when someone opens your profile' },
+  meteor: { name:'Meteor rain', blurb:'a meteor shower greets them' },
+  bloom:  { name:'Supernova',   blurb:'a burst of light from the centre' },
+};
+export const MSG_FX = {
+  confetti: { name:'Confetti', g:'party' },
+  stars:    { name:'Stardust', g:'spark' },
+  hearts:   { name:'Hearts',   g:'heart' },
+  warp:     { name:'Warp',     g:'rocket' },
+};
+const plusPick = (p, key, table) => { const v = flairOf(p)[key]; return isPlus(p) && Object.hasOwn(table, v) ? v : null; };
+export const nameFxOf  = p => plusPick(p, 'nfx', NAME_PLUS);
+export const coverFxOf = p => plusPick(p, 'cfx', COVER_FX);
+export const entranceOf = p => plusPick(p, 'efx', ENTRANCES);
+// the badge grows the longer you stay (resets if Plus lapses), like Nitro's boost badge
+export const PLUS_TIERS = [
+  { m:0,  key:'moon',   name:'Moon',      g:'moon'   },
+  { m:1,  key:'comet',  name:'Comet',     g:'comet'  },
+  { m:3,  key:'planet', name:'Planet',    g:'planet' },
+  { m:6,  key:'star',   name:'Star',      g:'star'   },
+  { m:12, key:'nova',   name:'Supernova', g:'burst'  },
+];
+export const plusMonths = (p, now = Date.now()) => p?.plus_since ? Math.max(0, (now - Date.parse(p.plus_since)) / (30.44 * 864e5)) : 0;
+export const plusTier = (p, now = Date.now()) => {
+  if (!isPlus(p)) return null;
+  const m = plusMonths(p, now); let t = PLUS_TIERS[0];
+  for (const x of PLUS_TIERS) if (m >= x.m) t = x;
+  const i = PLUS_TIERS.indexOf(t), nx = PLUS_TIERS[i + 1] || null;
+  return { ...t, months: m, next: nx, toNext: nx ? Math.max(0, nx.m - m) : 0 };
+};
+
+/* ---------- 24-hour media ----------
+   Photos and videos live in the private `ephemeral` bucket for 24 hours and
+   are then deleted — row, file and all (see sql/stories-plus-2026-09-24.sql).
+   Everything is re-encoded on the device first: smaller files are what keep
+   Orbit inside the free tier's 1 GB, and a re-encode strips photo metadata
+   (GPS included) as a side effect. Plus only raises the quality ceiling. */
+export const MEDIA = {
+  storyMaxSec: 10,
+  chatMaxSec: 60,
+  maxBytes: 30 * 1024 * 1024,       // the bucket refuses anything larger
+  img:   { free:1440, plus:2160, q:.84 },
+  vid:   { free:{ side:720, bps:1_600_000 }, plus:{ side:1080, bps:4_000_000 } },
+  photoSec: 5,                        // how long a photo story stays on screen
+};
+export const fmtBytes = n => { n = Number(n)||0;
+  if (n < 1024) return n + ' B';
+  const u = ['KB','MB','GB']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 2);
+  return (n >= 100 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i]; };
+// "23h left" / "40m left" / "gone"
+export const leftLabel = (iso, now = Date.now()) => {
+  const ms = Date.parse(iso) - now; if (!(ms > 0)) return 'gone';
+  const m = Math.ceil(ms / 6e4); return m >= 60 ? `${Math.floor(m/60)}h left` : `${m}m left`; };
+
 /* ---------- curated connections ----------
    Fixed allowlist. Users store a handle only; Orbit builds the URL,
    so nothing outside these domains can ever be linked or rendered. */
 export const cleanSocial = s => (s||'').replace(/^@/,'').replace(/[^a-zA-Z0-9._-]/g,'').slice(0,30);
 export const B = inner => ({ size=14 }) => html`<svg width=${size} height=${size} viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: inner }}/>`;
+/* Premade profile pictures, served from this repo. Stored as a full https URL
+   because profiles.avatar_url has a CHECK for https:// — which also means a
+   copy of the app on another origin still shows the same pictures. If Orbit
+   moves to its own domain, change the base here. */
+export const AVATAR_BASE = 'https://unorfl.github.io/Orbit/avatars/';
+export const PRESET_AVATARS = ['saturn','neptune','orchid','moon','sun','comet','astro','alien','robot','cat',
+  'blackhole','nebula','ufo','rocket','earth','ghost','starface'];
+export const presetUrl = n => AVATAR_BASE + n + '.svg';
+// only OUR files count as presets — a lookalike path on another host is just a link
+export const presetOf = url => { const u = String(url || ''); if (!u.startsWith(AVATAR_BASE)) return null;
+  const n = u.slice(AVATAR_BASE.length).replace(/\.svg$/, ''); return PRESET_AVATARS.includes(n) ? n : null; };
 export const SOCIALS = {
   discord:   { name:'Discord',   c:['#5865f2','#3b46c4'], url:null,   // no profile URLs by handle — copy instead
     Ic:B('<path d="M19.6 5.6A16 16 0 0 0 15.9 4l-.4.8a13 13 0 0 0-7 0L8 4a16 16 0 0 0-3.7 1.6C2 9.4 1.4 13 1.7 16.6A16 16 0 0 0 6.6 19l1-1.5a10 10 0 0 1-1.6-.8l.4-.3a11.4 11.4 0 0 0 11.2 0l.4.3c-.5.3-1 .6-1.6.8l1 1.5a16 16 0 0 0 4.9-2.4c.4-4.1-.6-7.6-2.7-11zM9 14.5c-.9 0-1.6-.8-1.6-1.8S8.1 11 9 11s1.6.8 1.6 1.8-.7 1.7-1.6 1.7zm6 0c-.9 0-1.6-.8-1.6-1.8s.7-1.7 1.6-1.7 1.6.8 1.6 1.8-.7 1.7-1.6 1.7z" fill="currentColor"/>') },
@@ -128,38 +267,38 @@ export const ACT_KINDS = {
 };
 export const ACTIVITY_CATALOG = [
   { id:'roblox',    k:'playing', name:'Roblox',            ic:SOCIALS.roblox.Ic, c:['#393b3d','#17191b'], tc:'#d3d6d9' },
-  { id:'minecraft', k:'playing', name:'Minecraft',         g:'⛏️', c:['#5f9c3f','#3e6b2a'] },
-  { id:'valorant',  k:'playing', name:'Valorant',          g:'🎯', c:['#ff4655','#b3202e'] },
-  { id:'mlbb',      k:'playing', name:'Mobile Legends',    g:'⚔️', c:['#2b6cff','#12318f'] },
-  { id:'codm',      k:'playing', name:'CoD Mobile',        g:'🔫', c:['#3a3f47','#1e2126'], tc:'#aab2bd' },
-  { id:'pubgm',     k:'playing', name:'PUBG Mobile',       g:'🪖', c:['#f2a900','#a86f00'] },
-  { id:'genshin',   k:'playing', name:'Genshin Impact',    g:'✨', c:['#7cc7e8','#3f7fae'] },
-  { id:'lol',       k:'playing', name:'League of Legends', g:'🏆', c:['#c8aa6e','#8a6d3b'] },
-  { id:'dota',      k:'playing', name:'Dota 2',            g:'🛡️', c:['#b23c2e','#7a241b'] },
-  { id:'cs2',       k:'playing', name:'CS2',               g:'💣', c:['#e9a13b','#9c651c'] },
-  { id:'fortnite',  k:'playing', name:'Fortnite',          g:'🌪️', c:['#8e6fff','#5b3fd0'] },
-  { id:'gta',       k:'playing', name:'GTA V',             g:'🚗', c:['#66bb6a','#2e7d32'] },
-  { id:'apex',      k:'playing', name:'Apex Legends',      g:'🦾', c:['#d13438','#8f1d20'] },
-  { id:'ow2',       k:'playing', name:'Overwatch 2',       g:'🛰️', c:['#f79c27','#c56f10'] },
-  { id:'amongus',   k:'playing', name:'Among Us',          g:'🛸', c:['#c51111','#7a0a0a'] },
-  { id:'stardew',   k:'playing', name:'Stardew Valley',    g:'🌾', c:['#f2b04c','#b57b23'] },
-  { id:'tekken',    k:'playing', name:'Tekken 8',          g:'🥊', c:['#7c4dff','#4527a0'] },
-  { id:'chess',     k:'playing', name:'Chess.com',         g:'♟️', c:['#7fa650','#4d6e2f'] },
+  { id:'minecraft', k:'playing', name:'Minecraft',         g:'pickaxe', c:['#5f9c3f','#3e6b2a'] },
+  { id:'valorant',  k:'playing', name:'Valorant',          g:'target', c:['#ff4655','#b3202e'] },
+  { id:'mlbb',      k:'playing', name:'Mobile Legends',    g:'swords', c:['#2b6cff','#12318f'] },
+  { id:'codm',      k:'playing', name:'CoD Mobile',        g:'xhair', c:['#3a3f47','#1e2126'], tc:'#aab2bd' },
+  { id:'pubgm',     k:'playing', name:'PUBG Mobile',       g:'helmet', c:['#f2a900','#a86f00'] },
+  { id:'genshin',   k:'playing', name:'Genshin Impact',    g:'spark', c:['#7cc7e8','#3f7fae'] },
+  { id:'lol',       k:'playing', name:'League of Legends', g:'trophy', c:['#c8aa6e','#8a6d3b'] },
+  { id:'dota',      k:'playing', name:'Dota 2',            g:'shield', c:['#b23c2e','#7a241b'] },
+  { id:'cs2',       k:'playing', name:'CS2',               g:'burst', c:['#e9a13b','#9c651c'] },
+  { id:'fortnite',  k:'playing', name:'Fortnite',          g:'wind', c:['#8e6fff','#5b3fd0'] },
+  { id:'gta',       k:'playing', name:'GTA V',             g:'car', c:['#66bb6a','#2e7d32'] },
+  { id:'apex',      k:'playing', name:'Apex Legends',      g:'robot', c:['#d13438','#8f1d20'] },
+  { id:'ow2',       k:'playing', name:'Overwatch 2',       g:'satlite', c:['#f79c27','#c56f10'] },
+  { id:'amongus',   k:'playing', name:'Among Us',          g:'ufo', c:['#c51111','#7a0a0a'] },
+  { id:'stardew',   k:'playing', name:'Stardew Valley',    g:'leaf', c:['#f2b04c','#b57b23'] },
+  { id:'tekken',    k:'playing', name:'Tekken 8',          g:'glove', c:['#7c4dff','#4527a0'] },
+  { id:'chess',     k:'playing', name:'Chess.com',         g:'pawn', c:['#7fa650','#4d6e2f'] },
   { id:'spotify',   k:'listening', name:'Spotify',         ic:SOCIALS.spotify.Ic, c:['#1db954','#12833c'] },
-  { id:'ytmusic',   k:'listening', name:'YT Music',        g:'🎵', c:['#ff0033','#b30024'] },
-  { id:'applemusic',k:'listening', name:'Apple Music',     g:'🎧', c:['#fa2d48','#c01f36'] },
-  { id:'soundcloud',k:'listening', name:'SoundCloud',      g:'☁️', c:['#ff5500','#c24100'] },
+  { id:'ytmusic',   k:'listening', name:'YT Music',        g:'music', c:['#ff0033','#b30024'] },
+  { id:'applemusic',k:'listening', name:'Apple Music',     g:'headph', c:['#fa2d48','#c01f36'] },
+  { id:'soundcloud',k:'listening', name:'SoundCloud',      g:'cloud', c:['#ff5500','#c24100'] },
   { id:'youtube',   k:'watching', name:'YouTube',          ic:SOCIALS.youtube.Ic, c:['#ff0033','#c60026'] },
-  { id:'netflix',   k:'watching', name:'Netflix',          g:'🍿', c:['#e50914','#8f050c'] },
+  { id:'netflix',   k:'watching', name:'Netflix',          g:'popcorn', c:['#e50914','#8f050c'] },
   { id:'twitch',    k:'watching', name:'Twitch',           ic:SOCIALS.twitch.Ic, c:['#9146ff','#6a2fd6'] },
-  { id:'crunchy',   k:'watching', name:'Crunchyroll',      g:'🍥', c:['#f47521','#bd5514'] },
-  { id:'study',     k:'study', name:'Studying',            g:'📚', c:['#2dd4bf','#178f80'] },
-  { id:'vscode',    k:'study', name:'VS Code',             g:'💻', c:['#3b9df2','#1f6ec2'] },
-  { id:'rbxstudio', k:'study', name:'Roblox Studio',       g:'🛠️', c:['#00a2ff','#0069a8'] },
-  { id:'canva',     k:'study', name:'Canva',               g:'🎨', c:['#7d2ae8','#00c4cc'] },
-  { id:'figma',     k:'study', name:'Figma',               g:'🧩', c:['#a259ff','#f24e1e'] },
-  { id:'photoshop', k:'study', name:'Photoshop',           g:'🖌️', c:['#31a8ff','#1471b8'] },
-  { id:'notion',    k:'study', name:'Notion',              g:'📝', c:['#3a3a3a','#1c1c1c'], tc:'#cfcfcf' },
+  { id:'crunchy',   k:'watching', name:'Crunchyroll',      g:'film', c:['#f47521','#bd5514'] },
+  { id:'study',     k:'study', name:'Studying',            g:'book', c:['#2dd4bf','#178f80'] },
+  { id:'vscode',    k:'study', name:'VS Code',             g:'code', c:['#3b9df2','#1f6ec2'] },
+  { id:'rbxstudio', k:'study', name:'Roblox Studio',       g:'wrench', c:['#00a2ff','#0069a8'] },
+  { id:'canva',     k:'study', name:'Canva',               g:'palette', c:['#7d2ae8','#00c4cc'] },
+  { id:'figma',     k:'study', name:'Figma',               g:'puzzle', c:['#a259ff','#f24e1e'] },
+  { id:'photoshop', k:'study', name:'Photoshop',           g:'brush', c:['#31a8ff','#1471b8'] },
+  { id:'notion',    k:'study', name:'Notion',              g:'note', c:['#3a3a3a','#1c1c1c'], tc:'#cfcfcf' },
 ];
 // resolve a stored status against the catalog — unknown ids and expired
 // statuses render as nothing, so tampered rows can't show anything odd
@@ -198,21 +337,106 @@ export const THEMES = {
   mono:{ name:'Monochrome', desc:'Quiet greys', sw:['#d4d4d8','#a1a1aa','#f4f4f5'],
     v:{ '--canvas':'#0f0f12','--panel':'#18181c','--panel2':'#1f1f24',
         '--major':'#d4d4d8','--ge':'#a1a1aa','--pe':'#e4e4e7','--nstp':'#fafafa','--now':'#f4f4f5' } },
+  // Orbit+ exclusives — `plus` themes fall back to Nebula when Plus lapses
+  supernova:{ name:'Supernova', desc:'Plus · solar flare', plus:true, sw:['#ffb347','#ff4f81','#8f5bff'],
+    v:{ '--canvas':'#170b14','--panel':'#22111d','--panel2':'#2a1524',
+        '--major':'#ff7a59','--ge':'#ffb347','--pe':'#ffd166','--nstp':'#8f5bff','--now':'#ff4f81' } },
+  eclipse:{ name:'Eclipse', desc:'Plus · corona gold', plus:true, sw:['#f7d774','#7df9ff','#c9a7ff'],
+    v:{ '--canvas':'#07070c','--panel':'#101019','--panel2':'#161622',
+        '--major':'#f7d774','--ge':'#7df9ff','--pe':'#a6f4c5','--nstp':'#c9a7ff','--now':'#ff6b9a' } },
 };
 export const THEME_IDS = Object.keys(THEMES);
 
+/* ============================================================
+   DEVICE TIER
+   index.html stamps data-perf on <html> before first paint
+   (0 = full, 1 = lite phones/mid, 2 = min low-end). main.js can
+   step it down at runtime. Read it through perfTier() so every
+   module agrees on one number instead of each re-sniffing UA.
+   ============================================================ */
+export function perfTier(){
+  const v = +(document.documentElement.getAttribute('data-perf') || 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
+}
+export const isCoarse = () => document.documentElement.hasAttribute('data-coarse');
+/* The tier as measured at boot. Use this to decide whether a FEATURE is
+   available; use perfTier() only to decide how pretty to draw it. They differ
+   because main.js lowers data-perf when the background canvas struggles, and a
+   struggling background says nothing about whether MapLibre can run. */
+export function bootTier(){
+  const d = document.documentElement;
+  const v = +(d.getAttribute('data-perf0') ?? d.getAttribute('data-perf') ?? 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(2, v)) : 0;
+}
+
+/* Background canvas is fully hidden whenever a fullscreen surface
+   (a chat on mobile) sits on top of it. Every such surface pushes a
+   pause on mount and pops it on unmount; main.js skips its whole
+   frame while the count is above zero. Counted rather than boolean
+   so two overlapping surfaces can't un-pause each other. */
+let __bgPaused = 0;
+const __syncBgPause = () => {
+  const d = document.documentElement;
+  if (__bgPaused > 0) d.setAttribute('data-bgpause','1'); else d.removeAttribute('data-bgpause');
+};
+export function pauseBg(){ __bgPaused++; __syncBgPause(); }
+export function resumeBg(){ __bgPaused = Math.max(0, __bgPaused - 1); __syncBgPause(); }
+
 // Interactive background variants. Each is themed (reads --major/--ge live),
 // so it recolours on every colourway and greys out on Monochrome.
+//
+// `cost` is what the variant costs per frame, and it is what decides which
+// phones may pick it:
+//   1 = cheap   (a few hundred line segments)      — every device
+//   2 = medium  (per-frame gradients / O(n²) links) — tier 0 + 1
+//   3 = heavy   (per-pixel noise, additive blending) — tier 0 (desktop) only
+// Topographic re-evaluates fractal noise across the whole grid every frame and
+// Aurora composites with 'lighter' over full-width gradients; both are what made
+// weaker phones drop to single-digit framerates, so they stay off there.
 export const BG_STYLES = {
-  waves:{         name:'Ambient Waves',  desc:'Flowing wave field',    g:'〰' },
-  topo:{          name:'Topographic',    desc:'Contour terrain lines', g:'◎' },
-  starfield:{     name:'Starfield',      desc:'Parallax drifting stars',g:'✦' },
-  orbits:{        name:'Orbits',         desc:'Planets circling',      g:'☉' },
-  constellation:{ name:'Constellation',  desc:'Connected star web',    g:'✧' },
-  aurora:{        name:'Aurora',         desc:'Soft light ribbons',    g:'≈' },
+  waves:{         name:'Ambient Waves',  desc:'Flowing wave field',    g:'〰', cost:1 },
+  topo:{          name:'Topographic',    desc:'Contour terrain lines', g:'◎', cost:3 },
+  starfield:{     name:'Starfield',      desc:'Parallax drifting stars',g:'✦', cost:1 },
+  orbits:{        name:'Orbits',         desc:'Planets circling',      g:'☉', cost:2 },
+  constellation:{ name:'Constellation',  desc:'Connected star web',    g:'✧', cost:2 },
+  aurora:{        name:'Aurora',         desc:'Soft light ribbons',    g:'≈', cost:3 },
 };
 export const BG_IDS = Object.keys(BG_STYLES);
+
+// Highest background cost this device is allowed to run: desktop everything,
+// phones up to medium, low-end phones cheap only.
+export const bgBudget = (tier = perfTier()) => (tier >= 2 ? 1 : tier >= 1 ? 2 : 3);
+export const bgAllowed = (id, tier = perfTier()) => (BG_STYLES[id]?.cost || 1) <= bgBudget(tier);
+// What to actually render: the pick if this device can afford it, else the
+// cheapest variant. The stored preference is never rewritten, so the same
+// account still gets its real choice back on a desktop.
+export function bgFor(id, tier = perfTier()){
+  const pick = BG_STYLES[id] ? id : 'waves';
+  return bgAllowed(pick, tier) ? pick : 'waves';
+}
 export const DEFAULT_PREFS = { asteroids:true, bgStyle:'waves', sounds:false, autoSpeed:60 };
+
+/* Sign-out on a shared device (a school lab PC) used to leave the last user
+   behind: their push subscription kept delivering DM previews to this
+   browser, their block list and device-pinned places seeded whoever signed
+   in next, and a live share kept advertising their last fix until it expired.
+   Every sign-out goes through here. The theme is kept — it is cosmetic. */
+export async function signOutClean() {
+  try {
+    const { data } = await sb.auth.getSession();
+    const id = data?.session?.user?.id;
+    if (id) await sb.from('presence')
+      .update({ live_lat:null, live_lng:null, live_acc:null, live_until:null }).eq('user_id', id);
+  } catch {}
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub) { await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); }
+  } catch {}
+  try { ['orbit.blocks','orbit.prefs','orbit.systems.v2','orbit.systems.migrated']
+          .forEach(k => localStorage.removeItem(k)); } catch {}
+  await sb.auth.signOut();
+}
 
 export const store = {
   getTheme(){ try{ return localStorage.getItem('orbit.theme') || 'nebula'; }catch{ return 'nebula'; } },
@@ -232,10 +456,16 @@ export const store = {
    ever needing a copy of your layout. Friends "cluster" into the
    same system when you both name it the same thing.
    ============================================================ */
-export const SYS_KEY = 'orbit.systems.v1';
+/* Bumped to v2 when places moved from abstract orbital positions to real
+   coordinates. Every stored place in Supabase was cleared at the same time,
+   so a device carrying a v1 layout would be showing planets that no longer
+   exist anywhere. Reading a new key re-seeds a clean Campus system and the
+   old blob is dropped rather than left behind in localStorage. */
+export const SYS_KEY = 'orbit.systems.v2';
+try{ localStorage.removeItem('orbit.systems.v1'); }catch{}
 export const SYSTEM_HUES = [265, 190, 150, 330, 40, 210, 300, 95];
-export const EMOJI_SUGGESTIONS = ['🏠','🏫','🛍️','☕','🍜','🍔','🏀','🎮','🏋️','📚','🎬','🚉','🌳','🏖️','⛪','🏥','💻','🎤','🎨','🍦','🧋','🏬','🚗','✈️'];
-export const SYSTEM_GLYPHS = ['🪐','🌌','🌠','⭐','☄️','🌟','🔭','🚀','🛸','✨'];
+export const EMOJI_SUGGESTIONS = PLACE_SET;
+export const SYSTEM_GLYPHS = SYSTEM_SET;
 
 /* ---------- chat: themes, fonts, emoji, media ----------
    Everything link-based — Orbit never stores files. TENOR_KEY is optional:
@@ -249,6 +479,9 @@ export const CHAT_THEMES = {
   aurora:{ name:'Aurora', my:'linear-gradient(135deg,#34d399,#b06bff)', accent:'#34d399' },
   ember:{  name:'Ember',  my:'linear-gradient(135deg,#fb923c,#ff5d8f)', accent:'#fb923c' },
   mono:{   name:'Mono',   my:'linear-gradient(135deg,#8b93a7,#c3c9d6)', accent:'#aab2c5' },
+  holo:{   name:'Holo',   plus:true, my:'linear-gradient(120deg,#7df9ff,#c9a7ff,#ff9ecd,#7df9ff)', accent:'#7df9ff' },
+  galaxy:{ name:'Galaxy', plus:true, my:'linear-gradient(135deg,#3a1c71,#8f5bff 45%,#ff4f81)', accent:'#8f5bff' },
+  gold:{   name:'24K',    plus:true, my:'linear-gradient(135deg,#f7d774,#fff3bf 50%,#d4a017)', accent:'#f7d774' },
 };
 export const CHAT_FONTS = {
   inter:{   name:'Clean', css:"'Inter',system-ui,sans-serif" },
@@ -276,7 +509,7 @@ export const EMOJI_CATS = [
 ];
 export const chatKeyOf = sel => sel ? `${sel.scope}:${sel.ref}` : '';
 export const isMediaUrl = u => /^https:\/\/\S+$/i.test((u||'').trim());
-export const msgPreview = m => m.deleted ? 'unsent a message' : m.kind==='text' ? m.body : m.kind==='gif' ? 'sent a GIF' : 'sent a photo';
+export const msgPreview = m => m.deleted ? 'unsent a message' : m.kind==='text' ? m.body : m.kind==='gif' ? 'sent a GIF' : m.kind==='media' ? 'sent a snap' : 'sent a photo';
 export const clockOf = ts => new Date(ts).toLocaleTimeString(undefined,{ hour:'numeric', minute:'2-digit' });
 export const dayLabel = ts => {
   const d = new Date(ts), t = new Date(), y = new Date(Date.now()-864e5);
@@ -289,7 +522,7 @@ export const genId = p => p + Math.random().toString(36).slice(2,8) + Date.now()
 export const normName = s => (s||'').trim().toLowerCase();
 export const hueCss = (h, l=62, s=72, a=1) => `hsl(${h} ${s}% ${l}%${a<1?` / ${a}`:''})`;
 
-export function seedSystems(){ return [{ key:'campus', name:'Campus', kind:'campus', hue:265, glyph:'🏫', planets:[] }]; }
+export function seedSystems(){ return [{ key:'campus', name:'Campus', kind:'campus', hue:265, glyph:'school', planets:[] }]; }
 export function loadSystems(){
   try{ const a = JSON.parse(localStorage.getItem(SYS_KEY)||'null'); if(Array.isArray(a) && a.length) return a; }catch{}
   return seedSystems();
@@ -305,15 +538,15 @@ export function planetsOf(sys){
 
 // pack/unpack the rich location that rides inside presence.zone
 export function encodePlace({ placeLabel, emoji, systemLabel, systemKey, planetId }){
-  return JSON.stringify({ p:placeLabel||'', e:emoji||'📍', s:systemLabel||'', k:systemKey||'', pi:planetId||'' });
+  return JSON.stringify({ p:placeLabel||'', e:emoji||'pin', s:systemLabel||'', k:systemKey||'', pi:planetId||'' });
 }
 export function decodePlace(zone){
   if(!zone) return null;
   if(typeof zone==='string' && zone.charAt(0)==='{'){
-    try{ const o=JSON.parse(zone); if(o && (o.p||o.s)) return { place:o.p||null, emoji:o.e||'📍', system:o.s||null, key:o.k||null, pi:o.pi||null }; }catch{}
+    try{ const o=JSON.parse(zone); if(o && (o.p||o.s)) return { place:o.p||null, emoji:o.e||'pin', system:o.s||null, key:o.k||null, pi:o.pi||null }; }catch{}
   }
   const z = ZONES.find(x=>x.id===zone);            // legacy bare zone id → campus
-  return { place: z?z.name:String(zone), emoji: z?z.icon:'📍', system:'Campus', key:'campus' };
+  return { place: z?z.name:String(zone), emoji: z?z.icon:'pin', system:'Campus', key:'campus' };
 }
 // a friend's location, but only if they're actually sharing (respects the toggle + ghost)
 export function presencePlace(pr){ return (pr && pr.sharing && !pr.ghost && pr.zone) ? decodePlace(pr.zone) : null; }
@@ -359,12 +592,22 @@ export function startAutoTheme(){
     root.setProperty('--now',   c(H+300,80,72));
     document.querySelector('meta[name=theme-color]')?.setAttribute('content','#100b18');
   };
+  /* Writing five custom properties on <html> invalidates style for the WHOLE
+     document, so doing it every frame was recalculating the entire app 60x a
+     second — on its own enough to make the Auto theme unusable on a phone.
+     The drift is slow (a full spectrum over ~60s), so a step finer than ~0.4°
+     is invisible: throttle to a hue quantum and skip the write when nothing
+     visibly changed. Costs one extra rAF callback, saves every recalc. */
   const t0 = performance.now();
+  const step = perfTier() >= 1 ? 1.2 : 0.4;   // degrees of hue per repaint
+  let lastH = NaN;
   const loop = (t)=>{
-    const secPer = Math.max(6, (window.__orbit?.autoSpeed)||60);
-    const H = ((t - t0)/1000) * (360/secPer);
-    set(H);
     __autoRAF = requestAnimationFrame(loop);
+    if (document.hidden) return;
+    const secPer = Math.max(6, (window.__orbit?.autoSpeed)||60);
+    const H = Math.round((((t - t0)/1000) * (360/secPer)) / step) * step;
+    if (H === lastH) return;
+    lastH = H; set(H);
   };
   __autoRAF = requestAnimationFrame(loop);
 }
@@ -397,7 +640,77 @@ export const toMin = s => { const [h,m]=s.split(':').map(Number); return h*60+m;
 export const pxFor = m => (Math.max(START, Math.min(END, m)) - START) * (HOUR/60);
 export const fmt = min => { let h=Math.floor(min/60), m=min%60, ap=h>=12?'PM':'AM', hh=h%12||12; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; };
 export const nowInfo = () => { const d=new Date(); return { day:(d.getDay()+6)%7, min:d.getHours()*60+d.getMinutes() }; };
+/* Leaked-password check — the free stand-in for Supabase's paid "leaked
+   password protection". Have I Been Pwned's range API is k-anonymous: only the
+   first 5 hex chars of the password's SHA-1 leave the device, the service
+   answers with every breached suffix under that prefix, and the match happens
+   here. Fails open (returns 0) if the service is unreachable, so an outage
+   never blocks a sign-up. Runs on new passwords only — never on sign-in. */
+export async function pwnedCount(pw) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pw));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const r = await fetch('https://api.pwnedpasswords.com/range/' + hex.slice(0, 5), { headers: { 'Add-Padding': 'true' } });
+    if (!r.ok) return 0;
+    const line = (await r.text()).split(/\r?\n/).find(l => l.startsWith(hex.slice(5)));
+    return line ? parseInt(line.split(':')[1], 10) || 0 : 0;
+  } catch { return 0; }
+}
+export const pwnedMessage = n => `That password has shown up in ${n.toLocaleString()} data breaches — attackers try those first. Pick a different one.`;
 export const zoneName = id => ZONES.find(z=>z.id===id)?.name || null;
+
+/* ---------- plan time ----------
+   Plans carry a real start and end (starts_at / ends_at), so one on next
+   Tuesday is next Tuesday, and a sleepover that starts Friday 9PM ends
+   Saturday 7AM instead of being impossible. day / start_min / end_min stay on
+   the row for the weekly grid; end_min may run past 1440, which means "into
+   the next day". Rows written before starts_at existed fall back to this
+   week's occurrence of their weekday. */
+export const DAYS7 = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+export const dayIdx = d => (d.getDay() + 6) % 7;                    // 0 = Monday
+export function weekStart(d = new Date()) {
+  const m = new Date(d); m.setHours(0,0,0,0); m.setDate(m.getDate() - dayIdx(m)); return m;
+}
+export function evSpan(e) {
+  if (e && e.starts_at && e.ends_at) return { s: new Date(e.starts_at), e: new Date(e.ends_at) };
+  const mon = weekStart();
+  const s = new Date(mon); s.setDate(mon.getDate() + (e?.day || 0)); s.setHours(0, e?.start_min || 0, 0, 0);
+  const en = new Date(mon); en.setDate(mon.getDate() + (e?.day || 0)); en.setHours(0, e?.end_min || 0, 0, 0);
+  return { s, e: en };
+}
+export const evUpcoming = (e, now = Date.now()) => evSpan(e).e.getTime() > now;
+export const evSort = (a, b) => evSpan(a).s - evSpan(b).s;
+/* The parts of a plan that land on each day of THIS week, in minutes from that
+   day's midnight — what the grid draws and what "busy now" checks. An overnight
+   plan is two pieces. */
+export function evPieces(ev, mon = weekStart()) {
+  const { s, e } = evSpan(ev), out = [];
+  for (let d = 0; d < 7; d++) {
+    const d0 = new Date(mon); d0.setDate(mon.getDate() + d);
+    const d1 = new Date(d0); d1.setDate(d0.getDate() + 1);
+    const a = Math.max(s, d0), b = Math.min(e, d1);
+    if (b > a) out.push({ day: d, s: Math.round((a - d0) / 6e4), e: Math.round((b - d0) / 6e4) });
+  }
+  return out;
+}
+export const fmtClockOf = d => fmt(d.getHours() * 60 + d.getMinutes());
+export function relDay(d, now = new Date()) {
+  const a = new Date(d); a.setHours(0,0,0,0); const b = new Date(now); b.setHours(0,0,0,0);
+  const n = Math.round((a - b) / 864e5);
+  if (n === 0) return 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n === -1) return 'Yesterday';
+  if (n > 1 && n < 7) return DAYS7[dayIdx(a)];
+  return DAYS7[dayIdx(a)] + ' ' + a.getDate() + ' ' + a.toLocaleDateString(undefined, { month: 'short' });
+}
+// "Today 3PM–5PM" · "Fri 9PM → Sat 7AM" · "Tomorrow 8PM–11:30PM"
+export function whenLabel(ev) {
+  const { s, e } = evSpan(ev);
+  const sameDay = s.toDateString() === new Date(e - 1).toDateString();
+  return sameDay ? `${relDay(s)} ${fmtClockOf(s)}–${fmtClockOf(e)}`
+                 : `${relDay(s)} ${fmtClockOf(s)} → ${relDay(e)} ${fmtClockOf(e)}`;
+}
+export const durLabel = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`;
 export const initialsOf = n => { n=(n||'??').trim(); return (n[0]==='@' ? n.slice(1,3) : n.split(/\s+/).map(w=>w[0]).slice(0,2).join('')).toUpperCase(); };
 export const firstName = n => (n||'').trim().split(/\s+/)[0] || '—';
 // what a person chose to go by — full name, or just @handle if they keep their name private
