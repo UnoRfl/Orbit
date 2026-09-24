@@ -1,10 +1,11 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { h, html, useEffect, useRef, useState } from './lib.js';
-import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
+import { applyTheme, BADGE_DEFS, badgesOf, CAT, chatKeyOf, DAYS, decodePlace, DEFAULT_PREFS, fmt, fname, groupBy, IcBell, IcCal, IcChat, IcGear, IcHome, IcOut, IcPin, IcRadio, IcShield, IcUser, IcUsers, loadSystems, msgPreview, pingChime, PROFILE_VIEW, PUSH_PUBLIC_KEY, roleOf, saveSystems, sb, signOutClean, store, ui, uidTail, urlB64ToUint8Array } from './core.js';
 import { Sheet, SolarLoader, You, statusOf } from './components.js';
 import { FriendDash, FriendsSheet, Home } from './home.js';
 import { useLiveShare } from './live.js';
 import { MapScreen } from './map.js';
+import { UpdatesPanel, unseenUpdates } from './updates.js';
 import { Creator, Detail, ImportSheet, Inbox, PingSheet, Plans } from './plans.js';
 import { ChatsScreen } from './chat.js';
 import { Settings } from './settings.js';
@@ -903,6 +904,8 @@ export function Shell({ session }) {
   const unreadN = notifs.filter(n=>!n.read).length;
   const inboxBadge = unseen + unreadN + sharedInvited.length;
   const isFounder = badgesOf(me).includes('founder');
+  // recomputed every render; opening the panel marks everything seen
+  const updatesBadge = sheet?.t==='updates' ? 0 : unseenUpdates(uid, updates);
   const myRole = roleOf(me);
   const staffOpenN = myRole && Array.isArray(staff.reports) ? staff.reports.filter(r=>r.status==='open').length : 0;
   const chatsBadge = Object.entries(chatOv).reduce((s,[k,v])=> s + ((chatReads[k]?.muted) ? 0 : (v.n||0)), 0);
@@ -943,6 +946,9 @@ export function Shell({ session }) {
     <div class="topbar">
       <div><div class="brand-eyebrow">student network</div><div class="brand">Orbit</div></div>
       <div style="display:flex;gap:8px">
+        <button class="iconbtn" aria-label="Updates" onClick=${()=>setSheet({t:'updates'})}>
+          <${IcRadio} size=${18}/>${updatesBadge>0 && html`<span class="nbadge">${updatesBadge}</span>`}
+        </button>
         <button class="iconbtn" aria-label="Friends" onClick=${()=>setSheet({t:'friends'})}>
           <${IcUsers} size=${18}/>${reqBadge>0 && html`<span class="nbadge">${reqBadge}</span>`}
         </button>
@@ -972,8 +978,7 @@ export function Shell({ session }) {
           presence=${presence} myPres=${myPres} setPres=${setPres} live=${live} classesBy=${classesBy} events=${events}
           respondInvite=${respondInvite} shared=${{ accepted:sharedAccepted, invited:sharedInvited }} actions=${sysActions}
           onNewCosmic=${s=>setSheet({t:'creator', sys:s})} onOpenEvent=${e=>setSheet({t:'detail', d:{type:'event',row:e}})}
-          onOpenFriend=${id=>setOpenFriend(id)}
-          updates=${updates} isFounder=${isFounder} publishUpdate=${publishUpdate} deleteUpdate=${deleteUpdate} chat=${chatKit} />`
+          onOpenFriend=${id=>setOpenFriend(id)} chat=${chatKit} />`
       : tab==='chats' ? html`<${ChatsScreen} kit=${chatKit} />`
       : tab==='plans' ? html`<${Plans} uid=${uid} events=${events} myInvites=${myInvites} classesBy=${classesBy}
           nameOf=${nameOf} profiles=${profiles} me=${me}
@@ -1008,6 +1013,10 @@ export function Shell({ session }) {
       </div></div>`;
     })()}
 
+    <${Sheet} open=${sheet?.t==='updates'} onClose=${()=>setSheet(null)} accent="var(--nstp)">
+      <${UpdatesPanel} uid=${uid} updates=${updates} isFounder=${isFounder} nameOf=${nameOf}
+        onPublish=${publishUpdate} onDelete=${deleteUpdate} onClose=${()=>setSheet(null)}/>
+    <//>
     <${Sheet} open=${sheet?.t==='friends'} onClose=${()=>setSheet(null)} accent="var(--ge)">
       <${FriendsSheet} uid=${uid} graph=${graph} profiles=${profiles} blocks=${blocks}
         sendRequest=${sendRequest} acceptRequest=${acceptRequest} removeFriendship=${removeFriendship}

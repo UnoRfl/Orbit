@@ -3,19 +3,17 @@ import { Fragment, h, html, useEffect, useRef, useState } from './lib.js';
 import { B, DAYS, EMOJI_SUGGESTIONS, I, IcBack, IcChat, IcCheck, IcPlus, IcRadio, IcSend, IcTrash, IcUsers, IcX, KINDS, LOG_TAGS, SYSTEM_GLYPHS, SYSTEM_HUES, ago, decodePlace, encodePlace, fmt, fname, genId, hueCss, loadSystems, normName, nowInfo, planetsOf, presencePlace, saveSystems, seedSystems, store, systemPhrase, ui } from './core.js';
 import { Avatar, Eyebrow, Sheet, Toggle, You, statusOf } from './components.js';
 import { GeoMap, canUseGeoMap } from './geomap.js';
+import { Galaxy } from './galaxy.js';
 import { LIVE_DURATIONS, liveOf, untilLabel } from './live.js';
 import { Home } from './home.js';
 import { ChatView } from './chat.js';
 
 export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres, setPres, live, classesBy, events, respondInvite,
-                     shared, actions, onNewCosmic, onOpenEvent, onOpenFriend,
-                     updates=null, isFounder=false, publishUpdate, deleteUpdate, chat }) {
+                     shared, actions, onNewCosmic, onOpenEvent, onOpenFriend, chat }) {
   const [localSys, setLocalSys] = useState(loadSystems);          // campus extras live on-device
   const [activeKey, setActiveKey] = useState(null);
   const [sel, setSel] = useState(null);
-  const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState(null);   // {t:'newsys'} | {t:'addplanet'} | {t:'people'} | {t:'publog'}
-  const [logTab, setLogTab] = useState('log');
+  const [form, setForm] = useState(null);   // {t:'newsys'} | {t:'addplanet'} | {t:'people'}
   /* Orbit view (the orrery) vs Map view (real coordinates). Remembered per
      device, and forced back to the orrery on hardware that can't take
      MapLibre so the tab always renders something. */
@@ -52,7 +50,7 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
   useEffect(()=>{ if(activeKey && !allSystems.find(s=>s.key===activeKey)) { setActiveKey(null); setSel(null); } },[allSystems.length]);
 
   const commitLocal = next => { setLocalSys(next); saveSystems(next); };
-  const addSystem = async spec => { const row = await actions.createSystem(spec); setForm(null); if(row){ setSel(null); setEdit(false); setActiveKey(row.id); } };
+  const addSystem = async spec => { const row = await actions.createSystem(spec); setForm(null); if(row){ setSel(null); setActiveKey(row.id); } };
   const addPlanet = async ({ name, icon, lat=null, lng=null }) => {
     if (!active) return;
     if (active.kind==='campus') {
@@ -148,10 +146,6 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
       ${form?.t==='people' && active && active.kind==='shared' && html`<${SystemPeople} sys=${active} uid=${uid} me=${me}
         friends=${friends} profiles=${profiles} nameOf=${nameOf} actions=${actions} onClose=${()=>setForm(null)} />`}
     <//>
-    <${Sheet} open=${form?.t==='publog'} onClose=${()=>setForm(null)} accent="var(--nstp)">
-      ${form?.t==='publog' && html`<${PublishUpdate} onClose=${()=>setForm(null)}
-        onPublish=${async row=>{ if(await publishUpdate(row)) setForm(null); }} />`}
-    <//>
   <//>`;
 
   /* ============ GRID: pick a solar system ============ */
@@ -161,107 +155,30 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
     .sort((a,b)=>a.day-b.day||a.start_min-b.start_min).slice(0,6);
   if (!active) {
     return html`<div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <${Eyebrow} color="var(--ge)">Your systems<//>
-        <button class=${'sysedit'+(edit?' on':'')} style="padding:6px 11px" onClick=${()=>setEdit(!edit)}>${edit?'Done':'Edit'}</button>
-      </div>
-      ${allSystems.length <= 1 && html`<div class="hint" style="margin-bottom:2px">Each system is a circle — a shared group with its own planets. Tap in to see who's where and check in.</div>`}
+      <${Eyebrow} color="var(--ge)">Your galaxy<//>
+      <${Galaxy} uid=${uid} me=${me} systems=${allSystems} invites=${shared.invited} myD=${myD}
+        matchSys=${matchSys} friendsInSys=${friendsInSys} events=${cosmicAll} nameOf=${nameOf}
+        onOpen=${key=>{ setActiveKey(key); setSel(null); }}
+        onNew=${()=>setForm({t:'newsys'})}
+        onRespondInvite=${actions.respondSystemInvite}
+        onDelete=${async sys=>{ if(await ui.confirm({ title:`Delete ${sys.name}?`, body:'Removes the system for everyone.', confirmLabel:'Delete', danger:true })) actions.deleteSystem(sys.key); }}
+        onLeave=${async sys=>{ if(await ui.confirm({ title:`Leave ${sys.name}?`, confirmLabel:'Leave', danger:true })) actions.leaveSystem(sys.key); }}
+        onOpenFriend=${onOpenFriend} onOpenEvent=${onOpenEvent}/>
 
-      ${shared.invited.map(({sys,mem})=>html`<div key=${sys.id} class="card sysinvite">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:20px">${sys.glyph}</span>
-          <div style="min-width:0;flex:1">
-            <div class="rowname">${sys.name}</div>
-            <div class="rowsub">${nameOf(mem.invited_by)} invited you to this system</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:11px">
-          <button class="btn btn-soft-green" style="flex:1" onClick=${()=>actions.respondSystemInvite(sys, true)}><${IcCheck} size=${14}/> Join</button>
-          <button class="btn" style="flex:1" onClick=${()=>actions.respondSystemInvite(sys, false)}>Decline</button>
-        </div>
-      </div>`)}
-
-      <div class="sysgrid">
-        ${allSystems.map(sys=>{
-          const pls = planetsOf(sys), sample = pls.slice(0,3);
-          const fHere = friendsInSys(sys);
-          const iHere = matchSys(myD, sys);
-          const liveN = fHere.length + (iHere?1:0);
-          const memberN = sys.kind==='shared' ? (sys.members||[]).filter(m=>m.status==='accepted').length : 0;
-          const mine = sys.kind==='shared' && sys.owner===uid;
-          return html`<button key=${sys.key} class="systile" style=${`--sh:${hueCss(sys.hue)}`}
-              onClick=${()=>{ setActiveKey(sys.key); setSel(null); setEdit(false); }}>
-            ${edit && sys.kind==='shared' && html`<span class="del" role="button"
-              onClick=${async e=>{ e.stopPropagation();
-                if (mine) { if(await ui.confirm({ title:`Delete ${sys.name}?`, body:'Removes the system for everyone.', confirmLabel:'Delete', danger:true })) actions.deleteSystem(sys.key); }
-                else { if(await ui.confirm({ title:`Leave ${sys.name}?`, confirmLabel:'Leave', danger:true })) actions.leaveSystem(sys.key); }
-              }}>${mine ? html`<${IcTrash} size=${13}/>` : html`<${IcX} size=${13}/>`}</span>`}
-            ${liveN>0 && !edit && html`<div class="sfaces">
-              ${iHere && html`<${Avatar} p=${me} size=${20}/>`}
-              ${fHere.slice(0,3).map((x,idx)=>html`<div key=${x.f.id} style=${`margin-left:${(idx===0&&!iHere)?0:-8}px`}><${Avatar} p=${x.f} size=${20}/></div>`)}
-            </div>`}
-            <div class="sysmini" style=${`--sh:${hueCss(sys.hue)}`}>
-              <div class="ring" style="width:34px;height:34px"></div>
-              <div class="ring" style="width:56px;height:56px"></div>
-              <div class="ring" style="width:76px;height:76px"></div>
-              <div class="sun"></div>
-              ${sample.map((p,i)=>html`<div key=${i} class="orbiter" style=${`--d:${9+i*6}s;animation-delay:${-i*4}s`}>
-                <div class="pdot" style=${`left:${[17,28,38][i]}px;top:0`}>${p.icon}</div></div>`)}
-            </div>
-            <div class="sname">${sys.glyph} ${sys.name} ${mine?html`<span style="font-size:11px">👑</span>`:''}</div>
-            <div class="smeta">
-              <span>${pls.length} ${pls.length===1?'place':'places'}${memberN?` · ${memberN} ${memberN===1?'member':'members'}`:''}</span>
-              ${liveN>0 && html`<span class="slive"><span style="width:5px;height:5px;border-radius:50%;background:var(--pe);display:inline-block;box-shadow:0 0 6px var(--pe)"></span> ${liveN} here</span>`}
-            </div>
-          </button>`;
-        })}
-        <button class="systile addsys" onClick=${()=>setForm({t:'newsys'})}>
-          <div class="plusdisc"><${IcPlus} size=${22}/></div>
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:inherit">New system</div>
-          <div class="small">Start a circle</div>
-        </button>
-      </div>
-
-      <div class="logframe">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div class="pillrow">
-            <button class=${'pill'+(logTab==='log'?' on':'')} style="font-weight:600" onClick=${()=>setLogTab('log')}>📡 Updates</button>
-            <button class=${'pill'+(logTab==='cosmic'?' on-teal':'')} style="font-weight:600" onClick=${()=>setLogTab('cosmic')}>☄️ Cosmic</button>
-          </div>
-          ${logTab==='log' && isFounder && html`<button class="sysedit" style="padding:6px 11px;flex:none" onClick=${()=>setForm({t:'publog'})}><${IcPlus} size=${12}/> Publish</button>`}
-        </div>
-
-        ${logTab==='log' && html`<div style="margin-top:8px">
-          ${updates===null && html`<div class="small" style="padding:6px 2px">The mission log opens soon.</div>`}
-          ${updates && !updates.length && html`<div class="small" style="padding:6px 2px">No updates published yet${isFounder?' — write the first one':''}.</div>`}
-          ${(updates||[]).map(u=>{ const T = LOG_TAGS[u.tag]||LOG_TAGS.new;
-            return html`<div key=${u.id} class="logrow">
-              <span style="font-size:18px;flex:none;margin-top:1px">${u.emoji}</span>
-              <div style="min-width:0;flex:1">
-                <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-                  <span class="rowname">${u.title}</span>
-                  <span class="logtag" style=${`color:${T.c};border-color:${T.c}55;background:${T.c}14`}>${T.l}</span>
-                </div>
-                ${u.body && html`<div class="rowsub" style="white-space:normal;margin-top:2px;line-height:1.5">${u.body}</div>`}
-                <div class="small" style="margin-top:4px">${ago(u.created_at)} · by ${u.author===uid?'you':nameOf(u.author)} ✦</div>
-              </div>
-              ${u.author===uid && isFounder && html`<button class="btn" style="padding:6px 9px;flex:none" onClick=${()=>deleteUpdate(u.id)} aria-label="Delete update"><${IcTrash} size=${13}/></button>`}
-            </div>`;})}
-        </div>`}
-
-        ${logTab==='cosmic' && html`<div style="margin-top:8px">
-          ${!cosmicAll.length && html`<div class="small" style="padding:6px 2px">No cosmic events coming up — open a system and hit ☄️ New.</div>`}
+      ${cosmicAll.length>0 && html`<div style="margin-top:22px">
+        <${Eyebrow} color="var(--nstp)">Coming up in your systems<//>
+        <div class="stack" style="margin-top:10px">
           ${cosmicAll.map(e=>{ const K = KINDS[e.kind]||KINDS.hangout; const s = sysByKey[e.system_id];
-            return html`<button key=${e.id} class="logrow" onClick=${()=>onOpenEvent(e)}>
-              <span style="font-size:18px;flex:none;margin-top:1px">${e.emoji||K.emoji}</span>
+            return html`<button key=${e.id} class="cardrow" onClick=${()=>onOpenEvent(e)}>
+              <span style="font-size:18px;flex:none">${e.emoji||K.emoji}</span>
               <div style="min-width:0;flex:1">
                 <div class="rowname">${e.title}</div>
                 <div class="rowsub">${DAYS[e.day]} · ${fmt(e.start_min)}–${fmt(e.end_min)}${e.place?` · ${e.place}`:''}</div>
                 <div class="uporigin"><span style=${`color:${hueCss(s.hue)}`}>${s.glyph} ${s.name}</span><span>·</span><span>set up by ${e.host===uid?'you':nameOf(e.host)}</span></div>
               </div>
             </button>`;})}
-        </div>`}
-      </div>
+        </div>
+      </div>`}
 
       ${friendPlaces.length>0 && html`<div style="margin-top:22px">
         <${Eyebrow}>Orbiting right now<//>
@@ -438,35 +355,6 @@ export function AddPlanetForm({ system, onSave, onClose, at=null }) {
     <div class="emojigrid">${EMOJI_SUGGESTIONS.map(g=>html`<button key=${g} class=${'emojibtn'+(icon===g?' on':'')} onClick=${()=>setIcon(g)}>${g}</button>`)}</div>
     <button class="btn btn-grad btn-block" style="margin-top:18px" disabled=${!ok||busy}
       onClick=${async()=>{ setBusy(true); await onSave({ name:name.trim(), icon }); setBusy(false); }}>${busy?'Adding…':'Add planet'}</button>
-  </div>`;
-}
-
-/* founder-only composer for the mission log */
-
-export function PublishUpdate({ onPublish, onClose }) {
-  const [emoji, setEmoji] = useState('🚀');
-  const [tag, setTag] = useState('new');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
-  return html`<div>
-    <div class="sheethead"><div class="sheettitle">Publish an update 📡</div>
-      <button class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
-    <div class="hint" style="margin-top:-8px;margin-bottom:4px">Lands in everyone's mission log on the Map tab, live.</div>
-    <div class="flabel">Emoji</div>
-    <div class="emojigrid">${['🚀','✨','🛠️','🐛','📡','🪐','☄️','🎉','📢','🧪','🗺️','🔔','🎨','⚡','🧭','💾'].map(em=>html`
-      <button key=${em} class=${'emojibtn'+(emoji===em?' on':'')} onClick=${()=>setEmoji(em)}>${em}</button>`)}</div>
-    <div class="flabel">Tag</div>
-    <div class="pillrow">${Object.entries(LOG_TAGS).map(([k,T])=>html`<button key=${k}
-      class=${'pill'+(tag===k?' on':'')} style=${tag===k?`border-color:${T.c};background:${T.c}18;color:var(--ink);font-weight:600`:'font-weight:600'}
-      onClick=${()=>setTag(k)}>${T.l}</button>`)}</div>
-    <div class="flabel">Title</div>
-    <input class="input" maxlength="80" value=${title} onInput=${e=>setTitle(e.target.value)} placeholder="Galaxy picker is live"/>
-    <div class="flabel">Details · optional</div>
-    <textarea class="input" rows="3" maxlength="600" value=${body} onInput=${e=>setBody(e.target.value)} placeholder="What changed, what to try…"></textarea>
-    <button class="btn btn-grad btn-block" style="margin-top:14px" disabled=${busy||!title.trim()}
-      onClick=${async()=>{ setBusy(true); await onPublish({ emoji, tag, title:title.trim(), body:body.trim()||null }); setBusy(false); }}>
-      <${IcSend} size=${15}/> ${busy?'Publishing…':'Publish'}</button>
   </div>`;
 }
 

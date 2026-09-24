@@ -373,34 +373,6 @@ a{color:var(--ge)}
 .storybubble .bdot{display:inline-block;width:5px;height:5px;border-radius:50%;margin-right:5px;vertical-align:middle;box-shadow:0 0 6px currentColor}
 @keyframes bubblein{from{opacity:0;transform:translateX(-50%) translateY(5px)}to{opacity:1;transform:translateX(-50%)}}
 
-/* ============ systems grid (map landing) ============ */
-.sysinvite{border-color:rgba(176,107,255,.45);background:rgba(176,107,255,.07);margin:12px 0 2px}
-.sysgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
-.systile{position:relative;border:1px solid var(--line);border-radius:16px;padding:14px;cursor:pointer;text-align:left;overflow:hidden;
-  background:radial-gradient(130% 120% at 50% -10%, color-mix(in srgb, var(--sh) 20%, transparent), transparent 62%), var(--panel);
-  transition:border-color .15s ease, transform .12s ease}
-.systile:hover{border-color:var(--line-strong)}
-.systile:active{transform:scale(.985)}
-.sysmini{position:relative;width:100%;height:80px;margin-bottom:11px;pointer-events:none}
-.sysmini .sun{position:absolute;left:50%;top:50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);
-  background:radial-gradient(circle at 38% 34%, #fff, color-mix(in srgb, var(--sh) 65%, #fff) 45%, color-mix(in srgb, var(--sh) 82%, #000));
-  box-shadow:0 0 18px color-mix(in srgb, var(--sh) 70%, transparent)}
-.sysmini .ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed color-mix(in srgb, var(--sh) 42%, transparent)}
-.sysmini .orbiter{position:absolute;left:50%;top:50%;width:0;height:0;transform-origin:0 0;animation:sys-spin var(--d,20s) linear infinite}
-.sysmini .pdot{position:absolute;font-size:12px;line-height:1;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
-@keyframes sys-spin{to{transform:rotate(360deg)}}
-.systile .sname{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#fff;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.systile .smeta{font-size:10.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.systile .slive{display:inline-flex;align-items:center;gap:4px;color:var(--pe);font-weight:600}
-.systile .sfaces{position:absolute;top:13px;right:13px;display:flex}
-.systile .sfaces .avatar{border:2px solid var(--panel)}
-.systile.addsys{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-style:dashed;
-  background:rgba(255,255,255,.02);min-height:158px;color:var(--muted);gap:8px}
-.systile.addsys .plusdisc{width:44px;height:44px;border-radius:50%;border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center}
-.systile.addsys:hover{color:var(--major)}
-.systile.addsys:hover .plusdisc{border-color:var(--major)}
-.systile .del{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:9px;background:rgba(255,93,143,.16);border:1px solid rgba(255,93,143,.42);
-  color:#ffb1c8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4}
 
 /* ============ system detail (orrery header) ============ */
 .syshead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -524,12 +496,6 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .adjmask.round::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:100%;aspect-ratio:1;border-radius:50%;box-shadow:0 0 0 400px rgba(8,5,14,.6);border:1.5px dashed rgba(255,255,255,.45)}
 
-/* mission log (Map landing) */
-.logframe{margin-top:24px;border:1px solid var(--line);border-radius:18px;padding:14px;position:relative;overflow:hidden;
-  background:linear-gradient(155deg, color-mix(in srgb, var(--major) 8%, transparent), transparent 46%), var(--panel)}
-.logrow{display:flex;gap:10px;align-items:flex-start;padding:11px 2px;border-top:1px solid var(--line)}
-button.logrow{background:none;border:none;border-top:1px solid var(--line);width:100%;text-align:left;cursor:pointer;font-size:inherit}
-button.logrow:hover .rowname{color:#fff}
 .logtag{flex:none;font-size:8.5px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:.12em;text-transform:uppercase;
   padding:2.5px 7px;border-radius:6px;border:1px solid}
 
@@ -1072,3 +1038,143 @@ html[data-rm] .chat3d .msgrow.me .bubcol{ transform:none }
    solid edge instead of the fuzzy one that means "somewhere around here". */
 .livedot.snapped .livedot-ring{opacity:1;border-style:solid}
 .livedot.snapped .livedot-l{font-weight:600}
+
+/* ============================================================
+   GALAXY — the Map tab's overview (galaxy.js)
+   Nodes' transform/opacity/z-index are written every frame by JS:
+   never give .gnode a transition on those, or the orbit lags.
+   ============================================================ */
+.galaxy-wrap{margin-top:12px}
+.galaxy{position:relative;height:380px;border-radius:22px;overflow:hidden;border:1px solid var(--line);
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 47%, color-mix(in srgb, var(--gfocus) 18%, transparent), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 115%, rgba(255,255,255,.05), transparent 70%),
+    color-mix(in srgb, var(--canvas) 72%, #000);
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;isolation:isolate}
+.galaxy:active{cursor:grabbing}
+@media (min-width:768px){ .galaxy{height:440px} }
+
+.gstars{position:absolute;inset:-260px;pointer-events:none;will-change:transform}
+.gstars i{position:absolute;inset:0;background-size:240px 240px;animation:gtwinkle 5s ease-in-out infinite alternate}
+.gstars i:nth-child(1){background-image:
+  radial-gradient(1px 1px at 12px 40px,#fff,transparent),radial-gradient(1px 1px at 90px 130px,#fff,transparent),
+  radial-gradient(1px 1px at 170px 60px,#fff,transparent),radial-gradient(1px 1px at 210px 200px,#fff,transparent),
+  radial-gradient(1px 1px at 60px 210px,#fff,transparent);opacity:.55}
+.gstars i:nth-child(2){background-image:
+  radial-gradient(1.5px 1.5px at 40px 90px,#fff,transparent),radial-gradient(1.5px 1.5px at 140px 20px,#fff,transparent),
+  radial-gradient(1.5px 1.5px at 200px 150px,#fff,transparent);opacity:.4;animation-delay:-2.5s}
+.gstars i:nth-child(3){background-image:
+  radial-gradient(2px 2px at 110px 180px,color-mix(in srgb,var(--ge) 70%,#fff),transparent),
+  radial-gradient(2px 2px at 20px 150px,color-mix(in srgb,var(--major) 70%,#fff),transparent);opacity:.5;animation-delay:-1s}
+@keyframes gtwinkle{from{opacity:.25}to{opacity:.7}}
+
+.gnebula{position:absolute;inset:0;pointer-events:none}
+.gnebula span{position:absolute;width:62%;height:70%;border-radius:50%;background:var(--nh);opacity:.11;filter:blur(48px);
+  left:calc(-12% + var(--ni) * 24%);top:calc(8% + (var(--ni) - 1) * 9%);animation:gdrift 26s ease-in-out infinite alternate;
+  animation-delay:calc(var(--ni) * -6s)}
+@keyframes gdrift{to{translate:8% -6%}}
+[data-perf="2"] .gnebula{display:none}
+
+.gsvg{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.gring{stroke:rgba(255,255,255,.2);stroke-width:1;stroke-dasharray:1 5;stroke-linecap:round}
+.gring.r1{stroke:rgba(255,255,255,.13)}
+.gring.r2{stroke:rgba(255,255,255,.07);stroke-dasharray:1 9}
+.gsignal{stroke-width:1.5;stroke-dasharray:3 7;stroke-linecap:round;animation:gsig 1.1s linear infinite}
+.gsignal.mine{stroke-dasharray:1 6;stroke-width:1.1}
+@keyframes gsig{to{stroke-dashoffset:-20}}
+
+.gcore{position:absolute;left:50%;top:47%;transform:translate(-50%,-26px);display:flex;flex-direction:column;align-items:center;pointer-events:none}
+.gcore .avatar{box-shadow:0 0 0 3px color-mix(in srgb,var(--canvas) 70%,#000),0 0 28px color-mix(in srgb,var(--major) 55%,transparent)}
+.gcore-halo{position:absolute;left:50%;top:26px;width:130px;height:130px;border-radius:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle, color-mix(in srgb,var(--major) 30%,transparent), transparent 62%);animation:ghalo 3.4s ease-in-out infinite}
+@keyframes ghalo{50%{transform:translate(-50%,-50%) scale(1.14);opacity:.7}}
+.gcore-l{margin-top:7px;font-size:10.5px;color:var(--ink);background:rgba(0,0,0,.4);padding:3px 9px;border-radius:99px;white-space:nowrap;
+  border:1px solid var(--line)}
+
+.gnode{position:absolute;left:0;top:0;border:none;background:none;padding:0;margin:0;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:7px;color:var(--ink);will-change:transform,opacity;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+.gstar{position:relative;width:var(--gs);height:var(--gs);border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;
+  background:radial-gradient(circle at 33% 28%, #fff 0 3%, color-mix(in srgb,var(--gh) 70%,#fff) 13%, var(--gh) 44%, color-mix(in srgb,var(--gh) 38%,#000) 100%);
+  box-shadow:0 0 24px color-mix(in srgb,var(--gh) 55%,transparent),0 0 64px color-mix(in srgb,var(--gh) 22%,transparent),
+    inset -7px -9px 18px rgba(0,0,0,.38)}
+.gglyph{font-size:calc(var(--gs) * .42);line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.gnode.busy .gstar::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--gh) 75%,transparent);
+  animation:gbeat 2.6s ease-out infinite;pointer-events:none}
+@keyframes gbeat{from{transform:scale(.92);opacity:.9}to{transform:scale(1.55);opacity:0}}
+.gnode:focus-visible{outline:none}
+.gnode:focus-visible .gstar{outline:2px solid var(--ink);outline-offset:5px}
+
+.gmoon,.gsat{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.gmoon{transform:rotate(var(--ma,0deg));animation:gorbit var(--md) linear infinite;animation-delay:var(--mo)}
+.gmoon i{position:absolute;left:var(--mr);top:-2.5px;width:5px;height:5px;border-radius:50%;
+  background:color-mix(in srgb,var(--gh) 45%,#fff);box-shadow:0 0 7px var(--gh)}
+.gsat{transform:rotate(var(--sa,0deg));animation:gorbit var(--sd) linear infinite;animation-delay:var(--so)}
+.gsat-in{position:absolute;left:var(--sr);top:0;transform:translate(-50%,-50%);animation:gcounter var(--sd) linear infinite;animation-delay:var(--so)}
+.gsat .avatar{box-shadow:0 0 0 2px color-mix(in srgb,var(--canvas) 70%,#000),0 0 12px var(--gh)}
+@keyframes gorbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes gcounter{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(-360deg)}}
+.gcount{position:absolute;top:-3px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--pe);color:#04210f;
+  font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px var(--pe),0 0 0 2px rgba(0,0,0,.35)}
+.gname{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;white-space:nowrap;padding:3px 9px;border-radius:99px;
+  background:rgba(8,6,12,.5);border:1px solid var(--line);text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.gnode.mine .gname{border-color:color-mix(in srgb,var(--ge) 70%,transparent)}
+
+.gnode.invite .gstar{background:radial-gradient(circle at 40% 36%, #fff 0 8%, var(--gh) 38%, transparent 72%);
+  box-shadow:0 0 20px var(--gh);animation:gflick 1.7s ease-in-out infinite}
+.gnode.invite .gglyph{font-size:15px}
+.gnode.invite .gname{border-style:dashed;border-color:color-mix(in srgb,var(--gh) 70%,transparent)}
+.gtail{position:absolute;left:50%;top:17px;width:78px;height:7px;margin-top:-3.5px;transform-origin:0 50%;transform:rotate(var(--tail,180deg));
+  border-radius:99px;background:linear-gradient(90deg, color-mix(in srgb,var(--gh) 75%,transparent), transparent);filter:blur(1.5px);pointer-events:none}
+@keyframes gflick{50%{box-shadow:0 0 34px var(--gh);filter:brightness(1.25)}}
+
+.gnew{position:absolute;right:12px;top:12px;z-index:400;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:99px;
+  border:1px solid var(--line-strong);background:rgba(8,6,12,.55);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.gnew:hover{border-color:var(--major)}
+.ghint{position:absolute;left:50%;bottom:11px;transform:translateX(-50%);z-index:400;font-size:10.5px;color:var(--faint);letter-spacing:.05em;
+  pointer-events:none;white-space:nowrap}
+.galaxy.focused .gring{stroke:rgba(255,255,255,.05)}
+
+/* still: perf tier 2 / reduced motion — same layout, nothing drifting */
+.galaxy.still .gstars i,.galaxy.still .gnebula span,.galaxy.still .gmoon,.galaxy.still .gsat,.galaxy.still .gsat-in,
+.galaxy.still .gsignal,.galaxy.still .gcore-halo,.galaxy.still .gnode.busy .gstar::after,.galaxy.still .gnode.invite .gstar{animation:none}
+
+.gcard{--gh:var(--major);margin-top:10px;border:1px solid color-mix(in srgb,var(--gh) 38%,var(--line));border-radius:16px;padding:14px;
+  background:linear-gradient(160deg, color-mix(in srgb,var(--gh) 13%,var(--panel)), var(--panel) 70%);animation:gcardin .3s ease-out}
+@keyframes gcardin{from{transform:translateY(6px)}}
+.gcard.idle{display:flex;flex-direction:column;gap:3px}
+.gcard-h{display:flex;align-items:center;gap:11px}
+.gcard-g{font-size:23px;width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--gh) 22%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gh) 40%,transparent)}
+.gcard-t{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;letter-spacing:-.01em}
+.gcard-who{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.gwho{display:inline-flex;align-items:center;gap:7px;padding:4px 11px 4px 4px;border-radius:99px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer}
+.gwho:hover{border-color:var(--line-strong)}
+.gwho.me{border-color:color-mix(in srgb,var(--ge) 60%,transparent);cursor:default}
+.gwho-at{color:var(--muted);font-weight:500;font-size:11px}
+.gcard-ev{margin-top:10px;width:100%;display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);color:var(--ink);font-size:12px;text-align:left;cursor:pointer}
+.gcard-ev:hover{border-color:var(--line-strong)}
+
+/* ============================================================
+   UPDATES PANEL (updates.js) — the mission log as a timeline
+   ============================================================ */
+.utimeline{position:relative;padding-left:4px}
+.ugroup+.ugroup{margin-top:14px}
+.ugroup-h{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 8px 44px}
+.uitem{position:relative;display:flex;gap:12px;padding:0 0 14px}
+.uitem::before{content:"";position:absolute;left:17px;top:38px;bottom:0;width:1px;
+  background:linear-gradient(var(--line-strong),transparent)}
+.ugroup .uitem:last-child::before{display:none}
+.uitem-dot{flex:none;width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;
+  background:color-mix(in srgb,var(--ut) 16%,var(--panel2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ut) 40%,transparent)}
+.uitem.fresh .uitem-dot{box-shadow:inset 0 0 0 1px var(--ut),0 0 18px color-mix(in srgb,var(--ut) 45%,transparent)}
+.uitem-b{min-width:0;flex:1;padding:9px 12px 10px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.uitem.fresh .uitem-b{border-color:color-mix(in srgb,var(--ut) 45%,var(--line));
+  background:linear-gradient(150deg,color-mix(in srgb,var(--ut) 9%,transparent),rgba(255,255,255,.02))}
+.uitem-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.uitem-t{font-weight:700;font-size:13.5px}
+.uitem-body{font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:4px;white-space:pre-line}
+.unew{width:7px;height:7px;border-radius:50%;background:var(--nstp);box-shadow:0 0 9px var(--nstp);margin-left:auto}
