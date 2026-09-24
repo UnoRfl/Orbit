@@ -149,7 +149,8 @@ export function ChatView({ kit, sel, onClose, dock=false }) {
   const typRef = useRef({ ch:null, last:0, t:0 });
   useEffect(()=>{
     if (mod) return;
-    const ch = sb.channel('typing:'+key, { config:{ broadcast:{ self:false } } });
+    // private: Realtime checks public.can_typing(topic) — members of this DM or system only
+    const ch = sb.channel('typing:'+key, { config:{ private:true, broadcast:{ self:false } } });
     ch.on('broadcast', { event:'t' }, ({ payload })=>{
       if (!payload || payload.uid===uid) return;
       setPeerTyping(payload.name || 'Someone');

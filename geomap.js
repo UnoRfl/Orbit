@@ -441,7 +441,10 @@ export function GeoMap({ system, places, friendsOnPlanet, canAdd, onAddAt, onPla
     <div class="geoctl">
       <button class=${'geobtn'+(locating?' busy':'')} onClick=${locate}
         aria-label="Find my location">${locating ? '◌' : '◎'}</button>
-      ${live && (live.active
+      ${live && (live.acquiring
+        ? html`<button class="geobtn live busy" onClick=${()=>live.stop()} aria-label="Cancel live location">
+            <span class="geospin"></span>Finding you… · Cancel</button>`
+        : live.active
         ? html`<button class="geobtn live on" onClick=${()=>live.stop('Live location off')}
             aria-label="Stop sharing live location"><span class="geodot"></span>${untilLabel(live.until)} · Stop</button>`
         : html`<button class="geobtn live" onClick=${()=>setAskLive(v=>!v)}

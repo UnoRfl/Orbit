@@ -6,10 +6,11 @@
 -- and evaluate it once per query instead. The predicate is otherwise identical,
 -- so permissions do not change — only how often the function is called.
 --
--- STATUS: reviewed, NOT applied.
--- Deliberately deferred: with ~16 users and ~120 messages the win is currently
--- nil, while rewriting every security policy at once carries real present-tense
--- risk. Run it when the tables get big enough for it to matter.
+-- STATUS: applied 2026-09-24 as migration rls_initplan_hoist_auth_calls, with
+-- one change from the loop below: the regex is '(?<![Ss][Ee][Ll][Ee][Cc][Tt] )'
+-- lookbehind-guarded, because the \m version also matched calls already inside
+-- ( SELECT auth.uid() AS uid ) and would have double-wrapped them. 84 of 95
+-- policies were rewritten; a check afterwards found 0 bare calls left.
 --
 -- This is written as a loop over pg_policies rather than 88 hand-pasted
 -- statements so it stays correct as policies are added or edited. It is

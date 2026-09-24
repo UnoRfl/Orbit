@@ -295,7 +295,6 @@ export function Shell({ session }) {
     Promise.allSettled([loadEvents(), loadPings(), loadPresence(fids), loadShared(), loadNotifs(), loadSettings(), loadUpdates(), loadBadgeDefs(), loadChats()]
       .map(p=>withTimeout(p, 12000)))
       .then(()=>{ stepSet('bg','ok'); migrateLocalSystems(); initPush(); if (roleOf(meRow)) loadStaffData();
-        if (badgesOf(meRow).includes('founder')) sb.rpc('chat_retention_sweep').then(()=>{},()=>{});   // 3-month chat sweep
       });
   }
 
@@ -408,7 +407,9 @@ export function Shell({ session }) {
       // refresh friend presence periodically (covers friends turning sharing off)
       loadPresence(friendIdsOf(graphRef.current));
     }, 45000);
-    const vis = () => { if(!document.hidden){ setTick(t=>t+1); loadPresence(friendIdsOf(graphRef.current)); } };
+    // back from the background: refresh friends AND our own row, which another
+    // device may have changed while this tab's socket was asleep
+    const vis = () => { if(!document.hidden){ setTick(t=>t+1); loadPresence(friendIdsOf(graphRef.current)); loadMyPresence(); } };
     document.addEventListener('visibilitychange', vis);
     return () => { sb.removeChannel(ch); sb.removeChannel(ch2); sb.removeChannel(ch3); clearInterval(tick); document.removeEventListener('visibilitychange', vis); };
   }, [uid]);
@@ -488,31 +489,22 @@ export function Shell({ session }) {
     }catch{}
     setPushOn(false); toast('Phone notifications off');
   }
+  /* Writes only the fields that changed. It used to upsert the WHOLE row from
+     the local copy, so every new column had to be carried forward by hand, and
+     a tab whose copy was stale (asleep while another device ended a live share)
+     wrote the old share straight back. The row always exists: handle_new_user()
+     creates it at signup and loadMyPresence() backfills it. The DB trigger
+     still wipes live coordinates whenever ghost goes on or sharing goes off. */
+  const presSeq = useRef(0);
   async function setPres(patch) {
-    /* This upserts the WHOLE row, so every column has to be carried forward or
-       it gets nulled. The live_* fields matter especially: without them here,
-       checking in to a place would silently end an active live-location share. */
-    const row = { user_id:uid, sharing:!!myPres?.sharing, ghost:!!myPres?.ghost, zone:myPres?.zone||null,
-                  activity: myPres?.activity ?? null,
-                  live_lat: myPres?.live_lat ?? null, live_lng: myPres?.live_lng ?? null,
-                  live_acc: myPres?.live_acc ?? null, live_until: myPres?.live_until ?? null,
-                  ...patch, updated_at:new Date().toISOString() };
-    setMyPres(row);
-    let { data, error } = await sb.from('presence').upsert(row).select().maybeSingle();
-    if (error && /live_(lat|lng|acc|until)/i.test(error.message||'')) {
-      // live-location columns not migrated yet — sync everything else
-      const { live_lat, live_lng, live_acc, live_until, ...rest } = row;
-      ({ data, error } = await sb.from('presence').upsert(rest).select().maybeSingle());
-      if (!error && 'live_until' in patch) toast('Live location needs a database update');
-    }
-    if (error && /activity/i.test(error.message||'')) {
-      // activity column not migrated yet — sync the rest, nudge once if a status was being set
-      const { activity, ...rest } = row;
-      ({ data, error } = await sb.from('presence').upsert(rest).select().maybeSingle());
-      if (!error && 'activity' in patch) toast('Could not save your status this time');
-    }
-    if (error) { toast("Couldn't sync that — try again"); }
-    else if (data) setMyPres(data);
+    const seq = ++presSeq.current;
+    const body = { ...patch, updated_at:new Date().toISOString() };
+    setMyPres(p => ({ ...(p || { user_id:uid }), ...body }));
+    let { data, error } = await sb.from('presence').update(body).eq('user_id', uid).select().maybeSingle();
+    if (!error && !data) ({ data, error } = await sb.from('presence').upsert({ user_id:uid, ...body }).select().maybeSingle());
+    if (error) { toast("Couldn't sync that — try again"); return; }
+    // a slow reply to an older write must not overwrite a newer one
+    if (data && seq === presSeq.current) setMyPres(data);
   }
   /* The live-location watch lives HERE, not in the Map screen, because only one
      tab is mounted at a time: the moment you tapped Home, MapScreen unmounted,
@@ -526,14 +518,7 @@ export function Shell({ session }) {
     if (starts_at && ends_at) { row.starts_at = starts_at; row.ends_at = ends_at; }
     if (system_id) row.system_id = system_id;
     if (emoji) row.emoji = emoji;
-    let { data:ev, error } = await sb.from('events').insert(row).select().single();
-    if (error && emoji && /emoji/i.test(error.message||'')) {
-      // emoji column not added yet — send the event without it, point at the migration once
-      delete row.emoji;
-      ({ data:ev, error } = await sb.from('events').insert(row).select().single());
-      if (!error) toast('Could not keep the custom emoji');
-    }
-    if (error && system_id && /system_id/i.test(error.message||'')) { toast('Could not create the plan'); return false; }
+    const { data:ev, error } = await sb.from('events').insert(row).select().single();
     if (error || !ev) { toast('Could not create the plan'); return false; }
     if (invitees.length) {
       const { error:e2 } = await sb.from('event_invitees').insert(invitees.map(i=>({ event_id:ev.id, invitee:i })));
@@ -593,9 +578,6 @@ export function Shell({ session }) {
       setBadgeV(v=>v+1);
     }catch{}
   }
-  async function modLog(action, target, note='') {
-    try{ await sb.from('mod_actions').insert({ actor:uid, action, target, note: note||null }); }catch{}
-  }
   async function sendReport(target, reason) {
     const { error } = await sb.from('reports').insert({ reporter:uid, target, kind:'user', reason });
     if (error) {
@@ -605,10 +587,10 @@ export function Shell({ session }) {
     }
     toast('Reported — staff will take a look', 'flag'); return true;
   }
+  // one RPC: the report changes state and the mod log records it, or neither happens
   async function resolveReport(r, status) {
-    const { error } = await sb.from('reports').update({ status, handled_by:uid }).eq('id', r.id);
+    const { error } = await sb.rpc('admin_resolve_report', { p_report:r.id, p_status:status });
     if (error) { toast('Could not update that report'); return; }
-    await modLog('report_'+status, r.target, (r.reason||'').slice(0,80));
     loadStaffData();
   }
   /* suspension + roles go through security-definer RPCs — one call updates the
@@ -749,7 +731,6 @@ export function Shell({ session }) {
       const m = e.message||'';
       toast(/not friends/i.test(m) ? 'You can only DM friends'
         : /blocked/i.test(m) ? "One of you has the other blocked"
-        : /does not exist|42P01|404/i.test(m) ? 'Chat isn\u2019t set up yet — run the chat migration'
         : 'Could not open the chat');
     }
   }
@@ -858,35 +839,25 @@ export function Shell({ session }) {
     return true;
   }
   async function importClasses(rows, { replace, profilePatch }) {
-    // Insert first, then drop the old rows by id — deleting first meant any
-    // rejected row left you with no schedule at all.
-    const { data:old } = replace ? await sb.from('classes').select('id').eq('owner', uid) : { data:[] };
-    const { error } = await sb.from('classes').insert(rows.map(r=>({ ...r, owner:uid })));
+    // Replacing is one transaction on the server (replace_classes): a rejected
+    // row rolls the whole thing back, so the old schedule is never half-gone.
+    const { error } = replace
+      ? await sb.rpc('replace_classes', { p_rows: rows })
+      : await sb.from('classes').insert(rows.map(r=>({ ...r, owner:uid })));
     if (error) { toast('Import failed — the file has values the database rejected'); return false; }
-    if (replace && old?.length) {
-      const { error:de } = await sb.from('classes').delete().in('id', old.map(r=>r.id));
-      if (de) toast('Imported, but could not clear your old schedule');
-    }
     if (profilePatch) await saveProfile(profilePatch, true);
     await loadClasses(friendIdsOf(graphRef.current));
     toast(`Imported ${rows.length} class${rows.length>1?'es':''}`, 'import');
     return true;
   }
+  /* One RPC removes the login itself; every table cascades from it. The old
+     table-by-table version ignored its errors (supabase-js returns them, it
+     doesn't throw), never touched messages or threads, and left the auth user,
+     so signing in again silently re-created the profile. */
   async function deleteAccount() {
-    try {
-      await sb.from('classes').delete().eq('owner', uid);
-      await sb.from('events').delete().eq('host', uid);
-      await sb.from('event_invitees').delete().eq('invitee', uid);
-      await sb.from('pings').delete().or(`sender.eq.${uid},recipient.eq.${uid}`);
-      await sb.from('friendships').delete().or(`requester.eq.${uid},addressee.eq.${uid}`);
-      await sb.from('presence').delete().eq('user_id', uid);
-      await sb.from('notifications').delete().eq('user_id', uid);
-      await sb.from('push_subscriptions').delete().eq('user_id', uid);
-      await sb.from('user_settings').delete().eq('user_id', uid);
-      await sb.from('system_members').delete().eq('user_id', uid);
-      await sb.from('systems').delete().eq('owner', uid);
-      await sb.from('profiles').delete().eq('id', uid);
-    } catch(e) { /* best effort — RLS limits deletes to your own rows */ }
+    const { error } = await sb.rpc('delete_my_account');
+    if (error) { toast(/founder/i.test(error.message||'') ? "The founder account can't be deleted from the app" : 'Could not delete your account — try again'); return; }
+    toast('Account deleted');
     await signOutClean();
   }
 

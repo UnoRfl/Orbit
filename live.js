@@ -373,12 +373,13 @@ export const untilLabel = until => {
 export function useLiveShare({ uid, myPres, setPres }) {
   const [err, setErr]   = useState(null);
   const [acc, setAcc]   = useState(null);
+  const [acquiring, setAcquiring] = useState(false);   // the first fix can take ~20s — say so
   const watchId = useRef(null);
   const last    = useRef({ at: 0, lat: null, lng: null, acc: null });
   const untilRef = useRef(0);
   /* The watch outlives the render that created it, so reading setPres out of
      that render's closure means writing with a stale snapshot of the presence
-     row — and setPres upserts the WHOLE row. That is how a GPS tick could undo
+     row — which is how a GPS tick once undid
      a check-in made after the share started. Always use the current one. */
   const setPresRef = useRef(setPres);
   setPresRef.current = setPres;
@@ -412,6 +413,7 @@ export function useLiveShare({ uid, myPres, setPres }) {
 
   async function stop(reason) {
     startSeq.current++;
+    setAcquiring(false);
     if (watchId.current != null) {
       try { navigator.geolocation.clearWatch(watchId.current); } catch {}
       watchId.current = null;
@@ -433,7 +435,9 @@ export function useLiveShare({ uid, myPres, setPres }) {
     const seq = ++startSeq.current;
     const g0 = !!presRef.current?.ghost, s0 = !!presRef.current?.sharing;
 
+    setAcquiring(true);
     const first = await acquireFix();
+    if (seq === startSeq.current) setAcquiring(false);
     // stopped, restarted, or opted out (ghost on / sharing off) while GPS was acquiring
     if (seq !== startSeq.current) return;
     if ((!g0 && presRef.current?.ghost) || (s0 && !presRef.current?.sharing)) return;
@@ -588,5 +592,5 @@ export function useLiveShare({ uid, myPres, setPres }) {
     return () => clearTimeout(t);
   }, [active, until]);
 
-  return { active, until, err, accuracy: acc, start, stop };
+  return { active, until, err, accuracy: acc, acquiring, start, stop };
 }

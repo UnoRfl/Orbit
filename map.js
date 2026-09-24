@@ -122,10 +122,15 @@ export function MapScreen({ uid, me, friends, profiles, nameOf, presence, myPres
             <div class="rowsub">Show friends where you are, moving, for a set time</div>
           </div>
         </div>
-        <div class="pillrow" style="margin-top:10px">
+        ${live.acquiring ? html`<div class="liverow" style="margin-top:10px">
+            <span class="geospin"></span>
+            <div class="rowsub" style="flex:1">Finding your location — indoors this can take up to 20 seconds</div>
+            <button class="btn" style="flex:none;padding:7px 11px" onClick=${()=>live.stop()}>Cancel</button>
+          </div>`
+        : html`<div class="pillrow" style="margin-top:10px">
           ${LIVE_DURATIONS.map(d=>html`<button key=${d.min} class="pill" disabled=${!!myPres?.ghost}
             onClick=${()=>live.start(d.min)}>${d.label}</button>`)}
-        </div>
+        </div>`}
         ${myPres?.ghost && html`<div class="set-hint" style="margin-top:8px">Turn ghost mode off first — it hides you from everyone.</div>`}
         ${live.err && html`<div class="errbox" style="margin-top:10px">${live.err}</div>`}
       <//>`}
