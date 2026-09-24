@@ -6,6 +6,7 @@ ran against the live project through the Supabase MCP.
 | file | status |
 |---|---|
 | `rls-initplan.sql` | **not applied** — see below |
+| `audit-2026-09-24.sql` | **applied 2026-09-24** — column grants matching what the client writes, tighter notification/report/membership policies, server-side expiry of live coordinates |
 
 ## Already applied (2026-09-11)
 
