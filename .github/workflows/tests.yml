@@ -1,0 +1,36 @@
+# Orbit's unit tests: the pure logic the app's safety and correctness lean on
+# (style sanitisers, schedule import, overnight plans, glyph keys, avatar
+# presets, Lanyard parsing). Plain `node --test`, no dependencies, no network:
+# tests/loader.mjs points the import map's CDN specifiers at local stubs.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # the runner image ships Node 20+, which has node:test and module.register
+      - name: Node version
+        run: node --version
+      - name: Run
+        run: node --import ./tests/setup.mjs --test tests/logic.test.mjs
+      - name: CSP hashes match the inline scripts
+        run: python3 tools/csp.py --check

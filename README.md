@@ -42,6 +42,17 @@ I designed and built Orbit entirely solo, handling everything from the schedule 
 * Sharing is **opt-in only**—absolutely nothing is public by default.
 * Toggle **Ghost Mode** to go invisible whenever you need to focus.
 
+**Stories & disappearing snaps**
+* 10-second video or photo stories that vanish after 24 hours — with your live status ("free till 3PM") and check-in place on every story, so a story doubles as an invite.
+* Send photos and videos in any chat; they're deleted from the server after a day, and *view once* burns after the first open.
+* Streaks, close-friends stories, reactions and replies that land in your DMs.
+
+**Find a time**
+* Pick friends and Orbit instantly lists every window this week when you're *all* free — no poll to fill in.
+
+**Orbit+**
+* Animated avatar auras, HD stories, *send later*, exclusive themes, and no ads.
+
 **Make it yours**
 * Six hand-tuned color themes, plus an **Auto** theme that slowly drifts through the full spectrum.
 * Fully customizable profile, handle, and bubble colors.
