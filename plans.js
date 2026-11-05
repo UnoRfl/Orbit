@@ -1,6 +1,6 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, useEffect, useMemo, useRef, useState } from './lib.js';
-import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, Glyph, GlyphTile, Sym, glyphLabel, toGlyph, IcCheck, IcClock, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
+import { CATHEX, CATNAME, DAYS, EVENT_EMOJIS, Glyph, GlyphTile, Sym, glyphLabel, toGlyph, IcCheck, IcClock, IcImage, IcPlus, IcSend, IcUpload, IcWarn, IcX, KINDS, PING_PRESETS, ZONES, DAYS7, ago, dayIdx, durLabel, evSort, evSpan, evUpcoming, fmt, fname, nowInfo, relDay, ui, whenLabel, zoneName } from './core.js';
 import { Avatar, You, conflictsFor, groupWindows } from './components.js';
 
 // plan tiles take their colour from the plan type
@@ -425,40 +425,99 @@ export function Detail({ d, uid, profiles, nameOf, onCancel }) {
    ============================================================ */
 
 export function ImportSheet({ onClose, onImport }) {
-  const [parsed, setParsed] = useState(null);
+  const [parsed, setParsed] = useState(null);   // { rows, skipped, profilePatch, from }
   const [err, setErr] = useState('');
   const [replace, setReplace] = useState(true);
   const [applyProfile, setApplyProfile] = useState(true);
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef(null);
+  const [scan, setScan] = useState(null);       // { stage, p } while the photo is read
+  const [preview, setPreview] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const fileRef = useRef(null), photoRef = useRef(null);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   function handleText(t) {
-    try { setParsed(parseScheduleFile(t)); setErr(''); }
+    try { setParsed({ ...parseScheduleFile(t), from:'file' }); setErr(''); }
     catch(e) { setParsed(null); setErr(e.message); }
   }
   async function pickFile(e) {
     const fl = e.target.files && e.target.files[0]; if (!fl) return;
-    try { handleText(await fl.text()); } catch { setErr('Could not read that file.'); }
     e.target.value = '';
+    if (/^image\//.test(fl.type)) return readPhoto(fl);
+    try { handleText(await fl.text()); } catch { setErr('Could not read that file.'); }
   }
+  async function pickPhoto(e) {
+    const fl = e.target.files && e.target.files[0]; e.target.value = '';
+    if (fl) readPhoto(fl);
+  }
+  // photo → on-device OCR (scan.js, loaded only when used) → editable rows
+  async function readPhoto(fl) {
+    if (fl.size > 25e6) { setErr('That picture is over 25 MB — try a screenshot instead.'); return; }
+    setErr(''); setParsed(null); setShowAll(false);
+    setPreview(URL.createObjectURL(fl));
+    setScan({ stage:'Preparing photo', p:0.02 });
+    try {
+      const { scanSchedule } = await import('./scan.js');
+      const res = await scanSchedule(fl, p => setScan(p));
+      if (!res.rows.length) setErr("Couldn't find any classes in that picture. Crop it to just the schedule, make sure the days and times are readable, and try again — or add them by hand.");
+      else { setParsed({ rows: res.rows, skipped: [], profilePatch: null, from:'photo', layout: res.layout }); setShowAll(true); }
+    } catch (x) {
+      console.warn('[scan]', x);
+      setErr(navigator.onLine === false ? 'The photo reader downloads once (about 5 MB) the first time — connect to the internet and try again.' : "Couldn't read that picture. Try a clearer screenshot.");
+    }
+    setScan(null);
+  }
+  const setRow = (i, patch) => setParsed(p => ({ ...p, rows: p.rows.map((r, k) => k===i ? { ...r, ...patch } : r) }));
+  const delRow = i => setParsed(p => ({ ...p, rows: p.rows.filter((_, k) => k!==i) }));
+  const addRow = () => setParsed(p => ({ ...p, rows: [...p.rows, { name:'', meta:'', cat:'major', day:0, start_min:480, end_min:540 }] }));
+  const hm = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const valid = r => r.name.trim() && r.day>=0 && r.day<=5 && r.end_min>r.start_min;
+  const good = parsed ? parsed.rows.filter(valid) : [];
+  const fromPhoto = parsed?.from==='photo';
   return html`<div>
     <div class="sheethead"><div class="sheettitle">Import schedule</div>
       <button aria-label="Close" class="xbtn" onClick=${onClose}><${IcX} size=${16}/></button></div>
-    <div class="hint" style="margin:0 0 14px">Send your registration form to Claude and ask for an <b>Orbit schedule file</b>. Upload the .json it gives you and your whole week fills itself in.</div>
-    <input ref=${fileRef} type="file" accept=".json,.txt,application/json,text/plain" style="display:none" onChange=${pickFile}/>
-    <button class="btn btn-grad btn-block" onClick=${()=>fileRef.current && fileRef.current.click()}>
-      <${IcUpload} size=${15}/> Choose schedule file</button>
-    <div class="flabel">…or paste the file contents</div>
-    <textarea class="input" style="min-height:96px;resize:vertical;font-size:12px" placeholder='{"classes":[ … ]}'
-      onInput=${e=>{ const t=e.target.value.trim(); if (t) handleText(t); else { setParsed(null); setErr(''); } }}></textarea>
+    <div class="hint" style="margin:0 0 14px">Snap or screenshot your registration form, COR or timetable — Orbit reads it right on your device, nothing is uploaded. You check the classes before they're saved.</div>
+    <input ref=${photoRef} type="file" accept="image/*" style="display:none" onChange=${pickPhoto}/>
+    <input ref=${fileRef} type="file" accept=".json,.txt,application/json,text/plain,image/*" style="display:none" onChange=${pickFile}/>
+    <button class="btn btn-grad btn-block" disabled=${!!scan} onClick=${()=>photoRef.current && photoRef.current.click()}>
+      <${IcImage} size=${15}/> ${scan ? 'Reading…' : 'Scan a photo or screenshot'}</button>
+    ${scan && html`<div class="card" style="margin-top:12px;padding:12px;display:flex;gap:12px;align-items:center">
+      ${preview && html`<img src=${preview} alt="" style="width:46px;height:46px;object-fit:cover;border-radius:8px;flex:none"/>`}
+      <div style="flex:1;min-width:0">
+        <div class="small" style="color:var(--muted)">${scan.stage}…</div>
+        <div style="height:6px;border-radius:99px;background:rgba(255,255,255,.08);margin-top:7px;overflow:hidden">
+          <div style=${`height:100%;width:${Math.round(Math.max(.03, Math.min(1, +scan.p||0))*100)}%;background:linear-gradient(90deg,#7b5cff,#b06bff);transition:width .3s`}></div></div>
+      </div></div>`}
+    <button class="btn btn-block" style="margin-top:8px" disabled=${!!scan} onClick=${()=>fileRef.current && fileRef.current.click()}>
+      <${IcUpload} size=${15}/> Upload an Orbit schedule file</button>
+    ${!parsed && html`<div class="flabel">…or paste the file contents</div>
+    <textarea class="input" style="min-height:72px;resize:vertical;font-size:12px" placeholder='{"classes":[ … ]}'
+      onInput=${e=>{ const t=e.target.value.trim(); if (t) handleText(t); else { setParsed(null); setErr(''); } }}></textarea>`}
     ${err && html`<div class="errbox">${err}</div>`}
     ${parsed && html`<div class="card" style="margin-top:14px;padding:14px">
-      <div style="font-size:13px;font-weight:600;color:var(--pe)">✓ ${parsed.rows.length} class${parsed.rows.length>1?'es':''} found</div>
-      <div class="stack" style="margin-top:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--pe);flex:1">✓ ${good.length} class${good.length===1?'':'es'} ${fromPhoto?'read from your photo':'found'}</div>
+        ${!showAll && html`<button class="btn" style="padding:6px 11px;border-radius:999px;font-size:12px" onClick=${()=>setShowAll(true)}>Edit</button>`}
+      </div>
+      ${fromPhoto && html`<div class="small" style="margin-top:4px;color:var(--muted)">Photo reading isn't perfect — check names, days and times before importing.</div>`}
+      ${showAll ? html`<div class="stack" style="margin-top:10px;gap:8px">
+        ${parsed.rows.map((r,i)=>html`<div key=${i} class="impRow" style=${valid(r)?'':'border-color:rgba(255,110,110,.5)'}>
+          <input class="input" aria-label="Class name" value=${r.name} placeholder="Class name" style="grid-area:n"
+            onInput=${e=>setRow(i,{ name:e.target.value.slice(0,80), cat:catOf(e.target.value) })}/>
+          <button aria-label="Remove class" class="xbtn" style="grid-area:x" onClick=${()=>delRow(i)}><${IcX} size=${14}/></button>
+          <select class="input" aria-label="Day" style="grid-area:d" value=${r.day} onChange=${e=>setRow(i,{ day:+e.target.value })}>
+            ${DAYS.slice(0,6).map((d,k)=>html`<option value=${k}>${d}</option>`)}</select>
+          <input class="input" type="time" aria-label="Starts" style="grid-area:s" value=${hm(r.start_min)} onChange=${e=>e.target.value && setRow(i,{ start_min:toMinV(e.target.value) })}/>
+          <input class="input" type="time" aria-label="Ends" style="grid-area:e" value=${hm(r.end_min)} onChange=${e=>e.target.value && setRow(i,{ end_min:toMinV(e.target.value) })}/>
+          <input class="input" aria-label="Room" value=${r.meta} placeholder="Room" style="grid-area:r" onInput=${e=>setRow(i,{ meta:e.target.value.slice(0,60) })}/>
+        </div>`)}
+        <button class="btn" style="padding:8px" onClick=${addRow}><${IcPlus} size=${13}/> Add a class</button>
+      </div>` : html`<div class="stack" style="margin-top:10px">
         ${parsed.rows.slice(0,4).map((r,i)=>html`<div key=${i} class="small" style="color:var(--muted)">
           ${DAYS[r.day]} ${fmt(r.start_min)}–${fmt(r.end_min)} · ${r.name}</div>`)}
         ${parsed.rows.length>4 && html`<div class="small">+ ${parsed.rows.length-4} more</div>`}
-        ${parsed.skipped.length>0 && html`<div class="small" style="color:var(--nstp)">Skipped ${parsed.skipped.length} unreadable line${parsed.skipped.length>1?'s':''}</div>`}
-      </div>
+      </div>`}
+      ${parsed.skipped.length>0 && html`<div class="small" style="margin-top:8px;color:var(--nstp)">Skipped ${parsed.skipped.length} unreadable line${parsed.skipped.length>1?'s':''}</div>`}
       ${parsed.profilePatch && html`<div class="small" style="margin-top:10px;color:var(--muted)">
         Profile in file: ${[parsed.profilePatch.display_name, parsed.profilePatch.course, parsed.profilePatch.school].filter(Boolean).join(' · ')}</div>`}
       <label style="display:flex;align-items:center;gap:9px;margin-top:12px;font-size:12.5px;cursor:pointer">
@@ -467,12 +526,15 @@ export function ImportSheet({ onClose, onImport }) {
       ${parsed.profilePatch && html`<label style="display:flex;align-items:center;gap:9px;margin-top:8px;font-size:12.5px;cursor:pointer">
         <input type="checkbox" checked=${applyProfile} onChange=${e=>setApplyProfile(e.target.checked)} style="accent-color:#b06bff;width:16px;height:16px"/>
         Also update my name / course / school</label>`}
-      <button class="btn btn-grad btn-block" style="margin-top:14px" disabled=${busy}
-        onClick=${async()=>{ setBusy(true); await onImport(parsed.rows, { replace, profilePatch: applyProfile ? parsed.profilePatch : null }); setBusy(false); }}>
-        ${busy ? 'Importing…' : 'Import to my schedule'}</button>
+      <button class="btn btn-grad btn-block" style="margin-top:14px" disabled=${busy || !good.length}
+        onClick=${async()=>{ setBusy(true);
+          const rows = good.map(r=>({ ...r, name:r.name.trim(), meta:(r.meta||'').trim(), cat:r.cat||catOf(r.name) }));
+          await onImport(rows, { replace, profilePatch: applyProfile ? parsed.profilePatch : null }); setBusy(false); }}>
+        ${busy ? 'Importing…' : `Import ${good.length} class${good.length===1?'':'es'}`}</button>
     </div>`}
   </div>`;
 }
+const toMinV = v => { const [h, m] = String(v).split(':').map(Number); return h*60 + (m||0); };
 
 /* ============================================================
    YOU — Discord × IG style profile + schedule manager

@@ -1,7 +1,7 @@
 /* Orbit — feature module. See GUIDE.md for the full map of what lives where. */
 import { Fragment, h, html, render, useEffect, useMemo, useRef, useState } from './lib.js';
 import { DISCORD_ID, LiveConnections, discordAvatar, lanyard, lastError } from './connect.js';
-import { auraOf, nameFxOf, coverFxOf, plusTier, ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
+import { auraOf, nameFxOf, coverFxOf, plusTier, ACCENTS, ACT_KINDS, ACTIVITY_CATALOG, actOf, B, BADGE_DEFS, badgesOf, CAT, CATHEX, CATNAME, cleanHandle, cleanSocial, clockOf, DAYS, decodePlace, END, evPieces, evSpan, fmtClockOf, whenLabel, Glyph, GlyphTile, hobbyOf, Sym, pwnedCount, pwnedMessage, PRESET_AVATARS, presetOf, presetUrl, flairOf, fmt, fname, hashStr, HOBBY_PRESETS, HOUR, I, IcEye, IcEyeOff, IcImage, IcOut, IcPin, IcPlus, IcTrash, IcUpload, IcX, initialsOf, KINDS, nowInfo, perfTier, posVars, PRONOUN_PRESETS, pxFor, safeColor, sb, shownName, signOutClean, SOCIALS, START, systemPhrase, ui } from './core.js';
 
 export function Avatar({ p, size=44, badge=null, ring=null }) {
   const a1 = safeColor(p?.accent1, '#b06bff'), a2 = safeColor(p?.accent2, '#2dd4bf');
@@ -970,7 +970,7 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
       <${Eyebrow} color="var(--ge)">Classes · ${mine.length}<//>
       <div style="display:flex;gap:8px">
         <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${onImport}>
-          <${IcUpload} size=${14}/> Import file</button>
+          <${IcImage} size=${14}/> Import schedule</button>
         <button class="btn" style="border-radius:999px;padding:8px 13px" onClick=${()=>setAdding(!adding)}>
           ${adding ? 'Close' : html`<${Fragment}><${IcPlus} size=${14}/> Add class<//>`}</button>
       </div>
@@ -1000,11 +1000,11 @@ export function You({ me, uid, classesBy, events, saveProfile, myPres, setPres, 
           </select></div>
       </div>
       <button class="btn btn-grad btn-block" style="margin-top:14px" onClick=${submitClass} disabled=${!nc.name.trim()}>Add to schedule</button>
-      <div class="small" style="margin-top:10px">Repeats weekly. If a class meets twice a week, add it once per day — or just import a schedule file.</div>
+      <div class="small" style="margin-top:10px">Repeats weekly. If a class meets twice a week, add it once per day — or just import a photo of your schedule.</div>
     </div>`}
 
     <div class="classlist" style="margin-top:12px">
-      ${!mine.length && html`<div class="small">No classes yet — add them by hand or import a schedule file so friends can see when you're free.</div>`}
+      ${!mine.length && html`<div class="small">No classes yet — add them by hand or import a photo of your schedule so friends can see when you're free.</div>`}
       ${[...mine].sort((a,b)=>a.day-b.day||a.start_min-b.start_min).map(c=>html`
         <div key=${c.id} class="cardrow" style="cursor:default">
           <span style=${`width:9px;height:9px;border-radius:3px;background:${CATHEX[c.cat]};box-shadow:0 0 0 3px ${CATHEX[c.cat]}33;flex:none`}></span>

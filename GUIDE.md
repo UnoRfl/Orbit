@@ -41,6 +41,7 @@ Keep that split in mind and most bug reports point themselves at a file.
 | `galaxy.js` | The interactive galaxy on the Map tab (rAF-driven; no CSS transitions on nodes) | `Galaxy` |
 | `updates.js` | Updates panel behind the top-bar button, unread per device | `UpdatesPanel`, `PublishUpdate` |
 | `plans.js` | Plans tab — events, invites, pings, **schedule import** | `Plans`, `Creator`, `ImportSheet`, `parseScheduleFile` |
+| `scan.js` | **Schedule from a photo** — on-device OCR (vendored Tesseract) + COR/timetable parsers | `scanSchedule`, `parseListLines`, `parseGrid`, `rowsFromWords` |
 | `chat.js` | Chat tab — threads, messages, media/emoji, typing, streaks, send later | `ChatsScreen`, `ChatView`, `MediaPop`, `LaterPane` |
 | `media.js` | 24-hour photos/videos: camera, on-device re-encode + trim, upload to the `ephemeral` bucket, viewing | `MediaComposer`, `Camera`, `SnapBubble`, `publishMedia`, `transcodeVideo` |
 | `stories.js` | Stories: rail rings, full-screen viewer, reactions/replies, seen-by | `StoryViewer`, `StoryRing`, `groupStories` |
@@ -70,7 +71,7 @@ Find the row that matches the report. "Also check" is usually the backend/data s
 | "Who's free" list wrong | `home.js` | `shell.js` (the data) |
 | Planet in wrong spot / can't add planet or system | `map.js` | `core.js` (`decodePlace`, hue helpers) |
 | System sharing / members / permissions | `map.js` (`SystemPeople`) | `shell.js` (`systems`, `system_members`) |
-| Imported schedule has wrong times / classes | `plans.js` (`parseScheduleFile`) | `core.js` (`toMin`, `fmt`, `nowInfo`); `replace_classes` RPC |
+| Imported schedule has wrong times / classes | `plans.js` (`parseScheduleFile`); photos: `scan.js` (`normalizeOcr`, `findRanges`, `parseGrid`) | `core.js` (`toMin`, `fmt`, `nowInfo`); `replace_classes` RPC |
 | A plan shows on the wrong day / overnight plan wrong | `core.js` (`evSpan`, `evPieces`, `whenLabel`) | `plans.js` (`WhenPicker`); `events.starts_at/ends_at` |
 | Spotify / game status missing on a profile | `connect.js` | the person joined discord.gg/lanyard? CSP `connect-src` in `tools/csp.py` |
 | An icon shows as a word or a dot | `glyphs.js` (`GLYPHS`, the emoji map) | the stored value (`systems.glyph`, `planets.icon`, …) |

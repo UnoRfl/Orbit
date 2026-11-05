@@ -133,6 +133,13 @@ select.input{background-image:linear-gradient(45deg,transparent 50%,var(--faint)
 .pweye:hover{color:var(--muted)}
 
 /* responsive form grids */
+.impRow{position:relative;display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.14fr) minmax(0,1.14fr);grid-template-areas:"n n n" "d s e" "r r r";gap:6px;padding:9px;border:1px solid rgba(255,255,255,.08);border-radius:12px}
+.impRow .input{padding:8px 10px;font-size:13px;min-width:0}
+.impRow>.input:first-child{padding-right:44px}
+.impRow>.xbtn{position:absolute;top:13px;right:13px;width:30px;height:30px}
+.impRow select.input,.impRow input[type=time]{padding:8px 6px}
+.impRow input[type=time]::-webkit-calendar-picker-indicator{margin:0;padding:0;width:12px}
+@media (min-width:620px){.impRow{grid-template-columns:2fr .9fr .9fr .9fr 1fr auto;grid-template-areas:"n d s e r x"}.impRow>.xbtn{position:static}.impRow>.input:first-child{padding-right:10px}}
 .addgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
 .addgrid .flabel{margin:0 0 8px}
 .f-wide{grid-column:1/-1}

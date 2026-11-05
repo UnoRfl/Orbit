@@ -99,7 +99,7 @@ export function Home({ uid, me, friends, classesBy, events, presence, myPres, my
 
     ${noClasses && html`<div class="card" style="margin-top:10px;border-color:rgba(176,107,255,.4)">
       <div style="font-weight:600;font-size:13.5px">Add your class schedule</div>
-      <div class="hint" style="margin-top:4px">Friends can only see when you're free once your classes are in. Add them by hand — or import a schedule file in two taps.</div>
+      <div class="hint" style="margin-top:4px">Friends can only see when you're free once your classes are in. Add them by hand — or snap a photo of your schedule.</div>
       <button class="btn btn-grad" style="margin-top:12px" onClick=${onYou}>Open the You tab</button>
     </div>`}
 

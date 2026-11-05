@@ -204,3 +204,66 @@ test('Orbit+ v2: badge tiers grow with months, effects only render while Plus is
   assert.equal(core.coverFxOf(lapsed), null);
   assert.equal(core.entranceOf({ ...live, flair: { efx: '__proto__' } }), null, 'only known keys');
 });
+
+test('photo import: times, day codes and COR-style lines', async () => {
+  const scan = await import('../scan.js');
+  const R = t => scan.findRanges(scan.normalizeOcr(t)).map(r => [r.start_min, r.end_min]);
+  assert.deepEqual(R('8:00-9:30AM'), [[480, 570]]);
+  assert.deepEqual(R('10:30-12:00PM'), [[630, 720]]);
+  assert.deepEqual(R('11-1PM'), [[660, 780]]);
+  assert.deepEqual(R('1:00 - 2:30 PM'), [[780, 870]]);
+  assert.deepEqual(R('13:00-14:30'), [[780, 870]]);
+  assert.deepEqual(R('1O.3O-12;00'), [[630, 720]]);      // OCR's O for 0 and ./; for :
+  assert.deepEqual(R('8 00-9 00AM'), [[480, 540]]);       // blurry photo dropped the colons
+  assert.deepEqual(R('100-230PM'), [[780, 870]]);
+  assert.deepEqual(R('3 - 4'), []);                        // units, not a time
+  assert.deepEqual(scan.parseDayCode('MWF'), [0, 2, 4]);
+  assert.deepEqual(scan.parseDayCode('TTh'), [1, 3]);
+  assert.deepEqual(scan.parseDayCode('T/TH'), [1, 3]);
+  assert.deepEqual(scan.parseDayCode('Sat'), [5]);
+  assert.equal(scan.parseDayCode('Math'), null);
+  assert.equal(scan.parseDayCode('IT'), null);
+  const rows = scan.parseListLines([
+    'Code Description Units Days Time Room',
+    'IT 101 Introduction to Computing 3 MWF 8:00-9:00AM CL3',
+    'GE 102 Purposive Communication 3 TTh 10:30-12:00PM Rm 204',
+    'PE 1 Physical Fitness 2 Sat 1:00-3:00PM GYM',
+    'MATH 11 Calculus 1 3 TF 7:30-9:00AM R305',
+    'Data Structures',
+    'MW 2:30-4:00 PM LAB2',
+  ]);
+  const s = rows.map(r => `${r.day} ${r.start_min}-${r.end_min} ${r.name} [${r.meta}] ${r.cat}`);
+  assert.deepEqual(s, [
+    '0 480-540 Introduction to Computing [CL3] major', '2 480-540 Introduction to Computing [CL3] major', '4 480-540 Introduction to Computing [CL3] major',
+    '1 630-720 Purposive Communication [Rm 204] major', '3 630-720 Purposive Communication [Rm 204] major',
+    '5 780-900 Physical Fitness [GYM] pe',
+    '1 450-540 Calculus 1 [R305] major', '4 450-540 Calculus 1 [R305] major',
+    '0 870-960 Data Structures [LAB2] major', '2 870-960 Data Structures [LAB2] major',
+  ]);
+});
+
+test('photo import: weekly timetable grid read from word boxes', async () => {
+  const scan = await import('../scan.js');
+  const W = (text, x, y, w = 60, h = 14) => ({ text, x0: x, y0: y, x1: x + w, y1: y + h });
+  const words = [
+    W('Mon', 200, 20), W('Tue', 350, 20), W('Wed', 500, 20), W('Thu', 650, 20), W('Fri', 800, 20),
+    W('8:00', 20, 100), W('9:00', 20, 200), W('10:00', 20, 300), W('11:00', 20, 400), W('12:00', 20, 500),
+    // Mon: no time written in the cell → read off the labels (8:00–10:00)
+    W('Calculus', 190, 110, 80), W('CL3', 200, 128, 40),
+    // Wed: time written inside the cell wins
+    W('Physics', 490, 210, 80), W('9:30-11:00', 490, 228, 90),
+    // Fri: two back-to-back classes in one column
+    W('Chem', 790, 105), W('8:00-9:00', 790, 123, 90), W('Bio', 790, 141), W('9:00-10:00', 790, 159, 90),
+  ];
+  const rows = scan.parseGrid(words).map(r => `${r.day} ${r.start_min}-${r.end_min} ${r.name}${r.meta ? ' @' + r.meta : ''}`).sort();
+  assert.deepEqual(rows, ['0 480-540 Calculus @CL3', '2 570-660 Physics', '4 480-540 Chem', '4 540-600 Bio'].sort());
+});
+
+test('photo import: table rows are rebuilt from word boxes, even when tilted', async () => {
+  const scan = await import('../scan.js');
+  // Tesseract hands columns back as separate blocks; the row is rebuilt by position
+  const W = (text, x, y) => ({ text, x0: x, y0: y, x1: x + text.length * 9, y1: y + 14 });
+  const words = [W('Calculus', 120, 100), W('MWF', 400, 103), W('8:00-9:00AM', 500, 106), W('CL3', 700, 109),
+                 W('Physics', 120, 140), W('TTh', 400, 143), W('1:00-2:30PM', 500, 146), W('LAB2', 700, 149)];
+  assert.deepEqual(scan.rowsFromWords(words), ['Calculus MWF 8:00-9:00AM CL3', 'Physics TTh 1:00-2:30PM LAB2']);
+});
