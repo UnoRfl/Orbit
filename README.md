@@ -1,6 +1,8 @@
+<p align="center"><img src=".github/assets/banner.png" alt="Orbit banner" width="100%"></p>
+
 <div align="center">
 
-# 🪐 Orbit
+# <img src=".github/assets/icon.png" width="38" align="top" alt=""> Orbit
 
 ### A little social universe for students.
 
