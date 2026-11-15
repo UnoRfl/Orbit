@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' https://cdnjs.cloudflare.com 'sha256-4NDqLgRTUuA3GLialMT405nIXdXZxt4U2XFrOhcK1BQ=' 'sha256-CK3kC9TNp9t5lrTZKfI+TuwLVR/l9iwPaqI8Rv4HYUQ='; default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://zdlevrezefagfqhflusj.supabase.co wss://zdlevrezefagfqhflusj.supabase.co https://tiles.openfreemap.org https://tenor.googleapis.com https://api.lanyard.rest https://api.github.com https://api.pwnedpasswords.com https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#17121f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,14 +29,62 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<script>
+/* ============================================================
+   Clickjacking. The CSP above would normally say frame-ancestors
+   'none', but that directive is IGNORED when a policy arrives in a
+   meta tag, and GitHub Pages cannot send a real header — so the
+   only place left to refuse being framed is here. Hide first, then
+   try to break out: a sandboxed frame can block the navigation but
+   cannot stop us blanking the page inside it.
+   ============================================================ */
+(function(){
+  try {
+    if (window.top === window.self) return;
+    document.documentElement.style.visibility = 'hidden';
+    window.top.location = window.self.location.href;   // may throw cross-origin
+  } catch (e) { /* framed and unable to escape — staying hidden is the answer */ }
+})();
+
+/* ============================================================
+   Device tier — decided BEFORE first paint so CSS can gate glass,
+   3D and motion immediately instead of flashing the heavy version.
+     data-perf   0 = full · 1 = lite (phones / mid) · 2 = min (low-end)
+     data-coarse touch pointer (no hover, no cursor glow)
+     data-rm     the OS asked for reduced motion
+   main.js can step data-perf DOWN at runtime if a device still can't
+   hold framerate; everything keyed off it follows automatically.
+   ============================================================ */
+(function(){
+  var d = document.documentElement, t = 0;
+  try {
+    var coarse = matchMedia('(pointer:coarse)').matches;
+    var mem    = navigator.deviceMemory || 8;          // undefined on iOS -> 8
+    var cpu    = navigator.hardwareConcurrency || 8;
+    var small  = Math.min(innerWidth || 9999, (screen && screen.width) || 9999) < 760;
+    if (coarse || small) t = 1;
+    if ((mem <= 4 && cpu <= 4) || (coarse && mem <= 4)) t = 2;
+    if (coarse) d.setAttribute('data-coarse', '1');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) d.setAttribute('data-rm', '1');
+    if (!(window.CSS && CSS.supports && (CSS.supports('backdrop-filter','blur(2px)') || CSS.supports('-webkit-backdrop-filter','blur(2px)')))) d.setAttribute('data-noglass','1');
+  } catch (e) {}
+  d.setAttribute('data-perf', String(t));
+  /* data-perf0 is the tier as measured at boot and is NEVER changed afterwards.
+     data-perf can be stepped DOWN at runtime when the ambient canvas can't hold
+     framerate — that should lower visual quality, but it must not remove whole
+     features, or a brief stutter makes the map option vanish mid-session. */
+  d.setAttribute('data-perf0', String(t));
+})();
+</script>
+
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">
 {
   "imports": {
-    "preact": "https://esm.sh/preact@10.23.2",
-    "preact/hooks": "https://esm.sh/preact@10.23.2/hooks",
-    "htm": "https://esm.sh/htm@3.1.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+    "preact": "./vendor/preact.mjs",
+    "preact/hooks": "./vendor/hooks.mjs",
+    "htm": "./vendor/htm.mjs",
+    "@supabase/supabase-js": "./vendor/supabase.mjs"
   }
 }
 </script>

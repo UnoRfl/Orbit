@@ -1,0 +1,12 @@
+# ZAP baseline rule overrides. Tab-separated: RULE_ID	ACTION	DESCRIPTION
+# WARN keeps a finding visible in the report; IGNORE drops it entirely.
+#
+# GitHub Pages serves every file from one fixed header set that Orbit cannot
+# change — there is no server config and no edge worker on the free tier. The
+# headers below are therefore not actionable here, and are enforced instead by
+# the <meta http-equiv="Content-Security-Policy"> in index.html where a meta
+# tag is allowed to carry them. Left as WARN, not IGNORE, so they still show up
+# if Orbit ever moves to a host that can set real headers.
+10035	WARN	Strict-Transport-Security — set by GitHub Pages, not by us
+10038	WARN	CSP header — delivered via meta tag; Pages cannot set headers
+10063	WARN	Permissions-Policy — needs a real header
